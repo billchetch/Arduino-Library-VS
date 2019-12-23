@@ -7,7 +7,8 @@ using System.Threading.Tasks;
 namespace Arduino
 {
     //Device Manager
-    public class Class1
+    public class ArduinoDeviceManager
     {
+
     }
 }
