@@ -7,8 +7,8 @@
     <ProjectGuid>{A810DE10-89EA-4487-AB3B-CCA84924075F}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>Arduino</RootNamespace>
-    <AssemblyName>Arduino</AssemblyName>
+    <RootNamespace>Chetch.Arduino</RootNamespace>
+    <AssemblyName>Chetch.Arduino</AssemblyName>
     <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
@@ -30,8 +30,18 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Chetch.Database">
+      <HintPath>..\..\Database\Database\bin\Debug\Chetch.Database.dll</HintPath>
+    </Reference>
+    <Reference Include="Chetch.Utilities">
+      <HintPath>..\..\Utilities\Utilities\bin\Debug\Chetch.Utilities.dll</HintPath>
+    </Reference>
+    <Reference Include="Solid.Arduino, Version=1.0.2.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\SolidSoils.Arduino.Client.0.4.0\lib\net45\Solid.Arduino.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.ServiceProcess" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -41,7 +51,22 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ArduinoDeviceManager.cs" />
+    <Compile Include="ArduinoDevice.cs" />
+    <Compile Include="ArduinoService.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="ArduinoServiceClient.cs" />
+    <Compile Include="Infrared\IRDB.cs" />
+    <Compile Include="Infrared\IRSamsungTV.cs" />
+    <Compile Include="Infrared\IRTransmitter.cs" />
+    <Compile Include="Infrared\IRLGHomeTheater.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config">
+      <SubType>Designer</SubType>
+    </None>
+  </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
