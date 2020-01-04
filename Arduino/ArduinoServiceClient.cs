@@ -2,79 +2,92 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
+using System.Threading;
 using System.IO;
 using System.IO.Pipes;
+using System.Threading.Tasks;
 
 namespace Chetch.Arduino
 {
-    abstract class ArduinoServiceClient
+    abstract public class ArduinoServiceClient : IDisposable
     {
+        private const int CONNECT_TIMEOUT = 5000;
+
         private String _serviceName;
         private NamedPipeClientStream _pipeClientIn;
         private NamedPipeClientStream _pipeClientOut;
+        private StreamWriter _sw;
 
-
-        ArduinoServiceClient(String serviceName)
+        public ArduinoServiceClient(String serviceName)
         {
             _serviceName = serviceName;
 
-            _pipeClientIn = new NamedPipeClientStream(".", _serviceName + "In", PipeDirection.In);
-            _pipeClientOut = new NamedPipeClientStream(".", _serviceName + "Out", PipeDirection.Out);
+            _pipeClientIn = new NamedPipeClientStream(".", _serviceName + "PipeOut", PipeDirection.In);
+            _pipeClientOut = new NamedPipeClientStream(".", _serviceName + "PipeIn", PipeDirection.Out);
 
         }
 
-        public void Listen()
+        public void StartListening(Action<Task> OnStoppedListening)
+        {
+            Task task = new Task(this.Listen);
+            task.ContinueWith(OnStoppedListening);
+            task.Start();
+        }
+
+        private void Listen()
         {
             if (!_pipeClientIn.IsConnected)
             {
-                _pipeClientIn.Connect();
+                _pipeClientIn.Connect(CONNECT_TIMEOUT);
             }
 
-            try
+            using (StreamReader sr = new StreamReader(_pipeClientIn))
             {
-                StreamReader sr = new StreamReader(_pipeClientIn);
-                String temp;
-                while ((temp = sr.ReadLine()) != null)
+                while (_pipeClientIn.IsConnected)
                 {
-                    OnMessageReceived(temp);
+                    String temp;
+                    while ((temp = sr.ReadLine()) != null)
+                    {
+                        OnMessageReceived(temp);
+                    }
+                    Thread.Sleep(100);
                 }
-            } catch (IOException)
-            {
-                //means pipe has been closed
             }
         }
 
         abstract public void OnMessageReceived(String message);
-        
-        public bool Send(String message)
+
+        public void Send(String data)
         {
             if (!_pipeClientOut.IsConnected)
             {
-                _pipeClientOut.Connect();
+                _pipeClientOut.Connect(CONNECT_TIMEOUT);
             }
 
-            try
+            if (_sw == null)
             {
-                StreamWriter sw = new StreamWriter(_pipeClientOut);
-                sw.AutoFlush = true;
-                sw.WriteLine(message);
-                return true;
-            } catch (IOException)
-            {
-                //means pipe has been closed
+                _sw = new StreamWriter(_pipeClientOut);
+                _sw.AutoFlush = true;
             }
-            return false;
+
+            _sw.WriteLine(data);
         }
+
 
         public void Dispose()
         {
+            _pipeClientOut.Close();
             _pipeClientIn.Dispose();
-            _pipeClientIn.Close();
             _pipeClientIn = null;
 
-            _pipeClientOut.Dispose();
+            if (_sw != null)
+            {
+                _sw.Close();
+                _sw.Dispose();
+                _sw = null;
+            }
             _pipeClientOut.Close();
+            _pipeClientOut.Dispose();
             _pipeClientOut = null;
         }
     }

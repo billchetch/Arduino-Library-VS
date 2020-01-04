@@ -21,6 +21,7 @@ namespace Chetch.Arduino
         protected Timer timer;
         private NamedPipeServerStream _pipeServerIn;
         private NamedPipeServerStream _pipeServerOut;
+        private StreamWriter _sw;
 
         public ArduinoService()
         {
@@ -62,10 +63,12 @@ namespace Chetch.Arduino
 
         protected override void OnStop()
         {
+            ClearPipeIn();
+            ClearPipeOut();
             Log.WriteEntry("Serivce stopped", EventLogEntryType.Information);
         }
 
-        public void OnTimer(Object sender, ElapsedEventArgs eventArgs)
+        public virtual void OnTimer(Object sender, ElapsedEventArgs eventArgs)
         {
 
             if (ADM == null)
@@ -73,9 +76,8 @@ namespace Chetch.Arduino
                 try
                 {
                     this.timer.Stop();
-                    WriteToClient("Connecting ADM...");
+                    Broadcast("Looking for ADM...");
                     ADM = ArduinoDeviceManager.Connect(SupportedBoards, this.OnADMFirmataMessage);
-                    WriteToClient("ADM connected");
                 }
                 catch (Exception e)
                 {
@@ -88,6 +90,7 @@ namespace Chetch.Arduino
                         //ADM connected to board
                         timer.Interval = 5000;
                         Log.WriteEntry("ADM connected ... checking for disconnect at intervals of " + timer.Interval + "ms", EventLogEntryType.Information);
+                        Broadcast("ADM connected");
                     }
                     timer.Start();
                 }
@@ -105,7 +108,7 @@ namespace Chetch.Arduino
                     ADM = null;
                     timer.Interval = 1000;
                     Log.WriteEntry("ADM disconnected ... checking for reconnect at intervals of " + timer.Interval + "ms", EventLogEntryType.Information);
-                    WriteToClient("ADM disconnected");
+                    Broadcast("ADM disconnected");
                 }
                 finally
                 {
@@ -117,26 +120,55 @@ namespace Chetch.Arduino
         //outbound connections
         virtual protected void OnADMFirmataMessage(FirmataMessage message)
         {
-            WriteToClient(message.Value.ToString());
+            Broadcast(message.Value.ToString());
         }
 
-        protected bool WriteToClient(String data)
+        protected bool Broadcast(String data)
         {
             if (_pipeServerOut.IsConnected)
             {
                 try
                 {
+                    if (_sw == null)
+                    {
+                        _sw = new StreamWriter(_pipeServerOut);
+                        _sw.AutoFlush = true;
+                    }
 
-                    StreamWriter sw = new StreamWriter(_pipeServerOut);
-                    sw.AutoFlush = true;
-                    sw.Write(data);
+                    _sw.WriteLine(data);
                     return true;
-                } catch (IOException)
+                }
+                catch (Exception e)
                 {
-                    //pipe connectin has unexpectedly closed
+                    Log.WriteEntry(e.Message, EventLogEntryType.Error);
                 }
             }
             return false;
+        }
+
+        private int OnClientConnectOutbound(NamedPipeServerStream stream)
+        {
+            try
+            {
+                if (stream != _pipeServerOut)
+                {
+                    ClearPipeOut(stream);
+                }
+
+                while (stream.IsConnected)
+                {
+                    //just wait...
+                    System.Threading.Thread.Sleep(100);
+                }
+                return NamedPipeManager.WAIT_FOR_NEXT_CONNECTION;
+            }
+            // Catch the IOException that is raised if the pipe is broken
+            // or disconnected.
+            catch (IOException e)
+            {
+                Log.WriteEntry(e.Message, EventLogEntryType.Error);
+                return NamedPipeManager.WAIT_FOR_NEXT_CONNECTION;
+            }
         }
 
         //inbound connections
@@ -149,13 +181,21 @@ namespace Chetch.Arduino
         {
             try
             {
-                StreamReader sr = new StreamReader(stream);
-                while(stream.IsConnected){
-                    // Display the read text to the console
-                    string temp;
-                    while ((temp = sr.ReadLine()) != null)
+                if (stream != _pipeServerIn)
+                {
+                    ClearPipeIn(stream);
+                }
+
+                using (StreamReader sr = new StreamReader(stream))
+                {
+                    while (stream.IsConnected)
                     {
-                        OnClientMessageReceived(temp);
+                        // Display the read text to the console
+                        string temp;
+                        while ((temp = sr.ReadLine()) != null)
+                        {
+                            OnClientMessageReceived(temp);
+                        }
                     }
                 }
                 return NamedPipeManager.WAIT_FOR_NEXT_CONNECTION;
@@ -168,25 +208,20 @@ namespace Chetch.Arduino
                 return NamedPipeManager.WAIT_FOR_NEXT_CONNECTION;
             }
         }
-
-        private int OnClientConnectOutbound(NamedPipeServerStream stream)
+        
+        protected void ClearPipeOut(NamedPipeServerStream newPipe = null)
         {
-            try
-            {
-                while (stream.IsConnected)
-                {
-                    //just wait...
-                    System.Threading.Thread.Sleep(1000);
-                }
-                return NamedPipeManager.WAIT_FOR_NEXT_CONNECTION;
-            }
-            // Catch the IOException that is raised if the pipe is broken
-            // or disconnected.
-            catch (IOException e)
-            {
-                Log.WriteEntry(e.Message, EventLogEntryType.Error);
-                return NamedPipeManager.WAIT_FOR_NEXT_CONNECTION;
-            }
+            _sw = null;
+            _pipeServerOut.Close();
+            _pipeServerOut.Dispose();
+            _pipeServerOut = newPipe;
+        }
+
+        protected void ClearPipeIn(NamedPipeServerStream newPipe = null)
+        {
+            _pipeServerIn.Close();
+            _pipeServerIn.Dispose();
+            _pipeServerIn = newPipe;
         }
     }
 }
