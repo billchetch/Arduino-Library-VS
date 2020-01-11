@@ -33,6 +33,9 @@
     <Reference Include="Chetch.Database">
       <HintPath>..\..\Database\Database\bin\Debug\Chetch.Database.dll</HintPath>
     </Reference>
+    <Reference Include="Chetch.Services">
+      <HintPath>..\..\Services\Services\bin\Debug\Chetch.Services.dll</HintPath>
+    </Reference>
     <Reference Include="Chetch.Utilities">
       <HintPath>..\..\Utilities\Utilities\bin\Debug\Chetch.Utilities.dll</HintPath>
     </Reference>

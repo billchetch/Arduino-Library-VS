@@ -10,62 +10,41 @@ using Chetch.Utilities;
 using System.Diagnostics;
 using System.Timers;
 using Solid.Arduino.Firmata;
+using Chetch.Services;
 
 namespace Chetch.Arduino
 {
-    abstract public class ArduinoService : ServiceBase
+    abstract public class ArduinoService : NamedPipeService
     {
         protected ArduinoDeviceManager ADM { get; set; }
         protected String SupportedBoards { get; set; }
-        protected EventLog Log { get; set; }
         protected Timer timer;
-        private NamedPipeServerStream _pipeServerIn;
-        private NamedPipeServerStream _pipeServerOut;
-        private StreamWriter _sw;
-
-        public ArduinoService()
+        
+        public ArduinoService(String inboundID) : base(inboundID)
         {
-            Log = new EventLog();
+            //empty
         }
 
         protected override void OnStart(string[] args)
         {
             try
             {
-                //create an inbound named pipe
-                String pipeName = ServiceName + "PipeIn";
-                PipeSecurity security = NamedPipeManager.GetSecurity(NamedPipeManager.SECURITY_EVERYONE);
-                _pipeServerIn = NamedPipeManager.Create(pipeName, PipeDirection.In, security, this.OnClientConnectInbound);
-                if (_pipeServerIn == null) throw new Exception("Failed to create inbound pipe server " + pipeName);
-                Log.WriteEntry("Created inbound pipe: " + pipeName, EventLogEntryType.Information);
-
-                //create an outbound named pipe
-                pipeName = ServiceName + "PipeOut";
-                _pipeServerOut = NamedPipeManager.Create(pipeName, PipeDirection.Out, security, this.OnClientConnectOutbound);
-                if (_pipeServerOut == null) throw new Exception("Failed to create outbound pipe server " + pipeName);
-                Log.WriteEntry("Created outbound pipe: " + pipeName, EventLogEntryType.Information);
-
+                if(SupportedBoards == null)
+                {
+                    throw new Exception("Cannot run service if no supported boards specified");
+                }
 
                 //create timer
                 timer = new Timer();
                 timer.Interval = 1000;
                 timer.Elapsed += new ElapsedEventHandler(this.OnTimer);
                 timer.Start();
-                Log.WriteEntry("Timer created with interval " + timer.Interval, EventLogEntryType.Information);
-
-                Log.WriteEntry("Serivce started", EventLogEntryType.Information);
+                Log.WriteInfo("Service started with timer at intervals " + timer.Interval);
             }
             catch (Exception e)
             {
-                Log.WriteEntry(e.Message, EventLogEntryType.Error);
+                Log.WriteError(e.Message);
             }
-        }
-
-        protected override void OnStop()
-        {
-            ClearPipeIn();
-            ClearPipeOut();
-            Log.WriteEntry("Serivce stopped", EventLogEntryType.Information);
         }
 
         public virtual void OnTimer(Object sender, ElapsedEventArgs eventArgs)
@@ -82,6 +61,7 @@ namespace Chetch.Arduino
                 catch (Exception e)
                 {
                     Log.WriteEntry(e.Message, EventLogEntryType.Error);
+                    Broadcast(new NamedPipeManager.Message(e.Message, NamedPipeManager.MessageType.ERROR));
                 }
                 finally
                 {
@@ -89,7 +69,7 @@ namespace Chetch.Arduino
                     {
                         //ADM connected to board
                         timer.Interval = 5000;
-                        Log.WriteEntry("ADM connected ... checking for disconnect at intervals of " + timer.Interval + "ms", EventLogEntryType.Information);
+                        Log.WriteInfo("ADM connected ... checking for disconnect at intervals of " + timer.Interval + "ms");
                         Broadcast("ADM connected");
                     }
                     timer.Start();
@@ -107,8 +87,9 @@ namespace Chetch.Arduino
                     //ADM disconnected
                     ADM = null;
                     timer.Interval = 1000;
-                    Log.WriteEntry("ADM disconnected ... checking for reconnect at intervals of " + timer.Interval + "ms", EventLogEntryType.Information);
-                    Broadcast("ADM disconnected");
+                    var s = "ADM disconnected ... checking for reconnect at intervals of " + timer.Interval + "ms";
+                    Log.WriteWarning(s);
+                    Broadcast(new NamedPipeManager.Message(s, NamedPipeManager.MessageType.WARNING));
                 }
                 finally
                 {
@@ -117,111 +98,35 @@ namespace Chetch.Arduino
             }
         }
 
+        virtual protected NamedPipeManager.Message CreateMessage(FirmataMessage firmataMessage)
+        {
+            var message = new NamedPipeManager.Message(NamedPipeManager.MessageType.CUSTOM);
+            message.SubType = (int)firmataMessage.Type;
+            message.Add(firmataMessage.Value.ToString());
+            return message;
+        }
+
+        protected override NamedPipeManager.Message CreatePingResponse(NamedPipeManager.Message message)
+        {
+            var response = base.CreatePingResponse(message);
+            response.Add(ADM == null ? "ADM not connected" : "ADM connected");
+            return response;
+        }
+
+        public void Send(FirmataMessage firmataMessage, String pipeName)
+        {
+            Send(CreateMessage(firmataMessage), pipeName);
+        }
+
+        public void Broadcast(FirmataMessage firmataMessage)
+        {
+            Broadcast(CreateMessage(firmataMessage));
+        }
+
         //outbound connections
         virtual protected void OnADMFirmataMessage(FirmataMessage message)
         {
-            Broadcast(message.Value.ToString());
-        }
-
-        protected bool Broadcast(String data)
-        {
-            if (_pipeServerOut.IsConnected)
-            {
-                try
-                {
-                    if (_sw == null)
-                    {
-                        _sw = new StreamWriter(_pipeServerOut);
-                        _sw.AutoFlush = true;
-                    }
-
-                    _sw.WriteLine(data);
-                    return true;
-                }
-                catch (Exception e)
-                {
-                    Log.WriteEntry(e.Message, EventLogEntryType.Error);
-                }
-            }
-            return false;
-        }
-
-        private int OnClientConnectOutbound(NamedPipeServerStream stream)
-        {
-            try
-            {
-                if (stream != _pipeServerOut)
-                {
-                    ClearPipeOut(stream);
-                }
-
-                while (stream.IsConnected)
-                {
-                    //just wait...
-                    System.Threading.Thread.Sleep(100);
-                }
-                return NamedPipeManager.WAIT_FOR_NEXT_CONNECTION;
-            }
-            // Catch the IOException that is raised if the pipe is broken
-            // or disconnected.
-            catch (IOException e)
-            {
-                Log.WriteEntry(e.Message, EventLogEntryType.Error);
-                return NamedPipeManager.WAIT_FOR_NEXT_CONNECTION;
-            }
-        }
-
-        //inbound connections
-        virtual protected void OnClientMessageReceived(String message)
-        {
-            Log.WriteEntry(message, EventLogEntryType.Information);
-        }
-
-        private int OnClientConnectInbound(NamedPipeServerStream stream)
-        {
-            try
-            {
-                if (stream != _pipeServerIn)
-                {
-                    ClearPipeIn(stream);
-                }
-
-                using (StreamReader sr = new StreamReader(stream))
-                {
-                    while (stream.IsConnected)
-                    {
-                        // Display the read text to the console
-                        string temp;
-                        while ((temp = sr.ReadLine()) != null)
-                        {
-                            OnClientMessageReceived(temp);
-                        }
-                    }
-                }
-                return NamedPipeManager.WAIT_FOR_NEXT_CONNECTION;
-            }
-            // Catch the IOException that is raised if the pipe is broken
-            // or disconnected.
-            catch (IOException e)
-            {
-                Log.WriteEntry(e.Message, EventLogEntryType.Error);
-                return NamedPipeManager.WAIT_FOR_NEXT_CONNECTION;
-            }
-        }
-        
-        protected void ClearPipeOut(NamedPipeServerStream newPipe = null)
-        {
-            _sw = null;
-            _pipeServerOut.Close();
-            _pipeServerOut.Dispose();
-            _pipeServerOut = newPipe;
-        }
-
-        protected void ClearPipeIn(NamedPipeServerStream newPipe = null)
-        {
-            _pipeServerIn.Close();
-            _pipeServerIn.Dispose();
-            _pipeServerIn = newPipe;
+            Broadcast(message);
         }
     }
 }
