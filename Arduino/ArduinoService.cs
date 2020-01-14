@@ -60,7 +60,7 @@ namespace Chetch.Arduino
                 }
                 catch (Exception e)
                 {
-                    Log.WriteEntry(e.Message, EventLogEntryType.Error);
+                    Log.WriteError(e.Message);
                     Broadcast(new NamedPipeManager.Message(e.Message, NamedPipeManager.MessageType.ERROR));
                 }
                 finally
