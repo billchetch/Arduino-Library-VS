@@ -10,7 +10,7 @@ using Chetch.Services;
 
 namespace Chetch.Arduino
 {
-    abstract public class ArduinoServiceClient : NamedPipeServiceClient
+    abstract public class ArduinoServiceClient : NamedPipeServiceClient<ArduinoServiceMessage>
     {
         public ArduinoServiceClient(String serviceInboundID) : base(serviceInboundID)
         {

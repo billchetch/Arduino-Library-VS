@@ -14,7 +14,32 @@ using Chetch.Services;
 
 namespace Chetch.Arduino
 {
-    abstract public class ArduinoService : NamedPipeService
+    public class ArduinoServiceMessage : ServiceMessage
+    {
+        public bool IsFirmata = false;
+
+        public ArduinoServiceMessage()
+        {
+            //parameterless constructor required for xml serializing
+        }
+
+        public ArduinoServiceMessage(NamedPipeManager.MessageType type = NamedPipeManager.MessageType.NOT_SET) : base(type)
+        {
+
+        }
+
+        public ArduinoServiceMessage(String message, int subType = 0, NamedPipeManager.MessageType type = NamedPipeManager.MessageType.NOT_SET) : base(message, subType, type)
+        {
+
+        }
+
+        public ArduinoServiceMessage(String message, NamedPipeManager.MessageType type = NamedPipeManager.MessageType.NOT_SET) : this(message, 0, type)
+        {
+            //empty
+        }
+    }
+
+    abstract public class ArduinoService : NamedPipeService<ArduinoServiceMessage>
     {
         protected ArduinoDeviceManager ADM { get; set; }
         protected String SupportedBoards { get; set; }
@@ -61,7 +86,7 @@ namespace Chetch.Arduino
                 catch (Exception e)
                 {
                     Log.WriteError(e.Message);
-                    Broadcast(new NamedPipeManager.Message(e.Message, NamedPipeManager.MessageType.ERROR));
+                    Broadcast(new ArduinoServiceMessage(e.Message, NamedPipeManager.MessageType.ERROR));
                 }
                 finally
                 {
@@ -89,7 +114,7 @@ namespace Chetch.Arduino
                     timer.Interval = 1000;
                     var s = "ADM disconnected ... checking for reconnect at intervals of " + timer.Interval + "ms";
                     Log.WriteWarning(s);
-                    Broadcast(new NamedPipeManager.Message(s, NamedPipeManager.MessageType.WARNING));
+                    Broadcast(new ArduinoServiceMessage(s, NamedPipeManager.MessageType.WARNING));
                 }
                 finally
                 {
@@ -98,15 +123,16 @@ namespace Chetch.Arduino
             }
         }
 
-        virtual protected NamedPipeManager.Message CreateMessage(FirmataMessage firmataMessage)
+        virtual protected ArduinoServiceMessage CreateMessage(FirmataMessage firmataMessage)
         {
-            var message = new NamedPipeManager.Message(NamedPipeManager.MessageType.CUSTOM);
+            var message = new ArduinoServiceMessage(NamedPipeManager.MessageType.CUSTOM);
             message.SubType = (int)firmataMessage.Type;
+            message.IsFirmata = true;
             message.Add(firmataMessage.Value.ToString());
             return message;
         }
 
-        protected override NamedPipeManager.Message CreatePingResponse(NamedPipeManager.Message message)
+        protected override ArduinoServiceMessage CreatePingResponse(ArduinoServiceMessage message)
         {
             var response = base.CreatePingResponse(message);
             response.Add(ADM == null ? "ADM not connected" : "ADM connected");
