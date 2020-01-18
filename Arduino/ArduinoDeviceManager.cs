@@ -8,6 +8,12 @@ using Solid.Arduino;
 
 namespace Chetch.Arduino
 {
+    public enum ADMStatus
+    {
+        NOT_CONNECTED,
+        CONNECTED
+    }
+
     public class ArduinoDeviceManager
     {
         private const int CONNECT_TIMEOUT = 10000;
@@ -52,6 +58,9 @@ namespace Chetch.Arduino
             return Connect(supportedBoards, CONNECT_TIMEOUT, null);
         }
 
+
+        public ADMStatus Status { get { return _status; } }
+        private ADMStatus _status;
         private ArduinoSession _session;
         private List<ArduinoDevice> _devices;
         private BoardCapability _boardCapability;
@@ -67,10 +76,13 @@ namespace Chetch.Arduino
             _devices = new List<ArduinoDevice>();
             _boardCapability = _session.GetBoardCapability();
             _pin2device = new Dictionary<int, List<ArduinoDevice>>();
+
+            _status = ADMStatus.CONNECTED;
         }
 
         public void Disconnect()
         {
+            _status = ADMStatus.NOT_CONNECTED;
             _session.Dispose();
         }
 
@@ -83,10 +95,12 @@ namespace Chetch.Arduino
             }
             catch (System.IO.IOException e)
             {
+                _status = ADMStatus.NOT_CONNECTED;
                 throw e;
             }
             catch (UnauthorizedAccessException e)
             {
+                _status = ADMStatus.NOT_CONNECTED;
                 throw e;
             }
         }

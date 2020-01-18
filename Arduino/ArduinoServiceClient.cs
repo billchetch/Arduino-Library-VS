@@ -12,9 +12,20 @@ namespace Chetch.Arduino
 {
     abstract public class ArduinoServiceClient : NamedPipeServiceClient<ArduinoServiceMessage>
     {
+        public ADMStatus DeviceManagerStatus { get { return _admStatus; } }
+
+        private ADMStatus _admStatus; 
+        
         public ArduinoServiceClient(String serviceInboundID) : base(serviceInboundID)
         {
 
+        }
+
+        override protected void HandleReceivedMessage(ArduinoServiceMessage message)
+        {
+            _admStatus = message.DeviceManagerStatus;
+
+            base.HandleReceivedMessage(message);
         }
     }
 }

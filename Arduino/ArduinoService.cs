@@ -17,7 +17,7 @@ namespace Chetch.Arduino
     public class ArduinoServiceMessage : ServiceMessage
     {
         public bool IsFirmata = false;
-        public bool IsDeviceConnected = false;
+        public ADMStatus DeviceManagerStatus = ADMStatus.NOT_CONNECTED;
 
         public ArduinoServiceMessage()
         {
@@ -76,8 +76,33 @@ namespace Chetch.Arduino
         protected ArduinoServiceMessage CreateMessage()
         {
             var message = new ArduinoServiceMessage();
-            message.IsDeviceConnected = ADM != null;
+            message.DeviceManagerStatus = ADM.Status;
             return message;
+        }
+
+        virtual protected ArduinoServiceMessage CreateMessage(FirmataMessage firmataMessage)
+        {
+            var message = new ArduinoServiceMessage(NamedPipeManager.MessageType.CUSTOM);
+            message.SubType = (int)firmataMessage.Type;
+            message.IsFirmata = true;
+            message.Add(firmataMessage.Value.ToString());
+            return message;
+        }
+
+        protected override ArduinoServiceMessage CreatePingResponse(ArduinoServiceMessage message)
+        {
+            var response = base.CreatePingResponse(message);
+            response.DeviceManagerStatus = ADM == null ? ADMStatus.NOT_CONNECTED : ADM.Status;
+            response.Add(ADM.Status == ADMStatus.NOT_CONNECTED ? "ADM not connected" : "ADM connected");
+            return response;
+        }
+
+        protected override ArduinoServiceMessage CreateStatusResponse(ArduinoServiceMessage message)
+        {
+            var response = base.CreateStatusResponse(message);
+            response.DeviceManagerStatus = ADM == null ? ADMStatus.NOT_CONNECTED : ADM.Status;
+            response.Add(ADM.Status == ADMStatus.NOT_CONNECTED ? "ADM not connected" : "ADM connected");
+            return response;
         }
 
         public virtual void OnTimer(Object sender, ElapsedEventArgs eventArgs)
@@ -133,22 +158,6 @@ namespace Chetch.Arduino
                     timer.Start();
                 }
             }
-        }
-
-        virtual protected ArduinoServiceMessage CreateMessage(FirmataMessage firmataMessage)
-        {
-            var message = new ArduinoServiceMessage(NamedPipeManager.MessageType.CUSTOM);
-            message.SubType = (int)firmataMessage.Type;
-            message.IsFirmata = true;
-            message.Add(firmataMessage.Value.ToString());
-            return message;
-        }
-
-        protected override ArduinoServiceMessage CreatePingResponse(ArduinoServiceMessage message)
-        {
-            var response = base.CreatePingResponse(message);
-            response.Add(ADM == null ? "ADM not connected" : "ADM connected");
-            return response;
         }
 
         public void Send(FirmataMessage firmataMessage, String pipeName)
