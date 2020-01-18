@@ -17,6 +17,7 @@ namespace Chetch.Arduino
     public class ArduinoServiceMessage : ServiceMessage
     {
         public bool IsFirmata = false;
+        public bool IsDeviceConnected = false;
 
         public ArduinoServiceMessage()
         {
@@ -72,6 +73,13 @@ namespace Chetch.Arduino
             }
         }
 
+        protected ArduinoServiceMessage CreateMessage()
+        {
+            var message = new ArduinoServiceMessage();
+            message.IsDeviceConnected = ADM != null;
+            return message;
+        }
+
         public virtual void OnTimer(Object sender, ElapsedEventArgs eventArgs)
         {
 
@@ -80,7 +88,9 @@ namespace Chetch.Arduino
                 try
                 {
                     this.timer.Stop();
-                    Broadcast("Looking for ADM...");
+                    var message = CreateMessage();
+                    message.Value = "ADM not connected...";
+                    Broadcast(message);
                     ADM = ArduinoDeviceManager.Connect(SupportedBoards, this.OnADMFirmataMessage);
                 }
                 catch (Exception e)
@@ -95,7 +105,9 @@ namespace Chetch.Arduino
                         //ADM connected to board
                         timer.Interval = 5000;
                         Log.WriteInfo("ADM connected ... checking for disconnect at intervals of " + timer.Interval + "ms");
-                        Broadcast("ADM connected");
+                        var message = CreateMessage();
+                        message.Value = "ADM connected!";
+                        Broadcast(message);
                     }
                     timer.Start();
                 }
