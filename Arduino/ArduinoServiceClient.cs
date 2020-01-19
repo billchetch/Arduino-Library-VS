@@ -7,14 +7,13 @@ using System.IO;
 using System.IO.Pipes;
 using System.Threading.Tasks;
 using Chetch.Services;
+using Chetch.Utilities;
 
 namespace Chetch.Arduino
 {
-    abstract public class ArduinoServiceClient : NamedPipeServiceClient<ArduinoServiceMessage>
+    abstract public class ArduinoServiceClient : NamedPipeServiceClient<ArduinoServiceMessage, ArduinoServiceData>
     {
-        public ADMStatus DeviceManagerStatus { get { return _admStatus; } }
-
-        private ADMStatus _admStatus; 
+        
         
         public ArduinoServiceClient(String serviceInboundID) : base(serviceInboundID)
         {
@@ -23,7 +22,14 @@ namespace Chetch.Arduino
 
         override protected void HandleReceivedMessage(ArduinoServiceMessage message)
         {
-            _admStatus = message.DeviceManagerStatus;
+            ServiceData.DeviceManagerStatus = message.DeviceManagerStatus;
+            switch (message.Type)
+            {
+                case NamedPipeManager.MessageType.STATUS_RESPONSE:
+                    ServiceData.DeviceCount = message.DeviceCount;
+                    break;
+            }
+
 
             base.HandleReceivedMessage(message);
         }

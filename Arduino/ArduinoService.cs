@@ -18,6 +18,7 @@ namespace Chetch.Arduino
     {
         public bool IsFirmata = false;
         public ADMStatus DeviceManagerStatus = ADMStatus.NOT_CONNECTED;
+        public int DeviceCount = 0;
 
         public ArduinoServiceMessage()
         {
@@ -37,6 +38,21 @@ namespace Chetch.Arduino
         public ArduinoServiceMessage(String message, NamedPipeManager.MessageType type = NamedPipeManager.MessageType.NOT_SET) : this(message, 0, type)
         {
             //empty
+        }
+    }
+
+    public class ArduinoServiceData : ServiceData<ArduinoServiceMessage>
+    {
+        public ADMStatus DeviceManagerStatus
+        {
+            set { SetValue("DeviceManagerStatus", value); }
+            get { return (ADMStatus)GetValue("DeviceManagerStatus");  }
+        }
+
+        public int DeviceCount
+        {
+            set { SetValue("DeviceCount", value); }
+            get { return GetIntValue("DeviceCount"); }
         }
     }
 
@@ -76,7 +92,7 @@ namespace Chetch.Arduino
         protected ArduinoServiceMessage CreateMessage()
         {
             var message = new ArduinoServiceMessage();
-            message.DeviceManagerStatus = ADM.Status;
+            message.DeviceManagerStatus = ADM == null ? ADMStatus.NOT_CONNECTED : ADM.Status;
             return message;
         }
 
@@ -101,7 +117,10 @@ namespace Chetch.Arduino
         {
             var response = base.CreateStatusResponse(message);
             response.DeviceManagerStatus = ADM == null ? ADMStatus.NOT_CONNECTED : ADM.Status;
-            response.Add(ADM.Status == ADMStatus.NOT_CONNECTED ? "ADM not connected" : "ADM connected");
+            if(ADM != null)
+            {
+                response.DeviceCount = ADM.DeviceCount;
+            }
             return response;
         }
 

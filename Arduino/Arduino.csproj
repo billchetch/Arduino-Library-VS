@@ -55,9 +55,7 @@
   <ItemGroup>
     <Compile Include="ArduinoDeviceManager.cs" />
     <Compile Include="ArduinoDevice.cs" />
-    <Compile Include="ArduinoService.cs">
-      <SubType>Component</SubType>
-    </Compile>
+    <Compile Include="ArduinoService.cs" />
     <Compile Include="ArduinoServiceClient.cs" />
     <Compile Include="Infrared\IRDB.cs" />
     <Compile Include="Infrared\IRSamsungTV.cs" />

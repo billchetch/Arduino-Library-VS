@@ -60,6 +60,14 @@ namespace Chetch.Arduino
 
 
         public ADMStatus Status { get { return _status; } }
+        public int DeviceCount
+        {
+            get
+            {
+                return _devices != null ? _devices.Count : 0;
+            }
+        }
+
         private ADMStatus _status;
         private ArduinoSession _session;
         private List<ArduinoDevice> _devices;
