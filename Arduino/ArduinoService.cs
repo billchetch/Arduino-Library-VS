@@ -54,6 +54,27 @@ namespace Chetch.Arduino
             get { return (ADMStatus)GetValue("DeviceManagerStatus");  }
         }
 
+        public String DeviceManagerStatusDescription
+        {
+            get
+            {
+                String s = "!";
+
+                switch (DeviceManagerStatus)
+                {
+                    case ADMStatus.CONNECTED:
+                        s = "ADM connected and managing " + DeviceCount + " devices";
+                        break;
+
+                    case ADMStatus.NOT_CONNECTED:
+                        s = "ADM not connected";
+                        break;
+                }
+
+                return s;
+            }
+        }
+
         public int DeviceCount
         {
             set { SetValue("DeviceCount", value); }
