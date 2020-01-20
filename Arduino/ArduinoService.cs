@@ -43,6 +43,11 @@ namespace Chetch.Arduino
 
     public class ArduinoServiceData : ServiceData<ArduinoServiceMessage>
     {
+        public ArduinoServiceData()
+        {
+
+        }
+
         public ADMStatus DeviceManagerStatus
         {
             set { SetValue("DeviceManagerStatus", value); }
@@ -64,7 +69,7 @@ namespace Chetch.Arduino
         
         public ArduinoService(String inboundID) : base(inboundID)
         {
-            //empty
+            //empty consstructor 
         }
 
         protected override void OnStart(string[] args)
