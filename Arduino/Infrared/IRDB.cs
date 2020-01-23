@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Chetch.Arduino.Infrared
 {
-    public class IRDB : Database.DB
+    public class IRDB : ArduinoCommandsDB
     {
         public IRDB(String server, String db, String username, String password) : base(server, db, username, password)
         {
@@ -17,20 +17,19 @@ namespace Chetch.Arduino.Infrared
             this.AddSelectStatement("ir_device_commands", fields, from, filter, sort);
         }
 
-        public Dictionary<String, String> GetCommands(String deviceName)
+        override protected List<Dictionary<String, Object>> SelectCommands(String deviceName)
         {
-            if (deviceName == null || deviceName.Length == 0 || deviceName == "") throw new Exception("Cannot get commands if no device name is given");
+            return Select("ir_device_commands", "command, command_string, bits, protocol", deviceName);
+        }
 
-            Dictionary<String, String> commands = new Dictionary<string, string>();
-            List<Dictionary<String, Object>> rows = Select("ir_device_commands", "command, command_string, bits, protocol", deviceName);
-            foreach (var row in rows)
-            {
-                String commandName = (String)row["command"];
-                String command4arduino = (String)(row["command_string"] + " " + row["bits"] + " " + row["protocol"]);
-                commands[commandName] = command4arduino;
-            }
+        protected override ArduinoCommand CreateCommand(string deviceName, Dictionary<string, object> row)
+        {
+            var command = new ArduinoCommand();
 
-            return commands;
+            command.CommandAlias = (String)row["command"];
+            command.Command = (String)(row["command_string"] + " " + row["bits"] + " " + row["protocol"]);
+
+            return command;
         }
     }
 }

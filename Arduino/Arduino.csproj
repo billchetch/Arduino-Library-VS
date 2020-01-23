@@ -53,6 +53,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ArduinoCommandsDB.cs" />
     <Compile Include="ArduinoDeviceManager.cs" />
     <Compile Include="ArduinoDevice.cs" />
     <Compile Include="ArduinoService.cs" />
