@@ -16,10 +16,19 @@ namespace Chetch.Arduino
 {
     public class ArduinoServiceMessage : ServiceMessage
     {
+
+        static public ArduinoServiceMessage CreateCommand(String target, String command, String[] args)
+        {
+            var cmd = new ArduinoServiceMessage();
+            cmd.Target = target;
+            cmd.SetCommand(command, args);
+            return cmd;
+        }
+
         public bool IsFirmata = false;
         public ADMStatus DeviceManagerStatus = ADMStatus.NOT_CONNECTED;
         public int DeviceCount = 0;
-
+        
         public ArduinoServiceMessage()
         {
             //parameterless constructor required for xml serializing
@@ -215,7 +224,24 @@ namespace Chetch.Arduino
             Broadcast(CreateMessage(firmataMessage));
         }
 
-        //outbound connections
+        protected virtual void HandleCommand(String target, String command, String[] args)
+        {
+            if (ADM == null || ADM.Status == ADMStatus.NOT_CONNECTED) throw new Exception("ADM not connected");
+            ADM.IssueCommand(target, command, args);
+        }
+
+        override protected void OnMessageReceived(ArduinoServiceMessage message)
+        {
+            switch (message.Type)
+            {
+                case NamedPipeManager.MessageType.COMMAND:
+                    HandleCommand(message.Target, message.Command, message.CommandArgs);
+                    break;
+
+            }
+        }
+
+        //Firmata
         virtual protected void OnADMFirmataMessage(FirmataMessage message)
         {
             Broadcast(message);

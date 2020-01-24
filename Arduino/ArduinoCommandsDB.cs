@@ -16,16 +16,16 @@ namespace Chetch.Arduino
         abstract protected List<Dictionary<String, Object>> SelectCommands(String deviceName);
         abstract protected ArduinoCommand CreateCommand(String deviceName, Dictionary<String, Object> row);
 
-        public Dictionary<String, ArduinoCommand> GetCommands(String deviceName)
+        virtual public List<ArduinoCommand> GetCommands(String deviceName)
         {
             if (deviceName == null || deviceName.Length == 0 || deviceName == "") throw new Exception("Cannot get commands if no device name is given");
-            Dictionary<String, ArduinoCommand> commands = new Dictionary<string, ArduinoCommand>();
+            List<ArduinoCommand> commands = new List<ArduinoCommand>();
 
             var rows = SelectCommands(deviceName);
             foreach (var row in rows)
             {
                 var command = CreateCommand(deviceName, row);
-                commands[command.CommandAlias] = command;
+                commands.Add(command);
             }
 
             return commands;

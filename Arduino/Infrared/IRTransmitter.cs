@@ -20,19 +20,13 @@ namespace Chetch.Arduino.Infrared
             ConfigurePin(_enablePin, PinMode.DigitalOutput);
             ConfigurePin(_transmitPin, PinMode.PwmOutput);
 
-            if (db != null) AddCommands(db);
+            if (db != null) AddCommands(db.GetCommands(name));
         }
 
-        public void AddCommands(IRDB db)
+        
+        override protected String CreateCommandString(String command, String[] args)
         {
-            _commands.Clear();
-            _commands = db.GetCommands(Name);
-            if (_commands.Count == 0) throw new Exception("No commands found for " + Name);
-        }
-
-        public String GetCommand(String command)
-        {
-            return "IR " + _commands[command];
+            return base.CreateCommandString("IR " + command, args);
         }
 
         public void Disable()
@@ -45,7 +39,7 @@ namespace Chetch.Arduino.Infrared
             mgr.SetDigitalPin(_enablePin, false);
         }
 
-        public void SendCommand(String command)
+        override public void SendCommand(ArduinoCommand command, String[] args = null)
         {
             if (mgr == null) throw new Exception("Device has not yet been added to a device manager");
 
@@ -60,18 +54,7 @@ namespace Chetch.Arduino.Infrared
 
             Enable();
 
-            mgr.SendString(GetCommand(command));
-        }
-
-        public void SendCommands(String commands, int delayInMillis = 100)
-        {
-            var cmds = commands.Split(',');
-            SendCommand(cmds[0]);
-            for (int i = 1; i < cmds.Length; i++)
-            {
-                if (delayInMillis > 0) System.Threading.Thread.Sleep(delayInMillis);
-                mgr.SendString(GetCommand(cmds[i]));
-            }
+            base.SendCommand(command, args);
         }
     }
 }

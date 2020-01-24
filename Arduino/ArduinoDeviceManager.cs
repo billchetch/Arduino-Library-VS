@@ -70,7 +70,7 @@ namespace Chetch.Arduino
 
         private ADMStatus _status;
         private ArduinoSession _session;
-        private List<ArduinoDevice> _devices;
+        private Dictionary<String, ArduinoDevice> _devices;
         private BoardCapability _boardCapability;
         private Dictionary<int, List<ArduinoDevice>> _pin2device;
         private Action<FirmataMessage> _listener;
@@ -81,7 +81,7 @@ namespace Chetch.Arduino
             _session.MessageReceived += OnMessageReceived;
             _listener = listener;
 
-            _devices = new List<ArduinoDevice>();
+            _devices = new Dictionary<String, ArduinoDevice>();
             _boardCapability = _session.GetBoardCapability();
             _pin2device = new Dictionary<int, List<ArduinoDevice>>();
 
@@ -133,20 +133,29 @@ namespace Chetch.Arduino
 
         public ArduinoDevice AddDevice(ArduinoDevice device)
         {
+            if(device.ID == null)
+            {
+                throw new Exception("Cannot add this device as it does not have an ID");
+            }
+            if (_devices.ContainsKey(device.ID))
+            {
+                throw new Exception("Cannot add this device because there is already a device with ID " + device.ID);
+            }
+
             foreach (var dpin in device.Pins)
             {
                 //check that pins have the required capability
                 if (!IsPinCapable(dpin)) throw new Exception("Cannot add device " + device.Name + " as pin " + dpin.PinNumber + " is not compatibl with the board");
 
                 //check no conflict with existing pin usage
-                foreach (var dev in _devices)
+                foreach (var dev in _devices.Values)
                 {
                     if (!dev.IsPinCompatible(dpin)) throw new Exception("Cannot add device " + device.Name + " as it is not pin-compatible with " + dev.Name);
                 }
             }
 
             device.mgr = this;
-            _devices.Add(device);
+            _devices[device.ID] = device;
 
             foreach (var dpin in device.Pins)
             {
@@ -157,6 +166,17 @@ namespace Chetch.Arduino
 
 
             return device;
+        }
+
+        public ArduinoDevice GetDevice(String deviceID)
+        {
+            if (_devices.ContainsKey(deviceID))
+            {
+                return _devices[deviceID];
+            } else
+            {
+                return null;
+            }
         }
 
         public List<ArduinoDevice> GetDevicesByPin(int pinNumber)
@@ -201,6 +221,17 @@ namespace Chetch.Arduino
         public void SetDigitalPin(int pinNumber, bool value)
         {
             _session.SetDigitalPin(pinNumber, value);
+        }
+
+        public void IssueCommand(String deviceID, String command, String[] args)
+        {
+            var device = GetDevice(deviceID);
+            if(device == null)
+            {
+                throw new Exception("Cannot find device with ID " + deviceID);
+            }
+
+            device.SendCommand(command, args);
         }
     }
 }

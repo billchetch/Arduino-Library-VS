@@ -10,7 +10,7 @@ namespace Chetch.Arduino.Infrared
     {
         public IRDB(String server, String db, String username, String password) : base(server, db, username, password)
         {
-            String fields = "dc.*, command";
+            String fields = "dc.*, command_alias";
             String from = "ir_device_commands dc INNER JOIN ir_devices d ON dc.device_id=d.id INNER JOIN ir_commands c ON dc.command_id=c.id";
             String filter = "device_name='{0}'";
             String sort = "dc.id";
@@ -26,8 +26,9 @@ namespace Chetch.Arduino.Infrared
         {
             var command = new ArduinoCommand();
 
-            command.CommandAlias = (String)row["command"];
-            command.Command = (String)(row["command_string"] + " " + row["bits"] + " " + row["protocol"]);
+            command.CommandAlias = (String)row["command_alias"];
+            command.Command = (String)(row["command"] + " " + row["bits"] + " " + row["protocol"]);
+            command.Repeat = (int)row["repeat_count"];
 
             return command;
         }

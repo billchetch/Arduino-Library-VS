@@ -26,7 +26,7 @@ namespace Chetch.Arduino
     public class ArduinoDevice
     {
         public String ID { get; internal set; }
-        public String Name { get; internal set; }
+        public String Name { get; set; }
         public List<ArduinoPin> Pins { get; internal set; }
 
         private Dictionary<String, ArduinoCommand> _commands = new Dictionary<string, ArduinoCommand>();
@@ -83,13 +83,33 @@ namespace Chetch.Arduino
             return pin;
         }
 
+        public void AddCommand(ArduinoCommand command)
+        {
+            var key = command.CommandAlias;
+            if (_commands.ContainsKey(key))
+            {
+                _commands[key].Commands.Add(command);
+            } else
+            {
+                _commands[key] = command;
+            }
+        }
+
+        public void AddCommands(List<ArduinoCommand> commands)
+        {
+            foreach(var command in commands)
+            {
+                AddCommand(command);
+            }
+        }
+
         public void SendCommand(String commandAlias, String[] args = null)
         {
             if (!_commands.ContainsKey(commandAlias)) throw new Exception("Command with alias " + commandAlias + " does not exist");
             SendCommand(_commands[commandAlias], args);
         }
 
-        public void SendCommand(ArduinoCommand command, String[] args = null)
+        virtual public void SendCommand(ArduinoCommand command, String[] args = null)
         {
             for(int i = 0; i < command.Repeat; i++)
             {
@@ -113,7 +133,7 @@ namespace Chetch.Arduino
             {
                 for (int i = 0; i < args.Length; i++)
                 {
-                    argString += (i == 0 ? "" : " ") + args[i];
+                    argString += " " + args[i];
                 }
             }
             return command + argString;
