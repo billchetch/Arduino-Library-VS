@@ -11,8 +11,7 @@ namespace Chetch.Arduino.Infrared
     {
         private int _enablePin; //HIGH output means the transmitter is disabled (as there is no voltage across it)
         private int _transmitPin;
-        private Dictionary<String, String> _commands = new Dictionary<string, string>();
-
+        
         public IRTransmitter(String name, int enablePin, int transmitPin, IRDB db = null) : base(name)
         {
             _enablePin = enablePin;

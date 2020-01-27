@@ -8,9 +8,9 @@ namespace Chetch.Arduino
 {
     abstract public class ArduinoCommandsDB : Database.DB
     {
-        public ArduinoCommandsDB(String server, String db, String username, String password) : base(server, db, username, password)
+        public ArduinoCommandsDB()
         {
-            
+            //empty constructor for template factory method
         }
 
         abstract protected List<Dictionary<String, Object>> SelectCommands(String deviceName);

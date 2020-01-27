@@ -20,7 +20,7 @@ namespace Chetch.Arduino
         public String CommandAlias { get; set; }
         public String Command { get; set; } = null;
         public List<ArduinoCommand> Commands { get; set; } = new List<ArduinoCommand>();
-        public int Repeat { get; set; } = 1;
+        public uint Repeat { get; set; } = 1;
     }
 
     public class ArduinoDevice
