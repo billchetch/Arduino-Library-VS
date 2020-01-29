@@ -21,6 +21,24 @@ namespace Chetch.Arduino
         public String Command { get; set; } = null;
         public List<ArduinoCommand> Commands { get; set; } = new List<ArduinoCommand>();
         public uint Repeat { get; set; } = 1;
+
+        public ArduinoCommand()
+        {
+
+        }
+
+        public ArduinoCommand(String commandAlias, String command, uint repeat  = 1)
+        {
+            CommandAlias = commandAlias;
+            Command = command;
+            Repeat = repeat;
+        }
+
+        public ArduinoCommand(String commandAlias, uint repeat = 1)
+        {
+            CommandAlias = commandAlias;
+            Repeat = repeat;
+        }
     }
 
     public class ArduinoDevice
@@ -83,16 +101,38 @@ namespace Chetch.Arduino
             return pin;
         }
 
+        //Commands
+        public ArduinoCommand GetCommand(String commandAlias)
+        {
+            var key = commandAlias.ToLower();
+            return _commands.ContainsKey(key) ? _commands[key] : null;
+        }
+
         public void AddCommand(ArduinoCommand command)
         {
-            var key = command.CommandAlias;
+            var key = command.CommandAlias.ToLower();
             if (_commands.ContainsKey(key))
             {
-                _commands[key].Commands.Add(command);
-            } else
-            {
-                _commands[key] = command;
+                throw new Exception("Already contains a command with alias " + command.CommandAlias);
             }
+            _commands[key] = command;
+        }
+
+        public void AddCommand(String commandAlias, String command, uint repeat = 1)
+        {
+            AddCommand(new ArduinoCommand(commandAlias, command, repeat));
+        }
+
+        public void AddCommand(String commandAlias, String[] commandAliases, uint repeat = 1)
+        {
+            var command = new ArduinoCommand(commandAlias, repeat);
+            for(int i = 0; i < commandAliases.Length; i++)
+            {
+                var c = GetCommand(commandAliases[i]);
+                if (c == null) throw new Exception("No command found with alias " + commandAliases[i]);
+                command.Commands.Add(c);
+            }
+            AddCommand(command);
         }
 
         public void AddCommands(List<ArduinoCommand> commands)
@@ -105,8 +145,9 @@ namespace Chetch.Arduino
 
         public void SendCommand(String commandAlias, String[] args = null)
         {
-            if (!_commands.ContainsKey(commandAlias)) throw new Exception("Command with alias " + commandAlias + " does not exist");
-            SendCommand(_commands[commandAlias], args);
+            var command = GetCommand(commandAlias);
+            if (command == null) throw new Exception("Command with alias " + commandAlias + " does not exist");
+            SendCommand(command, args);
         }
 
         virtual public void SendCommand(ArduinoCommand command, String[] args = null)
