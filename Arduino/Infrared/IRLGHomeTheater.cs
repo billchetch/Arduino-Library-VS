@@ -12,7 +12,14 @@ namespace Chetch.Arduino.Infrared
 
         public IRLGHomeTheater(int enablePin, int transmitPin, IRDB db) : base(NAME, enablePin, transmitPin, db)
         {
-            AddCommand("Unmute", new String[]{"Volume_up","Volume_down"});
+           
+        }
+
+        public override void AddCommands(List<ArduinoCommand> commands)
+        {
+            base.AddCommands(commands);
+
+            AddCommand("Unmute", new String[] { "Volume_up", "Volume_down" });
             AddCommand("Mute", new String[] { "Unmute", "Mute/Unmute" });
         }
     }

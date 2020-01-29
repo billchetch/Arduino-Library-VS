@@ -135,7 +135,7 @@ namespace Chetch.Arduino
             AddCommand(command);
         }
 
-        public void AddCommands(List<ArduinoCommand> commands)
+        virtual public void AddCommands(List<ArduinoCommand> commands)
         {
             foreach(var command in commands)
             {
