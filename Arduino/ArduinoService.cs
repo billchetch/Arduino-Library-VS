@@ -17,14 +17,6 @@ namespace Chetch.Arduino
     public class ArduinoServiceMessage : ServiceMessage
     {
 
-        static public ArduinoServiceMessage CreateCommand(String target, String command, String[] args)
-        {
-            var cmd = new ArduinoServiceMessage();
-            cmd.Target = target;
-            cmd.SetCommand(command, args);
-            return cmd;
-        }
-
         public bool IsFirmata = false;
         public ADMStatus DeviceManagerStatus = ADMStatus.NOT_CONNECTED;
         public int DeviceCount = 0;

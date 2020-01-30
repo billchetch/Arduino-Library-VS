@@ -18,18 +18,6 @@ namespace Chetch.Arduino
 
         }
 
-        ArduinoServiceMessage CreateCommand(String command, String[] args)
-        {
-            var cmd = new ArduinoServiceMessage();
-            cmd.Type = NamedPipeManager.MessageType.COMMAND;
-            cmd.Add(command);
-            if(args != null)
-            {
-                cmd.Values.AddRange(args);
-            }
-            return cmd;
-        }
-
         override protected void HandleReceivedMessage(ArduinoServiceMessage message)
         {
             ServiceData.DeviceManagerStatus = message.DeviceManagerStatus;

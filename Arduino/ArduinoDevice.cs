@@ -182,10 +182,11 @@ namespace Chetch.Arduino
 
         virtual protected void SendCommandString(String command, String[] args)
         {
-            if (mgr == null) throw new Exception("Device has not yet been added to a device manager");
+            //if (mgr == null) throw new Exception("Device has not yet been added to a device manager");
 
             var commandString = CreateCommandString(command, args);
-            mgr.SendString(commandString);
+            //mgr.SendString(commandString);
+            System.Diagnostics.Debug.Print(commandString);
         }
         
     }

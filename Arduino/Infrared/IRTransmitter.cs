@@ -9,6 +9,7 @@ namespace Chetch.Arduino.Infrared
 {
     public abstract class IRTransmitter : ArduinoDevice
     {
+        private bool _enabled = false;
         private int _enablePin; //HIGH output means the transmitter is disabled (as there is no voltage across it)
         private int _transmitPin;
         
@@ -31,27 +32,31 @@ namespace Chetch.Arduino.Infrared
         public void Disable()
         {
             mgr.SetDigitalPin(_enablePin, true);
+            _enabled = false;
         }
 
         public void Enable()
         {
             mgr.SetDigitalPin(_enablePin, false);
+            _enabled = true;
         }
 
         override public void SendCommand(ArduinoCommand command, String[] args = null)
         {
-            if (mgr == null) throw new Exception("Device has not yet been added to a device manager");
+            /*if (mgr == null) throw new Exception("Device has not yet been added to a device manager");
 
-            List<ArduinoDevice> devices = mgr.GetDevicesByPin(_transmitPin);
-            foreach (var device in devices)
-            {
-                if (device is IRTransmitter && device != this)
+            if(!_enabled){
+                List<ArduinoDevice> devices = mgr.GetDevicesByPin(_transmitPin);
+                foreach (var device in devices)
                 {
-                    ((IRTransmitter)device).Disable();
+                    if (device is IRTransmitter && device != this)
+                    {
+                        ((IRTransmitter)device).Disable();
+                    }
                 }
-            }
 
-            Enable();
+                Enable();
+            }*/
 
             base.SendCommand(command, args);
         }
