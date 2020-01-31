@@ -136,7 +136,7 @@ namespace Chetch.Arduino
         {
             var response = base.CreatePingResponse(message);
             response.DeviceManagerStatus = ADM == null ? ADMStatus.NOT_CONNECTED : ADM.Status;
-            response.Add(ADM.Status == ADMStatus.NOT_CONNECTED ? "ADM not connected" : "ADM connected");
+            response.Add(response.DeviceManagerStatus == ADMStatus.NOT_CONNECTED ? "ADM not connected" : "ADM connected");
             return response;
         }
 
@@ -206,37 +206,17 @@ namespace Chetch.Arduino
             }
         }
 
-        public void Send(FirmataMessage firmataMessage, String pipeName)
-        {
-            Send(CreateMessage(firmataMessage), pipeName);
-        }
-
-        public void Broadcast(FirmataMessage firmataMessage)
-        {
-            Broadcast(CreateMessage(firmataMessage));
-        }
-
-        protected virtual void HandleCommand(String target, String command, String[] args)
+        //send commands to ADM
+        override protected void OnCommandReceived(ArduinoServiceMessage message)
         {
             if (ADM == null || ADM.Status == ADMStatus.NOT_CONNECTED) throw new Exception("ADM not connected");
-            ADM.IssueCommand(target, command, args);
-        }
-
-        override protected void OnMessageReceived(ArduinoServiceMessage message)
-        {
-            switch (message.Type)
-            {
-                case NamedPipeManager.MessageType.COMMAND:
-                    HandleCommand(message.Target, message.Command, message.CommandArgs);
-                    break;
-
-            }
+            ADM.IssueCommand(message.Target, message.Command, message.CommandArgs);
         }
 
         //Firmata
         virtual protected void OnADMFirmataMessage(FirmataMessage message)
         {
-            Broadcast(message);
+            Broadcast(CreateMessage(message));
         }
     }
 }
