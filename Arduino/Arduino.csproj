@@ -36,7 +36,8 @@
     <Reference Include="Chetch.Services">
       <HintPath>..\..\Services\Services\bin\Debug\Chetch.Services.dll</HintPath>
     </Reference>
-    <Reference Include="Chetch.Utilities">
+    <Reference Include="Chetch.Utilities, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\Utilities\Utilities\bin\Debug\Chetch.Utilities.dll</HintPath>
     </Reference>
     <Reference Include="Solid.Arduino, Version=1.0.2.0, Culture=neutral, processorArchitecture=MSIL">
@@ -58,6 +59,7 @@
     <Compile Include="ArduinoDevice.cs" />
     <Compile Include="ArduinoService.cs" />
     <Compile Include="ArduinoServiceClient.cs" />
+    <Compile Include="Diagnostics\LEDBuiltIn.cs" />
     <Compile Include="Infrared\IRDB.cs" />
     <Compile Include="Infrared\IRSamsungTV.cs" />
     <Compile Include="Infrared\IRTransmitter.cs" />

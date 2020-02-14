@@ -46,6 +46,7 @@ namespace Chetch.Arduino
         public String ID { get; internal set; }
         public String Name { get; set; }
         public List<ArduinoPin> Pins { get; internal set; }
+        public String CommandTarget { get; set; }
 
         private Dictionary<String, ArduinoCommand> _commands = new Dictionary<string, ArduinoCommand>();
 
@@ -143,14 +144,14 @@ namespace Chetch.Arduino
             }
         }
 
-        public void SendCommand(String commandAlias, String[] args = null)
+        public void ExecuteCommand(String commandAlias, String[] args = null)
         {
             var command = GetCommand(commandAlias);
             if (command == null) throw new Exception("Command with alias " + commandAlias + " does not exist");
-            SendCommand(command, args);
+            ExecuteCommand(command, args);
         }
 
-        virtual public void SendCommand(ArduinoCommand command, String[] args = null)
+        virtual public void ExecuteCommand(ArduinoCommand command, String[] args = null)
         {
             for(int i = 0; i < command.Repeat; i++)
             {
@@ -158,36 +159,16 @@ namespace Chetch.Arduino
                 {
                     foreach(var ccommand in command.Commands)
                     {
-                        SendCommand(ccommand, args);
+                        ExecuteCommand(ccommand, args);
                     }
                 } else
                 {
-                    SendCommandString(command.Command, args);
+                    //if (mgr == null) throw new Exception("Device has not yet been added to a device manager");
+
+                    //mgr.SendCommand(CommandTarget, command, args);
+                    System.Diagnostics.Debug.Print(CommandTarget + ": " + command);
                 }
             }
         }
-
-        virtual protected String CreateCommandString(String command, String[] args)
-        {
-            String argString = "";
-            if (args != null)
-            {
-                for (int i = 0; i < args.Length; i++)
-                {
-                    argString += " " + args[i];
-                }
-            }
-            return command + argString;
-        }
-
-        virtual protected void SendCommandString(String command, String[] args)
-        {
-            //if (mgr == null) throw new Exception("Device has not yet been added to a device manager");
-
-            var commandString = CreateCommandString(command, args);
-            //mgr.SendString(commandString);
-            System.Diagnostics.Debug.Print(commandString);
-        }
-        
     }
 }

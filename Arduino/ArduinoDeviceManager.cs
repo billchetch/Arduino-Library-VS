@@ -5,6 +5,8 @@ using System.Text;
 using System.Threading.Tasks;
 using Solid.Arduino.Firmata;
 using Solid.Arduino;
+using Chetch.Services;
+using Chetch.Utilities;
 
 namespace Chetch.Arduino
 {
@@ -14,12 +16,20 @@ namespace Chetch.Arduino
         CONNECTED
     }
 
+    public class ADMMessage : ServiceMessage
+    {
+        public ADMMessage()
+        {
+
+        }
+    }
+
     public class ArduinoDeviceManager
     {
         private const int CONNECT_TIMEOUT = 10000;
 
         public const string ARDUINO_MEGA_2560 = "USB-SERIAL CH340";
-
+        
         static public ArduinoDeviceManager Connect(String supportedBoards, int timeOut, Action<FirmataMessage> listener)
         {
             var boards = supportedBoards.Split(',');
@@ -73,9 +83,9 @@ namespace Chetch.Arduino
         private Dictionary<String, ArduinoDevice> _devices;
         private BoardCapability _boardCapability;
         private Dictionary<int, List<ArduinoDevice>> _pin2device;
-        private Action<FirmataMessage> _listener;
+        private Action<ADMMessage> _listener;
         
-        public ArduinoDeviceManager(ArduinoSession firmata, Action<FirmataMessage> listener)
+        public ArduinoDeviceManager(ArduinoSession firmata, Action<ADMMessage> listener)
         {
             _session = firmata;
             _session.MessageReceived += OnMessageReceived;
@@ -86,6 +96,11 @@ namespace Chetch.Arduino
             _pin2device = new Dictionary<int, List<ArduinoDevice>>();
 
             _status = ADMStatus.CONNECTED;
+
+            //if here and no exceptions then the connection should be good
+            var message = new ADMMessage();
+            message.Type = NamedPipeManager.MessageType.STATUS_REQUEST;
+            SendMessage(message);
         }
 
         public void Disconnect()
@@ -187,35 +202,66 @@ namespace Chetch.Arduino
 
         public void OnMessageReceived(Object sender, FirmataMessageEventArgs eventArgs)
         {
-            var message = eventArgs.Value;
-            switch (message.Type)
+            var fmessage = eventArgs.Value;
+            ADMMessage message = null;
+            switch (fmessage.Type)
             {
                 case MessageType.StringData:
-                    StringData sd = (StringData)message.Value;
+                    StringData sd = (StringData)fmessage.Value;
+                    message = ADMMessage.Deserialize<ADMMessage>(sd.Text, NamedPipeManager.MessageEncoding.QUERY_STRING);
+                    switch (message.Type)
+                    {
+                        case NamedPipeManager.MessageType.STATUS_RESPONSE:
+                            break;
+
+                        case NamedPipeManager.MessageType.ERROR:
+                            break;
+                    }
                     break;
 
                 case MessageType.PinStateResponse:
                     break;
 
                 case MessageType.DigitalPortState:
-                    DigitalPortState state = (DigitalPortState)message.Value;
-                    string binary = Convert.ToString(state.Pins, 2);
+                    DigitalPortState state = (DigitalPortState)fmessage.Value;
+                    string binary = System.Convert.ToString(state.Pins, 2);
+                    break;
+
+                case MessageType.CapabilityResponse:
                     break;
 
                 default:
                     break;
             }
 
-            if (_listener != null)
+            if (_listener != null && message != null)
             {
                 _listener(message);
             }
 
         }
 
+
+        public void SendMessage(ADMMessage message)
+        {
+            if(message != null)
+            {
+                _session.SendStringData(message.Serialize());
+            }
+        }
+
         public void SendString(String s)
         {
-            _session.SendStringData(s); 
+            var message = new ADMMessage();
+            message.Value = s;
+            SendMessage(message);
+        }
+
+        public void SendCommand(String target, String command, String[] args = null)
+        {
+            var message = new ADMMessage();
+            message.SetCommand(target, command, args);
+            SendMessage(message);
         }
 
         public void SetDigitalPin(int pinNumber, bool value)
@@ -231,7 +277,7 @@ namespace Chetch.Arduino
                 throw new Exception("Cannot find device with ID " + deviceID);
             }
 
-            device.SendCommand(command, args);
+            device.ExecuteCommand(command, args);
         }
     }
 }
