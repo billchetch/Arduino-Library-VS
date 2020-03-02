@@ -16,11 +16,49 @@ namespace Chetch.Arduino
         CONNECTED
     }
 
-    public class ADMMessage : ServiceMessage
+    public class ADMMessage : NamedPipeManager.Message
     {
+        public enum Action
+        {
+            NOT_SET,
+            SEND
+        }
+
+        public ushort Tag { get; set; } = 0; //can be used to track messages
+        public ushort SenderID { get; set; } = 0; //normally set to Device ID
+        public Action RequestedAction { get; set; } = 0; //request to perform a certain action
+        public List<byte[]> Arguments { get; } = new List<byte[]>();
+        public bool LittleEndian { get; set; } = true; //used for bytes encoding
+
         public ADMMessage()
         {
 
+        }
+
+        public override void AddBytes(List<byte> bytes)
+        {
+            base.AddBytes(bytes);
+
+            bytes.AddRange(Utilities.Convert.ToBytes(Tag, LittleEndian));
+            bytes.AddRange(Utilities.Convert.ToBytes(SenderID, LittleEndian));
+            bytes.Add((byte)RequestedAction);
+
+            byte delimiter = (byte)' ';
+            foreach(var b in Arguments)
+            {
+                bytes.Add(delimiter);
+                bytes.AddRange(b);
+            }
+        }
+
+        public void AddArgument(UInt64 n)
+        {
+            AddArgument(Utilities.Convert.ToBytes(n, LittleEndian));
+        }
+
+        public void AddArgument(byte[] bytes)
+        {
+            Arguments.Add(bytes);
         }
     }
 
@@ -30,7 +68,7 @@ namespace Chetch.Arduino
 
         public const string ARDUINO_MEGA_2560 = "USB-SERIAL CH340";
         
-        static public ArduinoDeviceManager Connect(String supportedBoards, int timeOut, Action<FirmataMessage> listener)
+        static public ArduinoDeviceManager Connect(String supportedBoards, int timeOut, Action<ADMMessage> listener)
         {
             var boards = supportedBoards.Split(',');
             foreach (var board in boards)
@@ -58,7 +96,7 @@ namespace Chetch.Arduino
             return null;
         }
 
-        static public ArduinoDeviceManager Connect(String supportedBoards, Action<FirmataMessage> listener)
+        static public ArduinoDeviceManager Connect(String supportedBoards, Action<ADMMessage> listener)
         {
             return Connect(supportedBoards, CONNECT_TIMEOUT, listener);
         }
@@ -81,6 +119,7 @@ namespace Chetch.Arduino
         private ADMStatus _status;
         private ArduinoSession _session;
         private Dictionary<String, ArduinoDevice> _devices;
+        private Dictionary<String, ushort> _device2boardID;
         private BoardCapability _boardCapability;
         private Dictionary<int, List<ArduinoDevice>> _pin2device;
         private Action<ADMMessage> _listener;
@@ -92,15 +131,17 @@ namespace Chetch.Arduino
             _listener = listener;
 
             _devices = new Dictionary<String, ArduinoDevice>();
-            _boardCapability = _session.GetBoardCapability();
+            _device2boardID = new Dictionary<String, ushort>();
+
+            //_boardCapability = _session.GetBoardCapability();
             _pin2device = new Dictionary<int, List<ArduinoDevice>>();
 
             _status = ADMStatus.CONNECTED;
 
             //if here and no exceptions then the connection should be good
-            var message = new ADMMessage();
+            /*var message = new ADMMessage();
             message.Type = NamedPipeManager.MessageType.STATUS_REQUEST;
-            SendMessage(message);
+            SendMessage(message);*/
         }
 
         public void Disconnect()
@@ -150,11 +191,15 @@ namespace Chetch.Arduino
         {
             if(device.ID == null)
             {
-                throw new Exception("Cannot add this device as it does not have an ID");
+                throw new Exception("Cannot add this device as it does not have a valid ID");
             }
             if (_devices.ContainsKey(device.ID))
             {
                 throw new Exception("Cannot add this device because there is already a device with ID " + device.ID);
+            }
+            if(device.BoardID > 0 && _device2boardID.ContainsKey(device.ID) && _device2boardID[device.ID] == device.BoardID)
+            {
+                throw new Exception("Cannot add this device because there is already a device using board ID " + device.BoardID);
             }
 
             foreach (var dpin in device.Pins)
@@ -169,8 +214,12 @@ namespace Chetch.Arduino
                 }
             }
 
-            device.mgr = this;
+            device.Mgr = this;
             _devices[device.ID] = device;
+            if (device.BoardID > 0)
+            {
+                _device2boardID[device.ID] = device.BoardID;
+            }
 
             foreach (var dpin in device.Pins)
             {
@@ -208,7 +257,15 @@ namespace Chetch.Arduino
             {
                 case MessageType.StringData:
                     StringData sd = (StringData)fmessage.Value;
-                    message = ADMMessage.Deserialize<ADMMessage>(sd.Text, NamedPipeManager.MessageEncoding.QUERY_STRING);
+                    System.Diagnostics.Debug.Print(sd.Text);
+                    try
+                    {
+                        message = ADMMessage.Deserialize<ADMMessage>(sd.Text, NamedPipeManager.MessageEncoding.QUERY_STRING);
+                    } catch (Exception e)
+                    {
+                        //TODO: what to do here?
+                        System.Diagnostics.Debug.Print(e.Message);
+                    }
                     switch (message.Type)
                     {
                         case NamedPipeManager.MessageType.STATUS_RESPONSE:
@@ -246,22 +303,13 @@ namespace Chetch.Arduino
         {
             if(message != null)
             {
-                _session.SendStringData(message.Serialize());
+                //SendString(message.Serialize());
             }
         }
 
         public void SendString(String s)
         {
-            var message = new ADMMessage();
-            message.Value = s;
-            SendMessage(message);
-        }
-
-        public void SendCommand(String target, String command, String[] args = null)
-        {
-            var message = new ADMMessage();
-            message.SetCommand(target, command, args);
-            SendMessage(message);
+            _session.SendStringData(s);
         }
 
         public void SetDigitalPin(int pinNumber, bool value)

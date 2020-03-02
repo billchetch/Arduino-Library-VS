@@ -18,7 +18,7 @@ namespace Chetch.Arduino
     public class ArduinoCommand
     {
         public String CommandAlias { get; set; }
-        public String Command { get; set; } = null;
+        public List<byte[]> Arguments { get; set; } = new List<byte[]>();
         public List<ArduinoCommand> Commands { get; set; } = new List<ArduinoCommand>();
         public uint Repeat { get; set; } = 1;
 
@@ -27,30 +27,50 @@ namespace Chetch.Arduino
 
         }
 
-        public ArduinoCommand(String commandAlias, String command, uint repeat  = 1)
+        public ArduinoCommand(String commandAlias, uint repeat  = 1)
         {
             CommandAlias = commandAlias;
-            Command = command;
             Repeat = repeat;
         }
 
-        public ArduinoCommand(String commandAlias, uint repeat = 1)
+        public void AddArgument(byte b)
         {
-            CommandAlias = commandAlias;
-            Repeat = repeat;
+            var bytes = new byte[] { b };
+            Arguments.Add(bytes);
+        }
+
+        public void AddArgument(ulong l)
+        {
+            AddArgument(Utilities.Convert.ToBytes(l));
+        }
+
+        public void AddArgument(long l)
+        {
+            AddArgument(Utilities.Convert.ToBytes(l));
+        }
+
+        public void AddArgument(String s)
+        {
+            AddArgument(Utilities.Convert.ToBytes(s));
+        }
+
+        public void AddArgument(byte[] bytes)
+        {
+            Arguments.Add(bytes);
         }
     }
 
     public class ArduinoDevice
     {
         public String ID { get; internal set; }
+        public ushort BoardID { get; set; }
         public String Name { get; set; }
         public List<ArduinoPin> Pins { get; internal set; }
         public String CommandTarget { get; set; }
 
         private Dictionary<String, ArduinoCommand> _commands = new Dictionary<string, ArduinoCommand>();
 
-        public ArduinoDeviceManager mgr { get; set; }
+        public ArduinoDeviceManager Mgr { get; set; }
 
         public ArduinoDevice()
         {
@@ -62,10 +82,11 @@ namespace Chetch.Arduino
             Name = name;
         }
 
-        public ArduinoDevice(String id, String name)
+        public ArduinoDevice(String id, String name, ushort boardID = 0)
         {
             ID = id;
             Name = name;
+            BoardID = boardID;
         }
 
         public bool IsPinCompatible(ArduinoPin pin)
@@ -109,7 +130,7 @@ namespace Chetch.Arduino
             return _commands.ContainsKey(key) ? _commands[key] : null;
         }
 
-        public void AddCommand(ArduinoCommand command)
+        public ArduinoCommand AddCommand(ArduinoCommand command)
         {
             var key = command.CommandAlias.ToLower();
             if (_commands.ContainsKey(key))
@@ -117,14 +138,15 @@ namespace Chetch.Arduino
                 throw new Exception("Already contains a command with alias " + command.CommandAlias);
             }
             _commands[key] = command;
+            return command;
         }
 
-        public void AddCommand(String commandAlias, String command, uint repeat = 1)
+        public ArduinoCommand AddCommand(String commandAlias,  uint repeat = 1)
         {
-            AddCommand(new ArduinoCommand(commandAlias, command, repeat));
+            return AddCommand(new ArduinoCommand(commandAlias, repeat));
         }
 
-        public void AddCommand(String commandAlias, String[] commandAliases, uint repeat = 1)
+        public ArduinoCommand AddCommand(String commandAlias, String[] commandAliases, uint repeat = 1)
         {
             var command = new ArduinoCommand(commandAlias, repeat);
             for(int i = 0; i < commandAliases.Length; i++)
@@ -133,7 +155,7 @@ namespace Chetch.Arduino
                 if (c == null) throw new Exception("No command found with alias " + commandAliases[i]);
                 command.Commands.Add(c);
             }
-            AddCommand(command);
+            return AddCommand(command);
         }
 
         virtual public void AddCommands(List<ArduinoCommand> commands)
@@ -165,8 +187,17 @@ namespace Chetch.Arduino
                 {
                     //if (mgr == null) throw new Exception("Device has not yet been added to a device manager");
 
+                    var message = new ADMMessage();
+                    //message.Tag = ;
+                    message.SenderID = BoardID;
+                    for(var j = 0; j < command.Arguments.Count; j++)
+                    {
+                        message.AddArgument(command.Arguments[j]);
+                    }
                     //mgr.SendCommand(CommandTarget, command, args);
-                    System.Diagnostics.Debug.Print(CommandTarget + ": " + command);
+
+
+                    System.Diagnostics.Debug.Print(command.CommandAlias);
                 }
             }
         }

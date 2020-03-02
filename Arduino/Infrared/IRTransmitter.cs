@@ -24,29 +24,24 @@ namespace Chetch.Arduino.Infrared
         }
 
         
-        override protected String CreateCommandString(String command, String[] args)
-        {
-            return base.CreateCommandString("IR " + command, args);
-        }
-
         public void Disable()
         {
-            mgr.SetDigitalPin(_enablePin, true);
+            Mgr.SetDigitalPin(_enablePin, true);
             _enabled = false;
         }
 
         public void Enable()
         {
-            mgr.SetDigitalPin(_enablePin, false);
+            Mgr.SetDigitalPin(_enablePin, false);
             _enabled = true;
         }
 
-        override public void SendCommand(ArduinoCommand command, String[] args = null)
+        /*override public void ExecuteCommand(ArduinoCommand command, String[] args = null)
         {
-            /*if (mgr == null) throw new Exception("Device has not yet been added to a device manager");
+            if (Mgr == null) throw new Exception("Device has not yet been added to a device manager");
 
             if(!_enabled){
-                List<ArduinoDevice> devices = mgr.GetDevicesByPin(_transmitPin);
+                List<ArduinoDevice> devices = Mgr.GetDevicesByPin(_transmitPin);
                 foreach (var device in devices)
                 {
                     if (device is IRTransmitter && device != this)
@@ -56,9 +51,9 @@ namespace Chetch.Arduino.Infrared
                 }
 
                 Enable();
-            }*/
+            }
 
-            base.SendCommand(command, args);
-        }
+            base.ExecuteCommand(command, args);
+        }*/
     }
 }

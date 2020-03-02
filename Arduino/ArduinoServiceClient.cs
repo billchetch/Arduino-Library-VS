@@ -27,8 +27,7 @@ namespace Chetch.Arduino
                     ServiceData.DeviceCount = message.DeviceCount;
                     break;
             }
-
-
+            
             base.HandleReceivedMessage(message);
         }
     }

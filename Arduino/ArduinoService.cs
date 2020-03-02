@@ -123,20 +123,11 @@ namespace Chetch.Arduino
             return message;
         }
 
-        virtual protected ArduinoServiceMessage CreateMessage(FirmataMessage firmataMessage)
-        {
-            var message = new ArduinoServiceMessage(NamedPipeManager.MessageType.CUSTOM);
-            message.SubType = (int)firmataMessage.Type;
-            message.IsFirmata = true;
-            message.Add(firmataMessage.Value.ToString());
-            return message;
-        }
-
         protected override ArduinoServiceMessage CreatePingResponse(ArduinoServiceMessage message)
         {
             var response = base.CreatePingResponse(message);
             response.DeviceManagerStatus = ADM == null ? ADMStatus.NOT_CONNECTED : ADM.Status;
-            response.Add(response.DeviceManagerStatus == ADMStatus.NOT_CONNECTED ? "ADM not connected" : "ADM connected");
+            response.Value = response.DeviceManagerStatus == ADMStatus.NOT_CONNECTED ? "ADM not connected" : "ADM connected";
             return response;
         }
 
@@ -162,7 +153,7 @@ namespace Chetch.Arduino
                     var message = CreateMessage();
                     message.Value = "ADM not connected...";
                     Broadcast(message);
-                    ADM = ArduinoDeviceManager.Connect(SupportedBoards, this.OnADMFirmataMessage);
+                    ADM = ArduinoDeviceManager.Connect(SupportedBoards, this.ADMMessageReceived);
                 }
                 catch (Exception e)
                 {
@@ -210,14 +201,15 @@ namespace Chetch.Arduino
         override protected void OnCommandReceived(ArduinoServiceMessage message)
         {
             if (ADM == null || ADM.Status == ADMStatus.NOT_CONNECTED) throw new Exception("ADM not connected");
+
+
             ADM.IssueCommand(message.Target, message.Command, message.CommandArgs);
         }
 
-        //Firmata
-        virtual protected void OnADMFirmataMessage(FirmataMessage message)
+        //messaging
+        virtual protected void ADMMessageReceived(ADMMessage message)
         {
-            //TODO: needs work this
-            Broadcast(CreateMessage(message));
+            //TODO: stuff in response to messages from the board manager
         }
     }
 }
