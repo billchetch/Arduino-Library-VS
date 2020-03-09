@@ -142,9 +142,13 @@ namespace Chetch.Arduino
             return response;
         }
 
+        protected virtual void OnADMConnected()
+        {
+            //ADM.AddDevice();
+        }
+
         public virtual void OnTimer(Object sender, ElapsedEventArgs eventArgs)
         {
-
             if (ADM == null)
             {
                 try
@@ -154,6 +158,7 @@ namespace Chetch.Arduino
                     message.Value = "ADM not connected...";
                     Broadcast(message);
                     ADM = ArduinoDeviceManager.Connect(SupportedBoards, this.ADMMessageReceived);
+                    OnADMConnected();
                 }
                 catch (Exception e)
                 {
@@ -207,7 +212,7 @@ namespace Chetch.Arduino
         }
 
         //messaging
-        virtual protected void ADMMessageReceived(ADMMessage message)
+        virtual protected void ADMMessageReceived(ADMMessage message, ArduinoDeviceManager Mgr)
         {
             //TODO: stuff in response to messages from the board manager
         }

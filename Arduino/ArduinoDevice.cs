@@ -63,11 +63,10 @@ namespace Chetch.Arduino
     public class ArduinoDevice
     {
         public String ID { get; internal set; }
-        public ushort BoardID { get; set; }
+        public ushort BoardID { get; set; } //ID of device on the arduino board ... thi 
         public String Name { get; set; }
         public List<ArduinoPin> Pins { get; internal set; }
-        public String CommandTarget { get; set; }
-
+        
         private Dictionary<String, ArduinoCommand> _commands = new Dictionary<string, ArduinoCommand>();
 
         public ArduinoDeviceManager Mgr { get; set; }
@@ -194,7 +193,7 @@ namespace Chetch.Arduino
                     {
                         message.AddArgument(command.Arguments[j]);
                     }
-                    //mgr.SendCommand(CommandTarget, command, args);
+                    //mgr.SendMessage(message);
 
 
                     System.Diagnostics.Debug.Print(command.CommandAlias);

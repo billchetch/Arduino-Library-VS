@@ -13,7 +13,8 @@ namespace Chetch.Arduino
     public enum ADMStatus
     {
         NOT_CONNECTED,
-        CONNECTED
+        CONNECTED,
+        DEVICE_READY
     }
 
     public class ADMMessage : NamedPipeManager.Message
@@ -68,7 +69,7 @@ namespace Chetch.Arduino
 
         public const string ARDUINO_MEGA_2560 = "USB-SERIAL CH340";
         
-        static public ArduinoDeviceManager Connect(String supportedBoards, int timeOut, Action<ADMMessage> listener)
+        static public ArduinoDeviceManager Connect(String supportedBoards, int timeOut, Action<ADMMessage, ArduinoDeviceManager> listener)
         {
             var boards = supportedBoards.Split(',');
             foreach (var board in boards)
@@ -96,7 +97,7 @@ namespace Chetch.Arduino
             return null;
         }
 
-        static public ArduinoDeviceManager Connect(String supportedBoards, Action<ADMMessage> listener)
+        static public ArduinoDeviceManager Connect(String supportedBoards, Action<ADMMessage, ArduinoDeviceManager> listener)
         {
             return Connect(supportedBoards, CONNECT_TIMEOUT, listener);
         }
@@ -118,13 +119,14 @@ namespace Chetch.Arduino
 
         private ADMStatus _status;
         private ArduinoSession _session;
+        private bool _littleEndian = true; //board uses little endian
         private Dictionary<String, ArduinoDevice> _devices;
         private Dictionary<String, ushort> _device2boardID;
         private BoardCapability _boardCapability;
         private Dictionary<int, List<ArduinoDevice>> _pin2device;
-        private Action<ADMMessage> _listener;
+        private Action<ADMMessage, ArduinoDeviceManager> _listener;
         
-        public ArduinoDeviceManager(ArduinoSession firmata, Action<ADMMessage> listener)
+        public ArduinoDeviceManager(ArduinoSession firmata, Action<ADMMessage, ArduinoDeviceManager> listener)
         {
             _session = firmata;
             _session.MessageReceived += OnMessageReceived;
@@ -139,9 +141,10 @@ namespace Chetch.Arduino
             _status = ADMStatus.CONNECTED;
 
             //if here and no exceptions then the connection should be good
-            /*var message = new ADMMessage();
+            var message = new ADMMessage();
+            message.Tag = 1;
             message.Type = NamedPipeManager.MessageType.STATUS_REQUEST;
-            SendMessage(message);*/
+            SendMessage(message);
         }
 
         public void Disconnect()
@@ -243,6 +246,11 @@ namespace Chetch.Arduino
             }
         }
 
+        public Boolean HasDevice(String deviceID)
+        {
+            return GetDevice(deviceID) != null;
+        }
+
         public List<ArduinoDevice> GetDevicesByPin(int pinNumber)
         {
             return _pin2device[pinNumber];
@@ -269,6 +277,15 @@ namespace Chetch.Arduino
                     switch (message.Type)
                     {
                         case NamedPipeManager.MessageType.STATUS_RESPONSE:
+                            //TODO: check for Tag value of 1
+                            _status = ADMStatus.DEVICE_READY;
+                            _littleEndian = true; //TODO: get little endian from the message
+
+                            if (!HasDevice(Diagnostics.LEDBuiltIn.LED_BUILTIN_ID))
+                            {
+                                var d = new Diagnostics.LEDBuiltIn(13); //TODO: get built in pin number from message
+                                AddDevice(d);
+                            }
                             break;
 
                         case NamedPipeManager.MessageType.ERROR:
@@ -293,7 +310,7 @@ namespace Chetch.Arduino
 
             if (_listener != null && message != null)
             {
-                _listener(message);
+                _listener(message, this);
             }
 
         }
