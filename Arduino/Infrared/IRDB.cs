@@ -34,8 +34,8 @@ namespace Chetch.Arduino.Infrared
         protected override ArduinoCommand CreateCommand(string deviceName, Dictionary<string, object> row)
         {
             var command = new ArduinoCommand((String)row["command_alias"], (uint)row["repeat_count"]);
-            command.AddArgument(Convert.ToUInt64(row["command"]));
-            command.AddArgument((byte)Convert.ToUInt16(row["bits"]));
+            command.AddArgument(Convert.ToUInt64((String)row["command"], 16)); //assumes commands are given in hex format
+            command.AddArgument(Convert.ToUInt16(row["bits"]));
             return command;
         }
     }

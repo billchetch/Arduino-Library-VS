@@ -10,7 +10,7 @@ namespace Chetch.Arduino.Infrared
     {
         const String NAME = "Samsung TV";
 
-        public IRSamsungTV(String id, ushort boardID, int enablePin, int transmitPin, IRDB db) : base(id, NAME, boardID, enablePin, transmitPin, db)
+        public IRSamsungTV(String id, byte boardID, int enablePin, int transmitPin, IRDB db) : base(id, NAME, boardID, enablePin, transmitPin, db)
         {
 
         }

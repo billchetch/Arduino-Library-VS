@@ -17,8 +17,16 @@ namespace Chetch.Arduino
 
     public class ArduinoCommand
     {
+        public enum CommandType
+        {
+            NOT_SET,
+            SEND,
+            RESET
+        }
+
         public String CommandAlias { get; set; }
-        public List<byte[]> Arguments { get; set; } = new List<byte[]>();
+        public CommandType Type { get; set; } = 0; //request to perform a certain command e.g. Send or Delete or Reset etc. etc.
+        public List<Object> Arguments { get; set; } = new List<Object>();
         public List<ArduinoCommand> Commands { get; set; } = new List<ArduinoCommand>();
         public uint Repeat { get; set; } = 1;
 
@@ -33,37 +41,16 @@ namespace Chetch.Arduino
             Repeat = repeat;
         }
 
-        public void AddArgument(byte b)
+        public void AddArgument(Object arg)
         {
-            var bytes = new byte[] { b };
-            Arguments.Add(bytes);
-        }
-
-        public void AddArgument(ulong l)
-        {
-            AddArgument(Utilities.Convert.ToBytes(l));
-        }
-
-        public void AddArgument(long l)
-        {
-            AddArgument(Utilities.Convert.ToBytes(l));
-        }
-
-        public void AddArgument(String s)
-        {
-            AddArgument(Utilities.Convert.ToBytes(s));
-        }
-
-        public void AddArgument(byte[] bytes)
-        {
-            Arguments.Add(bytes);
+            Arguments.Add(arg);
         }
     }
 
     public class ArduinoDevice
     {
         public String ID { get; internal set; }
-        public ushort BoardID { get; set; } //ID of device on the arduino board ... thi 
+        public byte BoardID { get; set; } //ID of 'device' on the arduino board ... used by code on the board to determine what should process the command 
         public String Name { get; set; }
         public List<ArduinoPin> Pins { get; internal set; }
         
@@ -81,7 +68,7 @@ namespace Chetch.Arduino
             Name = name;
         }
 
-        public ArduinoDevice(String id, String name, ushort boardID = 0)
+        public ArduinoDevice(String id, String name, byte boardID = 0)
         {
             ID = id;
             Name = name;
@@ -165,14 +152,14 @@ namespace Chetch.Arduino
             }
         }
 
-        public void ExecuteCommand(String commandAlias, String[] args = null)
+        public void ExecuteCommand(String commandAlias)
         {
             var command = GetCommand(commandAlias);
             if (command == null) throw new Exception("Command with alias " + commandAlias + " does not exist");
-            ExecuteCommand(command, args);
+            ExecuteCommand(command);
         }
 
-        virtual public void ExecuteCommand(ArduinoCommand command, String[] args = null)
+        virtual protected void ExecuteCommand(ArduinoCommand command)
         {
             for(int i = 0; i < command.Repeat; i++)
             {
@@ -180,23 +167,14 @@ namespace Chetch.Arduino
                 {
                     foreach(var ccommand in command.Commands)
                     {
-                        ExecuteCommand(ccommand, args);
+                        ExecuteCommand(ccommand);
                     }
                 } else
                 {
-                    //if (mgr == null) throw new Exception("Device has not yet been added to a device manager");
+                    if (Mgr == null) throw new Exception("Device has not yet been added to a device manager");
 
-                    var message = new ADMMessage();
-                    //message.Tag = ;
-                    message.SenderID = BoardID;
-                    for(var j = 0; j < command.Arguments.Count; j++)
-                    {
-                        message.AddArgument(command.Arguments[j]);
-                    }
-                    //mgr.SendMessage(message);
-
-
-                    System.Diagnostics.Debug.Print(command.CommandAlias);
+                    Mgr.SendCommand(BoardID, command);
+                    //System.Diagnostics.Debug.Print(command.CommandAlias);
                 }
             }
         }

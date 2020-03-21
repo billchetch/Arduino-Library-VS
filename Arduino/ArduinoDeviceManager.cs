@@ -19,18 +19,11 @@ namespace Chetch.Arduino
 
     public class ADMMessage : NamedPipeManager.Message
     {
-        public enum Action
-        {
-            NOT_SET,
-            SEND
-        }
-
-        public ushort Tag { get; set; } = 0; //can be used to track messages
-        public ushort SenderID { get; set; } = 0; //normally set to Device ID
-        public Action RequestedAction { get; set; } = 0; //request to perform a certain action
+        public byte Tag { get; set; } = 0; //can be used to track messages
+        public byte TargetID { get; set; } = 0; //ID number on board to determine what is beig targeted
+        public byte CommandID { get; set; } = 0; //Command ID on board ... basically to identify function e.g. Send or Delete ...
         public List<byte[]> Arguments { get; } = new List<byte[]>();
-        public bool LittleEndian { get; set; } = true; //used for bytes encoding
-
+        
         public ADMMessage()
         {
 
@@ -38,28 +31,30 @@ namespace Chetch.Arduino
 
         public override void AddBytes(List<byte> bytes)
         {
-            base.AddBytes(bytes);
+            //Scheme here is 4 bytes as a 'header' to include: Type, Tag, TargetID, CommandID
+            //Followed by a non-limited (although in reality it should be determined by the board)
+            //number of arguments, where each argument is preceded by the number of bytes the argument needs
+            base.AddBytes(bytes); //will add Type
 
-            bytes.AddRange(Utilities.Convert.ToBytes(Tag, LittleEndian));
-            bytes.AddRange(Utilities.Convert.ToBytes(SenderID, LittleEndian));
-            bytes.Add((byte)RequestedAction);
+            bytes.Add(Tag);
+            bytes.Add(TargetID);
+            bytes.Add(CommandID);
 
-            byte delimiter = (byte)' ';
             foreach(var b in Arguments)
             {
-                bytes.Add(delimiter);
+                bytes.Add((byte)b.Length);
                 bytes.AddRange(b);
             }
-        }
-
-        public void AddArgument(UInt64 n)
-        {
-            AddArgument(Utilities.Convert.ToBytes(n, LittleEndian));
         }
 
         public void AddArgument(byte[] bytes)
         {
             Arguments.Add(bytes);
+        }
+
+        public String Serialize()
+        {
+            return Serialize(NamedPipeManager.MessageEncoding.BYTES_ARRAY);
         }
     }
 
@@ -315,12 +310,40 @@ namespace Chetch.Arduino
 
         }
 
+        public void SendCommand(byte targetID, ArduinoCommand command)
+        {
+            var message = new ADMMessage();
+            message.Tag = 0; //TODO: create some kind of perhaps counter-based tagging
+            message.TargetID = targetID;
+            message.CommandID = (byte)command.Type;
+
+            foreach (Object arg in command.Arguments)
+            {
+                byte[] b;
+                if (arg is String)
+                {
+                    b = Chetch.Utilities.Convert.ToBytes((String)arg);
+                }
+                else if (arg.GetType().IsValueType)
+                {
+                    b = Chetch.Utilities.Convert.ToBytes((ValueType)arg, _littleEndian);
+                }
+                else
+                {
+                    throw new Exception("Unable to process type " + arg.GetType());
+                }
+                message.AddArgument(b);
+            }
+
+
+            SendMessage(message);
+        }
 
         public void SendMessage(ADMMessage message)
         {
             if(message != null)
             {
-                //SendString(message.Serialize());
+                SendString(message.Serialize());
             }
         }
 
@@ -334,7 +357,7 @@ namespace Chetch.Arduino
             _session.SetDigitalPin(pinNumber, value);
         }
 
-        public void IssueCommand(String deviceID, String command, String[] args)
+        public void IssueCommand(String deviceID, String command)
         {
             var device = GetDevice(deviceID);
             if(device == null)
@@ -342,7 +365,7 @@ namespace Chetch.Arduino
                 throw new Exception("Cannot find device with ID " + deviceID);
             }
 
-            device.ExecuteCommand(command, args);
+            device.ExecuteCommand(command);
         }
     }
 }
