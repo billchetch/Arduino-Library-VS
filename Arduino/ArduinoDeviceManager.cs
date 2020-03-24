@@ -13,6 +13,7 @@ namespace Chetch.Arduino
     public enum ADMStatus
     {
         NOT_CONNECTED,
+        CONNECTING,
         CONNECTED,
         DEVICE_READY
     }
@@ -45,11 +46,49 @@ namespace Chetch.Arduino
                 bytes.Add((byte)b.Length);
                 bytes.AddRange(b);
             }
+
+            //we now add a byte to handle the zero byte case cos the zero byte is interpreted as string termination
+            byte mask = (byte)255;
+            while(mask-- >= 1) {
+                bool useable = true;
+                foreach(var b in bytes)
+                {
+                    if(b == mask)
+                    {
+                        useable = false;
+                        break;
+                    }
+                }
+                if (useable) break;
+            }
+
+            if(mask >= 1)
+            {
+                bytes.Insert(0, mask); //use the 'mask' as the encoded zero byte
+                for(int i = 1; i < bytes.Count; i++)
+                {
+                    if (bytes[i] == 0) bytes[i] = mask;
+                }
+
+            } else
+            {
+                throw new Exception("Unable to generate mask for byte array");
+            }
         }
 
         public void AddArgument(byte[] bytes)
         {
             Arguments.Add(bytes);
+        }
+
+        public void AddArgument(byte b)
+        {
+            AddArgument(new byte[] { b });
+        }
+
+        public void AddArgument(String s)
+        {
+            AddArgument(Chetch.Utilities.Convert.ToBytes(s));
         }
 
         public String Serialize()
@@ -116,28 +155,29 @@ namespace Chetch.Arduino
         private ArduinoSession _session;
         private bool _littleEndian = true; //board uses little endian
         private Dictionary<String, ArduinoDevice> _devices;
-        private Dictionary<String, ushort> _device2boardID;
+        private Dictionary<String, byte> _device2boardID;
         private BoardCapability _boardCapability;
         private Dictionary<int, List<ArduinoDevice>> _pin2device;
         private Action<ADMMessage, ArduinoDeviceManager> _listener;
         
         public ArduinoDeviceManager(ArduinoSession firmata, Action<ADMMessage, ArduinoDeviceManager> listener)
         {
+            _status = ADMStatus.CONNECTING;
+
             _session = firmata;
             _session.MessageReceived += OnMessageReceived;
             _listener = listener;
 
             _devices = new Dictionary<String, ArduinoDevice>();
-            _device2boardID = new Dictionary<String, ushort>();
+            _device2boardID = new Dictionary<String, byte>();
 
-            //_boardCapability = _session.GetBoardCapability();
+            _boardCapability = _session.GetBoardCapability();
             _pin2device = new Dictionary<int, List<ArduinoDevice>>();
 
             _status = ADMStatus.CONNECTED;
 
             //if here and no exceptions then the connection should be good
             var message = new ADMMessage();
-            message.Tag = 1;
             message.Type = NamedPipeManager.MessageType.STATUS_REQUEST;
             SendMessage(message);
         }
@@ -151,6 +191,11 @@ namespace Chetch.Arduino
 
         public void AssertConnection()
         {
+            if(_status == ADMStatus.NOT_CONNECTED || _status == ADMStatus.CONNECTING)
+            {
+                throw new Exception("Status is " + _status);
+            }
+
             try
             {
                 SendString("X");
@@ -187,6 +232,10 @@ namespace Chetch.Arduino
 
         public ArduinoDevice AddDevice(ArduinoDevice device)
         {
+            if(_status != ADMStatus.DEVICE_READY)
+            {
+                throw new Exception("ADM status mut be DEVICE_READY ... currently " + _status);
+            }
             if(device.ID == null)
             {
                 throw new Exception("Cannot add this device as it does not have a valid ID");
@@ -195,6 +244,20 @@ namespace Chetch.Arduino
             {
                 throw new Exception("Cannot add this device because there is already a device with ID " + device.ID);
             }
+
+            //if no board ID is given then autogenerate one
+            if(device.BoardID == 0)
+            {
+                if(_device2boardID.ContainsKey(device.ID))
+                {
+                    device.BoardID = _device2boardID[device.ID];
+                } else
+                {
+                    if (_device2boardID.Count == 255) throw new Exception("Cannot automatically assign Board ID to device " + device.ID);
+                    device.BoardID = (byte)(_device2boardID.Count + 1);
+                }
+            }
+
             if(device.BoardID > 0 && _device2boardID.ContainsKey(device.ID) && _device2boardID[device.ID] == device.BoardID)
             {
                 throw new Exception("Cannot add this device because there is already a device using board ID " + device.BoardID);
@@ -226,7 +289,14 @@ namespace Chetch.Arduino
                 _pin2device[dpin.PinNumber].Add(device);
             }
 
-
+            //send configuration/setup data to board
+            /*var message = new ADMMessage();
+            message.Type = NamedPipeManager.MessageType.CONFIGURE;
+            message.TargetID = device.BoardID;
+            message.AddArgument(device.ID);
+            message.AddArgument(device.Name);
+            SendMessage(message);*/
+            
             return device;
         }
 
@@ -260,13 +330,13 @@ namespace Chetch.Arduino
             {
                 case MessageType.StringData:
                     StringData sd = (StringData)fmessage.Value;
-                    System.Diagnostics.Debug.Print(sd.Text);
+                    System.Diagnostics.Debug.Print("Received: " + sd.Text);
                     try
                     {
                         message = ADMMessage.Deserialize<ADMMessage>(sd.Text, NamedPipeManager.MessageEncoding.QUERY_STRING);
                     } catch (Exception e)
                     {
-                        //TODO: what to do here?
+                        //TODO: What to do here?
                         System.Diagnostics.Debug.Print(e.Message);
                     }
                     switch (message.Type)
@@ -278,8 +348,8 @@ namespace Chetch.Arduino
 
                             if (!HasDevice(Diagnostics.LEDBuiltIn.LED_BUILTIN_ID))
                             {
-                                var d = new Diagnostics.LEDBuiltIn(13); //TODO: get built in pin number from message
-                                AddDevice(d);
+                                //var d = new Diagnostics.LEDBuiltIn(13); //TODO: get built in pin number from message
+                                //AddDevice(d);
                             }
                             break;
 
@@ -313,6 +383,7 @@ namespace Chetch.Arduino
         public void SendCommand(byte targetID, ArduinoCommand command)
         {
             var message = new ADMMessage();
+            message.Type = NamedPipeManager.MessageType.COMMAND;
             message.Tag = 0; //TODO: create some kind of perhaps counter-based tagging
             message.TargetID = targetID;
             message.CommandID = (byte)command.Type;
@@ -335,6 +406,14 @@ namespace Chetch.Arduino
                 message.AddArgument(b);
             }
 
+            var bytes = new List<byte>();
+            message.AddBytes(bytes);
+            String s = "";
+            foreach(var b in bytes)
+            {
+                s += " " + b;
+            }
+            System.Diagnostics.Debug.Print("Sending bytes: " + s);
 
             SendMessage(message);
         }
@@ -349,6 +428,7 @@ namespace Chetch.Arduino
 
         public void SendString(String s)
         {
+            System.Diagnostics.Debug.Print("Sending: " + s);
             _session.SendStringData(s);
         }
 
