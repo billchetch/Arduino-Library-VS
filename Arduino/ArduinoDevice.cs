@@ -15,6 +15,14 @@ namespace Chetch.Arduino
         public long CurrentValue { get; set; }
     }
 
+    public enum DeviceCategory
+    {
+        NOT_SET,
+        DIAGNOSTICS,
+        IR_TRANSMITTER,
+        IR_RECEIVER
+    }
+
     public class ArduinoCommand
     {
         public enum CommandType
@@ -25,7 +33,7 @@ namespace Chetch.Arduino
         }
 
         public String CommandAlias { get; set; }
-        public CommandType Type { get; set; } = 0; //request to perform a certain command e.g. Send or Delete or Reset etc. etc.
+        public CommandType Type { get; set; } = CommandType.NOT_SET; //request to perform a certain command e.g. Send or Delete or Reset etc. etc.
         public List<Object> Arguments { get; set; } = new List<Object>();
         public List<ArduinoCommand> Commands { get; set; } = new List<ArduinoCommand>();
         public uint Repeat { get; set; } = 1;
@@ -53,7 +61,8 @@ namespace Chetch.Arduino
         public byte BoardID { get; set; } //ID of 'device' on the arduino board ... used by code on the board to determine what should process the command 
         public String Name { get; set; }
         public List<ArduinoPin> Pins { get; internal set; }
-        
+        public DeviceCategory Category { get; set; } = DeviceCategory.NOT_SET;
+
         private Dictionary<String, ArduinoCommand> _commands = new Dictionary<string, ArduinoCommand>();
 
         public ArduinoDeviceManager Mgr { get; set; }

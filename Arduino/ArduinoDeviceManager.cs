@@ -290,12 +290,13 @@ namespace Chetch.Arduino
             }
 
             //send configuration/setup data to board
-            /*var message = new ADMMessage();
+            var message = new ADMMessage();
             message.Type = NamedPipeManager.MessageType.CONFIGURE;
             message.TargetID = device.BoardID;
             message.AddArgument(device.ID);
             message.AddArgument(device.Name);
-            SendMessage(message);*/
+            message.AddArgument((byte)device.Category);
+            SendMessage(message);
             
             return device;
         }
@@ -344,12 +345,13 @@ namespace Chetch.Arduino
                         case NamedPipeManager.MessageType.STATUS_RESPONSE:
                             //TODO: check for Tag value of 1
                             _status = ADMStatus.DEVICE_READY;
-                            _littleEndian = true; //TODO: get little endian from the message
+                            _littleEndian = Chetch.Utilities.Convert.ToBoolean(message.GetValue("LittleEndian")); //TODO: get little endian from the message
 
-                            if (!HasDevice(Diagnostics.LEDBuiltIn.LED_BUILTIN_ID))
+                            if (!HasDevice(Diagnostics.LEDBuiltIn.LED_BUILTIN_ID) && message.HasValue("LED_BUILTIN"))
                             {
-                                //var d = new Diagnostics.LEDBuiltIn(13); //TODO: get built in pin number from message
-                                //AddDevice(d);
+                                int pin = System.Convert.ToUInt16(message.GetValue("LED_BUILTIN"));
+                                var d = new Diagnostics.LEDBuiltIn(pin);
+                                AddDevice(d);
                             }
                             break;
 

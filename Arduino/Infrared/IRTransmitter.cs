@@ -13,8 +13,10 @@ namespace Chetch.Arduino.Infrared
         private int _enablePin; //HIGH output means the transmitter is disabled (as there is no voltage across it)
         private int _transmitPin;
         
-        public IRTransmitter(String id, String name, byte boardID, int enablePin, int transmitPin, IRDB db = null) : base(id, name, boardID)
+        public IRTransmitter(String id, String name, int enablePin, int transmitPin, IRDB db = null) : base(id, name)
         {
+            Category = DeviceCategory.IR_TRANSMITTER;
+
             _enablePin = enablePin;
             _transmitPin = transmitPin;
             ConfigurePin(_enablePin, PinMode.DigitalOutput);
