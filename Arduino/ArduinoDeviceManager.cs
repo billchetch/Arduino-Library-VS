@@ -49,7 +49,7 @@ namespace Chetch.Arduino
 
             //we now add a byte to handle the zero byte case cos the zero byte is interpreted as string termination
             byte mask = (byte)255;
-            while(mask-- >= 1) {
+            while(mask >= 1) {
                 bool useable = true;
                 foreach(var b in bytes)
                 {
@@ -60,6 +60,7 @@ namespace Chetch.Arduino
                     }
                 }
                 if (useable) break;
+                mask--;
             }
 
             if(mask >= 1)
@@ -177,9 +178,14 @@ namespace Chetch.Arduino
             _status = ADMStatus.CONNECTED;
 
             //if here and no exceptions then the connection should be good
-            var message = new ADMMessage();
-            message.Type = NamedPipeManager.MessageType.STATUS_REQUEST;
+            //so initialise the board
+            ADMMessage message = new ADMMessage();
+            message.TargetID = 0;
+            message.Type = NamedPipeManager.MessageType.INITIALISE;
             SendMessage(message);
+
+            //and request board status
+            RequestStatus();
         }
 
         public void Disconnect()
@@ -293,9 +299,9 @@ namespace Chetch.Arduino
             var message = new ADMMessage();
             message.Type = NamedPipeManager.MessageType.CONFIGURE;
             message.TargetID = device.BoardID;
+            message.AddArgument((byte)device.Category);
             message.AddArgument(device.ID);
             message.AddArgument(device.Name);
-            message.AddArgument((byte)device.Category);
             SendMessage(message);
             
             return device;
@@ -343,15 +349,17 @@ namespace Chetch.Arduino
                     switch (message.Type)
                     {
                         case NamedPipeManager.MessageType.STATUS_RESPONSE:
-                            //TODO: check for Tag value of 1
-                            _status = ADMStatus.DEVICE_READY;
-                            _littleEndian = Chetch.Utilities.Convert.ToBoolean(message.GetValue("LittleEndian")); //TODO: get little endian from the message
-
-                            if (!HasDevice(Diagnostics.LEDBuiltIn.LED_BUILTIN_ID) && message.HasValue("LED_BUILTIN"))
+                            if (_status != ADMStatus.DEVICE_READY)
                             {
-                                int pin = System.Convert.ToUInt16(message.GetValue("LED_BUILTIN"));
-                                var d = new Diagnostics.LEDBuiltIn(pin);
-                                AddDevice(d);
+                                _status = ADMStatus.DEVICE_READY;
+                                _littleEndian = Chetch.Utilities.Convert.ToBoolean(message.GetValue("LittleEndian"));
+
+                                if (!HasDevice(Diagnostics.LEDBuiltIn.LED_BUILTIN_ID) && message.HasValue("LED_BUILTIN"))
+                                {
+                                    int pin = System.Convert.ToUInt16(message.GetValue("LED_BUILTIN"));
+                                    var d = new Diagnostics.LEDBuiltIn(pin);
+                                    AddDevice(d);
+                                }
                             }
                             break;
 
@@ -448,6 +456,27 @@ namespace Chetch.Arduino
             }
 
             device.ExecuteCommand(command);
+        }
+
+        public void RequestStatus(String deviceID = null)
+        {
+            var message = new ADMMessage();
+            message.Type = NamedPipeManager.MessageType.STATUS_REQUEST;
+
+            if (deviceID == null)
+            {
+                message.TargetID = 0;
+            }
+            else
+            {
+                var d = GetDevice(deviceID);
+                if (d == null)
+                {
+                    throw new Exception("Cannot find device with ID " + deviceID);
+                }
+                message.TargetID = d.BoardID;
+            }
+            SendMessage(message);
         }
     }
 }

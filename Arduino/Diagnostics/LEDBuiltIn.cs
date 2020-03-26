@@ -19,5 +19,15 @@ namespace Chetch.Arduino.Diagnostics
 
             ConfigurePin(_ledBuiltInPinNumber, PinMode.DigitalOutput);
         }
+
+        public void Blink(int repeat = 1, int delay = 1000)
+        {
+            for (int i = 0; i < repeat; i++)
+            {
+                Mgr.SetDigitalPin(_ledBuiltInPinNumber, true);
+                System.Threading.Thread.Sleep(delay);
+                Mgr.SetDigitalPin(_ledBuiltInPinNumber, false);
+            }
+        }
     }
 }
