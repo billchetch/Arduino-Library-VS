@@ -231,6 +231,8 @@ namespace Chetch.Arduino
                     return pinCapability.DigitalOutput;
                 case PinMode.PwmOutput:
                     return pinCapability.Pwm;
+                case PinMode.Undefined:
+                    return true;
             }
 
             return false;

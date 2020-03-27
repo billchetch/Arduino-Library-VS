@@ -86,7 +86,7 @@ namespace Chetch.Arduino
 
         public bool IsPinCompatible(ArduinoPin pin)
         {
-            if (Pins == null) return true;
+            if (Pins == null || pin.Mode == PinMode.Undefined) return true;
 
             //Check that it doesn't conflict with existing pins
             foreach (var p in Pins)
@@ -161,7 +161,7 @@ namespace Chetch.Arduino
             }
         }
 
-        public void ExecuteCommand(String commandAlias)
+        virtual public void ExecuteCommand(String commandAlias)
         {
             var command = GetCommand(commandAlias);
             if (command == null) throw new Exception("Command with alias " + commandAlias + " does not exist");
