@@ -154,7 +154,8 @@ namespace Chetch.Arduino
 
         private ADMStatus _status;
         private ArduinoSession _session;
-        private bool _littleEndian = true; //board uses little endian
+        private bool _littleEndian = true; //Should be set in STATUS_RESPONSE message from board
+        private String _boardName; //Should be set in STATUS_RESPONSE message from board
         private Dictionary<String, ArduinoDevice> _devices;
         private Dictionary<String, byte> _device2boardID;
         private BoardCapability _boardCapability;
@@ -274,7 +275,7 @@ namespace Chetch.Arduino
             foreach (var dpin in device.Pins)
             {
                 //check that pins have the required capability
-                if (!IsPinCapable(dpin)) throw new Exception("Cannot add device " + device.Name + " as pin " + dpin.PinNumber + " is not compatibl with the board");
+                if (!IsPinCapable(dpin)) throw new Exception("Cannot add device " + device.Name + " as pin " + dpin.PinNumber + " board does not support capability");
 
                 //check no conflict with existing pin usage
                 foreach (var dev in _devices.Values)
@@ -355,10 +356,11 @@ namespace Chetch.Arduino
                             {
                                 _status = ADMStatus.DEVICE_READY;
                                 _littleEndian = Chetch.Utilities.Convert.ToBoolean(message.GetValue("LittleEndian"));
+                                _boardName = message.GetString("Board");
 
-                                if (!HasDevice(Diagnostics.LEDBuiltIn.LED_BUILTIN_ID) && message.HasValue("LED_BUILTIN"))
+                                if (!HasDevice(Diagnostics.LEDBuiltIn.LED_BUILTIN_ID) && message.HasValue("LEDBuiltIn"))
                                 {
-                                    int pin = System.Convert.ToUInt16(message.GetValue("LED_BUILTIN"));
+                                    int pin = System.Convert.ToUInt16(message.GetValue("LEDBuiltIn"));
                                     var d = new Diagnostics.LEDBuiltIn(pin);
                                     AddDevice(d);
                                 }
@@ -417,15 +419,6 @@ namespace Chetch.Arduino
                 }
                 message.AddArgument(b);
             }
-
-            var bytes = new List<byte>();
-            message.AddBytes(bytes);
-            String s = "";
-            foreach(var b in bytes)
-            {
-                s += " " + b;
-            }
-            System.Diagnostics.Debug.Print("Sending bytes: " + s);
 
             SendMessage(message);
         }

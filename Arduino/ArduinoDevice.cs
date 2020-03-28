@@ -29,7 +29,14 @@ namespace Chetch.Arduino
         {
             NOT_SET,
             SEND,
-            RESET
+            RESET,
+            INITIALISE,
+            RECEIVE,
+            START,
+            STOP,
+            OPEN,
+            CLOSE,
+            RECORD
         }
 
         public String CommandAlias { get; set; }
@@ -93,7 +100,7 @@ namespace Chetch.Arduino
             {
                 if (p.PinNumber == pin.PinNumber)
                 {
-                    return (p.Mode == pin.Mode);
+                    return (p.Mode == PinMode.Undefined) || (p.Mode == pin.Mode);
                 }
             }
 
