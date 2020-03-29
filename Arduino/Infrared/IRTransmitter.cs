@@ -7,13 +7,13 @@ using Solid.Arduino.Firmata;
 
 namespace Chetch.Arduino.Infrared
 {
-    public abstract class IRTransmitter : ArduinoDevice
+    public abstract class IRTransmitter : IRDevice
     {
         private bool _enabled = false;
         private int _enablePin; //HIGH output means the transmitter is disabled (as there is no voltage across it)
         private int _transmitPin;
         
-        public IRTransmitter(String id, String name, int enablePin, int transmitPin, IRDB db = null) : base(id, name)
+        public IRTransmitter(String id, String name, int enablePin, int transmitPin, IRDB db = null) : base(id, name, db)
         {
             Category = DeviceCategory.IR_TRANSMITTER;
 

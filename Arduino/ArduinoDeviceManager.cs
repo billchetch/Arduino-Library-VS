@@ -158,6 +158,7 @@ namespace Chetch.Arduino
         private String _boardName; //Should be set in STATUS_RESPONSE message from board
         private Dictionary<String, ArduinoDevice> _devices;
         private Dictionary<String, byte> _device2boardID;
+        private Dictionary<byte, ArduinoDevice> _boardID2device;
         private BoardCapability _boardCapability;
         private Dictionary<int, List<ArduinoDevice>> _pin2device;
         private Action<ADMMessage, ArduinoDeviceManager> _listener;
@@ -172,6 +173,7 @@ namespace Chetch.Arduino
 
             _devices = new Dictionary<String, ArduinoDevice>();
             _device2boardID = new Dictionary<String, byte>();
+            _boardID2device = new Dictionary<byte, ArduinoDevice>();
 
             _boardCapability = _session.GetBoardCapability();
             _pin2device = new Dictionary<int, List<ArduinoDevice>>();
@@ -289,6 +291,7 @@ namespace Chetch.Arduino
             if (device.BoardID > 0)
             {
                 _device2boardID[device.ID] = device.BoardID;
+                _boardID2device[device.BoardID] = device;
             }
 
             foreach (var dpin in device.Pins)
@@ -301,10 +304,7 @@ namespace Chetch.Arduino
             //send configuration/setup data to board
             var message = new ADMMessage();
             message.Type = NamedPipeManager.MessageType.CONFIGURE;
-            message.TargetID = device.BoardID;
-            message.AddArgument((byte)device.Category);
-            message.AddArgument(device.ID);
-            message.AddArgument(device.Name);
+            device.AddConfig(message);
             SendMessage(message);
             
             return device;
@@ -319,6 +319,15 @@ namespace Chetch.Arduino
             {
                 return null;
             }
+        }
+
+        public ArduinoDevice GetDeviceByBoardID(byte boardID)
+        {
+            if (boardID > 0 && _boardID2device.ContainsKey(boardID))
+            {
+                return _boardID2device[boardID];
+            }
+            return null;
         }
 
         public Boolean HasDevice(String deviceID)
@@ -394,7 +403,7 @@ namespace Chetch.Arduino
 
         }
 
-        public void SendCommand(byte targetID, ArduinoCommand command)
+        public void SendCommand(byte targetID, ArduinoCommand command, List<Object> extraArgs = null)
         {
             var message = new ADMMessage();
             message.Type = NamedPipeManager.MessageType.COMMAND;
@@ -402,7 +411,14 @@ namespace Chetch.Arduino
             message.TargetID = targetID;
             message.CommandID = (byte)command.Type;
 
-            foreach (Object arg in command.Arguments)
+
+            List<Object> allArgs = command.Arguments;
+            if(extraArgs != null && extraArgs.Count > 0)
+            {
+                allArgs.AddRange(extraArgs);
+            }
+
+            foreach (Object arg in allArgs)
             {
                 byte[] b;
                 if (arg is String)
@@ -442,7 +458,7 @@ namespace Chetch.Arduino
             _session.SetDigitalPin(pinNumber, value);
         }
 
-        public void IssueCommand(String deviceID, String command)
+        public void IssueCommand(String deviceID, String command, params Object[] args)
         {
             var device = GetDevice(deviceID);
             if(device == null)
@@ -450,7 +466,14 @@ namespace Chetch.Arduino
                 throw new Exception("Cannot find device with ID " + deviceID);
             }
 
-            device.ExecuteCommand(command);
+            List<Object> extraArgs = null;
+            if(args.Length > 0)
+            {
+                extraArgs = new List<Object>();
+                extraArgs.AddRange(args);
+            }
+
+            device.ExecuteCommand(command, extraArgs, false);
         }
 
         public void RequestStatus(String deviceID = null)

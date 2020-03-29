@@ -61,6 +61,8 @@
     <Compile Include="Diagnostics\DiagnosticsDevice.cs" />
     <Compile Include="Diagnostics\LEDBuiltIn.cs" />
     <Compile Include="Infrared\IRDB.cs" />
+    <Compile Include="Infrared\IRDevice.cs" />
+    <Compile Include="Infrared\IRGenericReceiver.cs" />
     <Compile Include="Infrared\IRReceiver.cs" />
     <Compile Include="Infrared\IRSamsungTV.cs" />
     <Compile Include="Infrared\IRTransmitter.cs" />

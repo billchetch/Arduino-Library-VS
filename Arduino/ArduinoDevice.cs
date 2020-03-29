@@ -168,14 +168,14 @@ namespace Chetch.Arduino
             }
         }
 
-        virtual public void ExecuteCommand(String commandAlias)
+        virtual public void ExecuteCommand(String commandAlias, List<Object> extraArgs = null, bool deep = false)
         {
             var command = GetCommand(commandAlias);
             if (command == null) throw new Exception("Command with alias " + commandAlias + " does not exist");
-            ExecuteCommand(command);
+            ExecuteCommand(command, extraArgs, deep);
         }
 
-        virtual protected void ExecuteCommand(ArduinoCommand command)
+        virtual protected void ExecuteCommand(ArduinoCommand command, List<Object> extraArgs = null, bool deep = false)
         {
             for(int i = 0; i < command.Repeat; i++)
             {
@@ -183,16 +183,24 @@ namespace Chetch.Arduino
                 {
                     foreach(var ccommand in command.Commands)
                     {
-                        ExecuteCommand(ccommand);
+                        ExecuteCommand(ccommand, deep ? extraArgs : null, deep);
                     }
                 } else
                 {
                     if (Mgr == null) throw new Exception("Device has not yet been added to a device manager");
 
-                    Mgr.SendCommand(BoardID, command);
+                    Mgr.SendCommand(BoardID, command, extraArgs);
                     //System.Diagnostics.Debug.Print(command.CommandAlias);
                 }
             }
+        }
+
+        virtual public void AddConfig(ADMMessage message)
+        {
+            message.TargetID = BoardID;
+            message.AddArgument((byte)Category);
+            message.AddArgument(ID);
+            message.AddArgument(Name);
         }
     }
 }
