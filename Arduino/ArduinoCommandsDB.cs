@@ -3,17 +3,18 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Chetch.Database;
 
 namespace Chetch.Arduino
 {
-    abstract public class ArduinoCommandsDB : Database.DB
+    abstract public class ArduinoCommandsDB : DB
     {
         public ArduinoCommandsDB()
         {
             //empty constructor for template factory method
         }
 
-        abstract protected List<Dictionary<String, Object>> SelectCommands(String deviceName);
+        abstract public List<DBRow> SelectCommands(String deviceName);
         abstract protected ArduinoCommand CreateCommand(String deviceName, Dictionary<String, Object> row);
 
         virtual public List<ArduinoCommand> GetCommands(String deviceName)

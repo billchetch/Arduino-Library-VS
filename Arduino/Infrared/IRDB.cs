@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Chetch.Database;
 
 namespace Chetch.Arduino.Infrared
 {
@@ -24,6 +25,7 @@ namespace Chetch.Arduino.Infrared
 
         override public void Initialize()
         {
+            //SELECTS
             String fields = "dc.*, command_alias";
             String from = "ir_device_commands dc INNER JOIN ir_devices d ON dc.device_id=d.id INNER JOIN ir_commands c ON dc.command_id=c.id";
             String filter = "device_name='{0}'";
@@ -36,14 +38,25 @@ namespace Chetch.Arduino.Infrared
             sort = "device_name";
             this.AddSelectStatement("ir_devices", fields, from, filter, sort);
 
-            this.AddInsertStatement("ir_devices", "device_name='{0}',device_type='{1}',manufacturer='{2}'");
+            fields = "cmd.*";
+            from = "ir_commands cmd";
+            filter = null;
+            sort = "command_alias";
+            this.AddSelectStatement("ir_commands", fields, from, filter, sort);
 
+            //INSERTS
+            this.AddInsertStatement("ir_devices", "device_name='{0}',device_type='{1}',manufacturer='{2}'");
+            this.AddInsertStatement("ir_commands", "command_alias='{0}'");
+            this.AddInsertStatement("ir_device_commands", "device_id={0},command_id={1},command='{2}',protocol={3},bits={4}");
+
+            //UPDATES
             this.AddUpdateStatement("ir_devices", "device_name='{0}',device_type='{1}',manufacturer='{2}'", "id={3}");
 
+            //Init base
             base.Initialize();
         }
 
-        override protected List<Dictionary<String, Object>> SelectCommands(String deviceName)
+        override public List<DBRow> SelectCommands(String deviceName)
         {
             return Select("ir_device_commands", "command, command_alias, bits, protocol, repeat_count", deviceName);
         }
@@ -67,14 +80,14 @@ namespace Chetch.Arduino.Infrared
             return command;
         }
 
-        public List<Dictionary<String, Object>> GetDevices()
+        public List<DBRow> SelectDevices()
         {
             return Select("ir_devices", "id, device_name, device_type, manufacturer");
         }
 
-        public Dictionary<String, Object> GetDevice(String deviceName)
+        public DBRow GetDevice(String deviceName)
         {
-            var devs = GetDevices();
+            var devs = SelectDevices();
             foreach (var dev in devs)
             {
                 if (deviceName.Equals((String)dev["device_name"], StringComparison.OrdinalIgnoreCase))
@@ -105,5 +118,29 @@ namespace Chetch.Arduino.Infrared
         }
 
 
+        public List<DBRow> SelectCommandAliases()
+        {
+            return Select("ir_commands", "id,command_alias");
+        }
+
+        public long InsertCommandAlias(String alias)
+        {
+            return Insert("ir_commands", alias);
+        }
+
+        public long InsertCommand(long deviceId, long aliasId, long irCode, int protocol, int bits)
+        {
+            String code = "";
+            switch (Encoding)
+            {
+                case IREncoding.HEX:
+                    code = irCode.ToString("X");
+                    break;
+                case IREncoding.LONG:
+                    code = irCode.ToString();
+                    break;
+            }
+            return Insert("ir_device_commands", deviceId.ToString(), aliasId.ToString(), code, protocol.ToString(), bits.ToString());
+        }
     }
 }

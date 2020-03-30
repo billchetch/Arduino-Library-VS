@@ -88,7 +88,32 @@ namespace Chetch.Arduino.Infrared
         public void WriteIRCodes()
         {
             if (DB == null) throw new Exception("No database available");
-            //DB.
+            WriteDevice();
+            if (DBID == 0) throw new Exception("No database ID value for device");
+
+            var commandAliases = Chetch.Database.IDMap<String>.Create(DB.SelectCommandAliases(), "command_alias");
+            foreach (var kv in _irCodes)
+            {
+                IRCode irc = kv.Value;
+
+                long caid;
+                if (!commandAliases.ContainsKey(kv.Key))
+                {
+                    caid = DB.InsertCommandAlias(kv.Key);
+                }
+                else
+                {
+                    caid = System.Convert.ToInt64(commandAliases[kv.Key]["id"]);
+                }
+
+                try { 
+                    DB.InsertCommand(DBID, caid, irc.code, irc.protocol, irc.bits);
+                } catch (Exception e)
+                {
+                    //can happen if ir code is a duplicate
+                    //Console.WriteLine(e.Message);
+                }
+            }
         }
     }
 }
