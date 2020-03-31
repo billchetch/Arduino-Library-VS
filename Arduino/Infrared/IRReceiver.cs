@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Solid.Arduino.Firmata;
+using Chetch.Utilities;
 
 namespace Chetch.Arduino.Infrared
 {
@@ -14,6 +15,8 @@ namespace Chetch.Arduino.Infrared
         private int _receivePin;
         private Dictionary<String, IRCode> _irCodes = new Dictionary<String, IRCode>();
         private Dictionary<long, IRCode> _unknownCodes = new Dictionary<long, IRCode>();
+        private List<long> _ignoreCodes = new List<long>(); //codes we ignore
+
         public Dictionary<String, IRCode> IRCodes
         {
             get { return _irCodes;  }
@@ -42,6 +45,18 @@ namespace Chetch.Arduino.Infrared
             AddCommand(cmd);
         }
 
+        override public void ReadDevice()
+        {
+            base.ReadDevice();
+
+            ArduinoCommand cmd = DB.GetCommand(Name, REPEAT_COMMAND);
+            if (cmd != null)
+            {
+                long code = System.Convert.ToInt64(cmd.Arguments[0]);
+                _ignoreCodes.Add(code);
+            }
+        }
+
         override protected void ExecuteCommand(ArduinoCommand command, List<Object> extraArgs = null, bool deep = false)
         {
             switch (command.Type)
@@ -63,26 +78,63 @@ namespace Chetch.Arduino.Infrared
 
         virtual public void processCode(long code, int protocol, int bits = 32)
         {
-            if(_commandName != null && _commandName.Length > 0)
-            {
-                IRCode irc;
+            processCode(_commandName, code, protocol, bits);
+        }
 
-                if (_irCodes.ContainsKey(_commandName))
+        virtual public void processCode(String commandName, long code, int protocol, int bits)
+        {
+            if (commandName == null || commandName.Length == 0 || _ignoreCodes.Contains(code)) return;
+
+            IRCode irc = new IRCode();
+            if (_irCodes.ContainsKey(commandName))
+            {
+                if(_irCodes[commandName].code != code)
                 {
-                    irc = _irCodes[_commandName];
-                    if(irc.code != code)
-                    {
-                        _unknownCodes[code] = irc;
-                    }
-                } else
-                {
-                    irc = new IRCode();
                     irc.code = code;
                     irc.protocol = protocol;
                     irc.bits = bits;
-                    _irCodes[_commandName] = irc;
+                    _unknownCodes[code] = irc;
                 }
+            } else
+            {
+                irc.code = code;
+                irc.protocol = protocol;
+                irc.bits = bits;
+                _irCodes[commandName] = irc;
             }   
+        }
+
+        virtual public void processUnknownCode(String commandName, IRCode irc)
+        {
+            if (commandName == null || commandName.Length == 0) return;
+
+            if (!_irCodes.ContainsKey(commandName))
+            {
+                _irCodes[commandName] = irc;
+            } else
+            {
+                throw new Exception(commandName + " is not unknown");
+            }
+        }
+
+        public override void HandleMessage(ADMMessage message)
+        {
+            base.HandleMessage(message);
+            if (!IsConnected) return;
+
+            switch (message.Type)
+            {
+                case NamedPipeManager.MessageType.DATA:
+                    if(message.HasValues("Code","Protocol","Bits"))
+                    {
+                        long ircode = message.GetLong("Code");
+                        int protocol = message.GetInt("Protocol");
+                        int bits = message.GetInt("Bits");
+
+                        processCode(ircode, protocol, bits);
+                    }
+                    break;
+            }
         }
 
         public void WriteIRCodes()

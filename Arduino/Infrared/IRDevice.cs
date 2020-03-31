@@ -15,6 +15,8 @@ namespace Chetch.Arduino.Infrared
 
     public class IRDevice : ArduinoDevice
     {
+        public const String REPEAT_COMMAND = "_REPEAT";
+
         protected IRDB DB { get; set;  }
         protected long DBID { get; set;  }  = 0;
         public bool IsInDB

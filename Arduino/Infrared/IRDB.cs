@@ -61,18 +61,18 @@ namespace Chetch.Arduino.Infrared
             return Select("ir_device_commands", "command, command_alias, bits, protocol, repeat_count", deviceName);
         }
 
-        protected override ArduinoCommand CreateCommand(string deviceName, Dictionary<string, object> row)
+        protected override ArduinoCommand CreateCommand(string deviceName, DBRow row)
         {
             var command = new ArduinoCommand((String)row["command_alias"], (uint)row["repeat_count"]);
             command.Type = ArduinoCommand.CommandType.SEND;
             switch (Encoding)
             {
                 case IREncoding.HEX:
-                    command.AddArgument(Convert.ToUInt64((String)row["command"], 16));
+                    command.AddArgument(Convert.ToInt64((String)row["command"], 16));
                     break;
 
                 case IREncoding.LONG:
-                    command.AddArgument(Convert.ToUInt64((String)row["command"]));
+                    command.AddArgument(Convert.ToInt64((String)row["command"]));
                     break;
             }
             command.AddArgument(Convert.ToUInt16(row["bits"]));

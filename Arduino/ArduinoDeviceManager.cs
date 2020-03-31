@@ -340,6 +340,17 @@ namespace Chetch.Arduino
             return _pin2device[pinNumber];
         }
 
+        public ArduinoDevice GetTargetedDevice(ADMMessage message)
+        {
+            var boardID = Chetch.Utilities.Convert.ToByte(message.Target);
+            return GetDeviceByBoardID(boardID);
+        }
+
+        public bool IsDeviceConnected(String deviceID)
+        {
+            var d = GetDevice(deviceID);
+            return (d != null && d.IsConnected);
+        }
 
         public void OnMessageReceived(Object sender, FirmataMessageEventArgs eventArgs)
         {
@@ -361,7 +372,7 @@ namespace Chetch.Arduino
                     switch (message.Type)
                     {
                         case NamedPipeManager.MessageType.STATUS_RESPONSE:
-                            if (_status != ADMStatus.DEVICE_READY)
+                            if(_status != ADMStatus.DEVICE_READY)
                             {
                                 _status = ADMStatus.DEVICE_READY;
                                 _littleEndian = Chetch.Utilities.Convert.ToBoolean(message.GetValue("LittleEndian"));
@@ -376,8 +387,20 @@ namespace Chetch.Arduino
                             }
                             break;
 
+                        case NamedPipeManager.MessageType.CONFIGURE_RESPONSE:
+                            break;
+
                         case NamedPipeManager.MessageType.ERROR:
                             break;
+                    }
+
+                    if (_status == ADMStatus.DEVICE_READY)
+                    {
+                        var dev = GetTargetedDevice(message);
+                        if (dev != null)
+                        {
+                            dev.HandleMessage(message);
+                        }
                     }
                     break;
 

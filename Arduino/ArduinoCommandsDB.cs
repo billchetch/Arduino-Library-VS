@@ -15,7 +15,20 @@ namespace Chetch.Arduino
         }
 
         abstract public List<DBRow> SelectCommands(String deviceName);
-        abstract protected ArduinoCommand CreateCommand(String deviceName, Dictionary<String, Object> row);
+        virtual public DBRow SelectCommand(String deviceName, String commandAlias, String commandAliasField = "command_alias")
+        {
+            var commands = SelectCommands(deviceName);
+            foreach(var row in commands)
+            {
+                if (commandAlias.Equals((String)row[commandAliasField], StringComparison.OrdinalIgnoreCase))
+                {
+                    return row;
+                }
+            }
+            return null;
+        }
+
+        abstract protected ArduinoCommand CreateCommand(String deviceName, DBRow row);
 
         virtual public List<ArduinoCommand> GetCommands(String deviceName)
         {
@@ -30,6 +43,12 @@ namespace Chetch.Arduino
             }
 
             return commands;
+        }
+
+        virtual public ArduinoCommand GetCommand(String deviceName, String commandAlias, String commandAliasField = "command_alias")
+        {
+            var row = SelectCommand(deviceName, commandAlias, commandAliasField);
+            return row == null ? null : CreateCommand(deviceName, row);
         }
     }
 }

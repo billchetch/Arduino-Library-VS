@@ -69,6 +69,7 @@ namespace Chetch.Arduino
         public String Name { get; set; }
         public List<ArduinoPin> Pins { get; internal set; }
         public DeviceCategory Category { get; set; } = DeviceCategory.NOT_SET;
+        public bool IsConnected { get; internal set; } = false;
 
         private Dictionary<String, ArduinoCommand> _commands = new Dictionary<string, ArduinoCommand>();
 
@@ -192,6 +193,19 @@ namespace Chetch.Arduino
                     Mgr.SendCommand(BoardID, command, extraArgs);
                     //System.Diagnostics.Debug.Print(command.CommandAlias);
                 }
+            }
+        }
+
+        //messaging
+        virtual public void HandleMessage(ADMMessage message)
+        {
+            switch (message.Type)
+            {
+                case Chetch.Utilities.NamedPipeManager.MessageType.CONFIGURE_RESPONSE:
+                    IsConnected = true;
+                    break;
+                default:
+                    break;
             }
         }
 
