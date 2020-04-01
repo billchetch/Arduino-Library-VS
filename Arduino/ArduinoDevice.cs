@@ -23,6 +23,13 @@ namespace Chetch.Arduino
         IR_RECEIVER
     }
 
+    public enum FilterCommandsOptions
+    {
+        ALL,
+        BASE_ONLY,
+        COMPOUND_ONLY
+    }
+
     public class ArduinoCommand
     {
         public enum CommandType
@@ -44,6 +51,15 @@ namespace Chetch.Arduino
         public List<Object> Arguments { get; set; } = new List<Object>();
         public List<ArduinoCommand> Commands { get; set; } = new List<ArduinoCommand>();
         public uint Repeat { get; set; } = 1;
+        public int Delay { get; set; } = 0; //delay after command execution in milliseconds
+        public bool IsCompound
+        {
+            get
+            {
+                return Commands.Count > 0;
+            }
+        }
+
 
         public ArduinoCommand()
         {
@@ -60,13 +76,33 @@ namespace Chetch.Arduino
         {
             Arguments.Add(arg);
         }
+
+
+        public override string ToString()
+        {
+            String s;
+            if(IsCompound)
+            {
+                s = "";
+                foreach(var cmd in Commands)
+                {
+                    s += (s.Length > 0 ? ", " : "") + cmd.CommandAlias;
+                }
+                s = CommandAlias + ": " + s;
+            }
+            else
+            {
+                s = CommandAlias + ": " + String.Join(", ",  Arguments);
+            }
+            return s;
+        }
     }
 
     public class ArduinoDevice
     {
         public String ID { get; internal set; }
         public byte BoardID { get; set; } //ID of 'device' on the arduino board ... used by code on the board to determine what should process the command 
-        public String Name { get; set; }
+        virtual public String Name { get; set; }
         public List<ArduinoPin> Pins { get; internal set; }
         public DeviceCategory Category { get; set; } = DeviceCategory.NOT_SET;
         public bool IsConnected { get; internal set; } = false;
@@ -76,7 +112,7 @@ namespace Chetch.Arduino
         public ArduinoDeviceManager Mgr { get; set; }
 
         public ArduinoDevice()
-        {
+        { 
             //Empty constructor
         }
 
@@ -133,6 +169,25 @@ namespace Chetch.Arduino
             return _commands.ContainsKey(key) ? _commands[key] : null;
         }
 
+        public List<ArduinoCommand> GetCommands(FilterCommandsOptions options = FilterCommandsOptions.ALL)
+        {
+            List<ArduinoCommand> commands = new List<ArduinoCommand>();
+
+            if (_commands == null || _commands.Count == 0) return commands;
+
+            commands = _commands.Values.ToList();
+            switch (options)
+            {
+                case FilterCommandsOptions.BASE_ONLY:
+                    commands = commands.Where<ArduinoCommand>(x => !x.IsCompound).ToList();
+                    break;
+                case FilterCommandsOptions.COMPOUND_ONLY:
+                    commands = commands.Where<ArduinoCommand>(x => x.IsCompound).ToList();
+                    break;
+            }
+            return commands;
+        }
+
         public ArduinoCommand AddCommand(ArduinoCommand command)
         {
             var key = command.CommandAlias.ToLower();
@@ -169,6 +224,21 @@ namespace Chetch.Arduino
             }
         }
 
+        virtual public void ClearCommands(FilterCommandsOptions options = FilterCommandsOptions.ALL)
+        {
+            if (options == FilterCommandsOptions.ALL)
+            {
+                _commands.Clear();
+            } else
+            {
+                List<ArduinoCommand> commands2remove = GetCommands(options);
+                foreach(var cmd in commands2remove)
+                {
+                    _commands.Remove(cmd.CommandAlias);
+                }
+            }
+        }
+
         virtual public void ExecuteCommand(String commandAlias, List<Object> extraArgs = null, bool deep = false)
         {
             var command = GetCommand(commandAlias);
@@ -189,9 +259,11 @@ namespace Chetch.Arduino
                 } else
                 {
                     if (Mgr == null) throw new Exception("Device has not yet been added to a device manager");
-
                     Mgr.SendCommand(BoardID, command, extraArgs);
-                    //System.Diagnostics.Debug.Print(command.CommandAlias);
+                    if(command.Delay > 0)
+                    {
+                        System.Threading.Thread.Sleep(command.Delay);
+                    }
                 }
             }
         }

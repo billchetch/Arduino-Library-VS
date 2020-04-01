@@ -481,7 +481,7 @@ namespace Chetch.Arduino
             _session.SetDigitalPin(pinNumber, value);
         }
 
-        public void IssueCommand(String deviceID, String command, params Object[] args)
+        public void IssueCommand(String deviceID, String command, int repeat, params Object[] args)
         {
             var device = GetDevice(deviceID);
             if(device == null)
@@ -496,7 +496,15 @@ namespace Chetch.Arduino
                 extraArgs.AddRange(args);
             }
 
-            device.ExecuteCommand(command, extraArgs, false);
+            for (int i = 0; i < repeat; i++)
+            {
+                device.ExecuteCommand(command, extraArgs, false);
+            }
+        }
+
+        public void IssueCommand(String deviceID, String command, params Object[] args)
+        {
+            IssueCommand(deviceID, command, 1, args);
         }
 
         public void RequestStatus(String deviceID = null)

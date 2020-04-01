@@ -15,7 +15,14 @@ namespace Chetch.Arduino.Infrared
             HEX
         }
 
-        public IREncoding Encoding { get; set; } = IREncoding.LONG;
+        static public IRDB Create(System.Configuration.ApplicationSettingsBase settings, IREncoding encoding = IREncoding.HEX)
+        {
+            IRDB db = DB.Create<IRDB>(settings);
+            db.Encoding = encoding;
+            return db;
+        }
+
+        public IREncoding Encoding { get; set; } = IREncoding.HEX;
         
         public IRDB()
         {
@@ -29,7 +36,7 @@ namespace Chetch.Arduino.Infrared
             String fields = "dc.*, command_alias";
             String from = "ir_device_commands dc INNER JOIN ir_devices d ON dc.device_id=d.id INNER JOIN ir_commands c ON dc.command_id=c.id";
             String filter = "device_name='{0}'";
-            String sort = "dc.id";
+            String sort = "command_alias";
             this.AddSelectStatement("ir_device_commands", fields, from, filter, sort);
 
             fields = "dev.*";

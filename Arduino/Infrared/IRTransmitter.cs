@@ -22,10 +22,18 @@ namespace Chetch.Arduino.Infrared
             ConfigurePin(_enablePin, PinMode.DigitalOutput);
             ConfigurePin(_transmitPin, PinMode.PwmOutput);
 
-            if (db != null) AddCommands(db.GetCommands(name));
         }
 
-        
+        public override void ReadDevice()
+        {
+            base.ReadDevice();
+            if(DB != null)
+            {
+                ClearCommands();
+                AddCommands(DB.GetCommands(Name));
+            }
+        }
+
         public void Disable()
         {
             Mgr.SetDigitalPin(_enablePin, true);
@@ -38,10 +46,8 @@ namespace Chetch.Arduino.Infrared
             _enabled = true;
         }
 
-        /*override public void ExecuteCommand(ArduinoCommand command, String[] args = null)
+        override protected void ExecuteCommand(ArduinoCommand command, List<Object> extraArgs = null, bool deep = false)
         {
-            if (Mgr == null) throw new Exception("Device has not yet been added to a device manager");
-
             if(!_enabled){
                 List<ArduinoDevice> devices = Mgr.GetDevicesByPin(_transmitPin);
                 foreach (var device in devices)
@@ -55,7 +61,7 @@ namespace Chetch.Arduino.Infrared
                 Enable();
             }
 
-            base.ExecuteCommand(command, args);
-        }*/
+            base.ExecuteCommand(command, extraArgs, deep);
+        }
     }
 }
