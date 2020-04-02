@@ -77,6 +77,27 @@ namespace Chetch.Arduino
             Arguments.Add(arg);
         }
 
+        public override bool Equals(object obj)
+        {
+            if (obj == null) return false;
+            if (!(obj is ArduinoCommand)) return false;
+
+            var cmd = (ArduinoCommand)obj;
+            if (!CommandAlias.Equals(cmd.CommandAlias, StringComparison.OrdinalIgnoreCase)) return false;
+
+            if (Commands.Count != cmd.Commands.Count) return false;
+            for(int i = 0; i < Commands.Count; i++)
+            {
+                if (!Commands[i].Equals(cmd.Commands[i])) return false;
+            }
+
+            if (Arguments.Count != cmd.Arguments.Count) return false;
+            for(int i = 0; i < Arguments.Count; i++)
+            {
+                if (!Arguments[i].Equals(cmd.Arguments[i])) return false;
+            }
+            return true;
+        }
 
         public override string ToString()
         {
@@ -108,6 +129,8 @@ namespace Chetch.Arduino
         public bool IsConnected { get; internal set; } = false;
 
         private Dictionary<String, ArduinoCommand> _commands = new Dictionary<string, ArduinoCommand>();
+        public ArduinoCommand LastCommandSent { get; internal set; } = null;
+        public long LastCommandSentOn { get; internal set; } = 0;
 
         public ArduinoDeviceManager Mgr { get; set; }
 
@@ -258,14 +281,21 @@ namespace Chetch.Arduino
                     }
                 } else
                 {
-                    if (Mgr == null) throw new Exception("Device has not yet been added to a device manager");
-                    Mgr.SendCommand(BoardID, command, extraArgs);
+                    SendCommand(command, extraArgs);
                     if(command.Delay > 0)
                     {
                         System.Threading.Thread.Sleep(command.Delay);
                     }
                 }
             }
+        }
+
+        virtual protected void SendCommand(ArduinoCommand command, List<Object> extraArgs = null)
+        {
+            if (Mgr == null) throw new Exception("Device has not yet been added to a device manager");
+            Mgr.SendCommand(BoardID, command, extraArgs);
+            LastCommandSent = command;
+            LastCommandSentOn = DateTime.Now.Ticks;
         }
 
         //messaging
@@ -275,9 +305,24 @@ namespace Chetch.Arduino
             {
                 case Chetch.Utilities.NamedPipeManager.MessageType.CONFIGURE_RESPONSE:
                     IsConnected = true;
+                    OnConnect(message);
                     break;
                 default:
                     break;
+            }
+        }
+
+        virtual protected void OnConnect(ADMMessage message)
+        {
+            foreach(var pin in Pins)
+            {
+                switch(pin.Mode)
+                {
+                    case PinMode.DigitalInput:
+                    case PinMode.DigitalOutput:
+                        Mgr.SetDigitalPinMode(pin.PinNumber, pin.Mode);
+                        break;
+                }
             }
         }
 

@@ -12,6 +12,11 @@ namespace Chetch.Arduino.Infrared
         private bool _enabled = false;
         private int _enablePin; //HIGH output means the transmitter is disabled (as there is no voltage across it)
         private int _transmitPin;
+        private ArduinoCommand _repeatCommand = null;
+
+        //if last command is same as current command and time diff (millis) between last command and current command
+        //is less than RepeatInterval then use _repeatCommand if it exists.
+        protected int RepeatInterval { get; set; } = 200; 
         
         public IRTransmitter(String id, String name, int enablePin, int transmitPin, IRDB db = null) : base(id, name, db)
         {
@@ -31,6 +36,8 @@ namespace Chetch.Arduino.Infrared
             {
                 ClearCommands();
                 AddCommands(DB.GetCommands(Name));
+
+                _repeatCommand = GetCommand(REPEAT_COMMAND);
             }
         }
 
@@ -62,6 +69,20 @@ namespace Chetch.Arduino.Infrared
             }
 
             base.ExecuteCommand(command, extraArgs, deep);
+        }
+
+        override protected void SendCommand(ArduinoCommand command, List<Object> extraArgs = null)
+        {
+            var timeDiff = (DateTime.Now.Ticks - LastCommandSentOn) / TimeSpan.TicksPerMillisecond;
+            if (_repeatCommand != null && LastCommandSent != null && LastCommandSent.Equals(command) && timeDiff < RepeatInterval)
+            {
+                base.SendCommand(_repeatCommand, extraArgs);
+                LastCommandSent = command;
+            }
+            else
+            {
+                base.SendCommand(command, extraArgs);
+            }
         }
     }
 }

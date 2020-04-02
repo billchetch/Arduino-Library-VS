@@ -360,7 +360,6 @@ namespace Chetch.Arduino
             {
                 case MessageType.StringData:
                     StringData sd = (StringData)fmessage.Value;
-                    System.Diagnostics.Debug.Print("Received: " + sd.Text);
                     try
                     {
                         message = ADMMessage.Deserialize<ADMMessage>(sd.Text, NamedPipeManager.MessageEncoding.QUERY_STRING);
@@ -472,7 +471,7 @@ namespace Chetch.Arduino
 
         public void SendString(String s)
         {
-            System.Diagnostics.Debug.Print("Sending: " + s);
+            //System.Diagnostics.Debug.Print("Sending: " + s);
             _session.SendStringData(s);
         }
 
@@ -481,7 +480,13 @@ namespace Chetch.Arduino
             _session.SetDigitalPin(pinNumber, value);
         }
 
-        public void IssueCommand(String deviceID, String command, int repeat, params Object[] args)
+
+        public void SetDigitalPinMode(int pinNumber, PinMode pinMode)
+        {
+            _session.SetDigitalPinMode(pinNumber, pinMode);
+        }
+
+        public void IssueCommand(String deviceID, String command, int repeat, int delay, params Object[] args)
         {
             var device = GetDevice(deviceID);
             if(device == null)
@@ -499,12 +504,11 @@ namespace Chetch.Arduino
             for (int i = 0; i < repeat; i++)
             {
                 device.ExecuteCommand(command, extraArgs, false);
+                if(delay > 0)
+                {
+                    System.Threading.Thread.Sleep(delay);
+                }
             }
-        }
-
-        public void IssueCommand(String deviceID, String command, params Object[] args)
-        {
-            IssueCommand(deviceID, command, 1, args);
         }
 
         public void RequestStatus(String deviceID = null)

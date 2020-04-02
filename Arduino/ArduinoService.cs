@@ -208,7 +208,7 @@ namespace Chetch.Arduino
             if (ADM == null || ADM.Status == ADMStatus.NOT_CONNECTED) throw new Exception("ADM not connected");
 
 
-            ADM.IssueCommand(message.Target, message.Command);
+            ADM.IssueCommand(message.Target, message.Command, 1, 0);
         }
 
         //messaging
