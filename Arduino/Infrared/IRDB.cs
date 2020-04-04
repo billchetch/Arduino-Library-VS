@@ -33,18 +33,21 @@ namespace Chetch.Arduino.Infrared
         override public void Initialize()
         {
             //SELECTS
+            // - Device commands: IR codes etc.
             String fields = "dc.*, command_alias";
             String from = "ir_device_commands dc INNER JOIN ir_devices d ON dc.device_id=d.id INNER JOIN ir_commands c ON dc.command_id=c.id";
             String filter = "device_name='{0}'";
             String sort = "command_alias";
             this.AddSelectStatement("ir_device_commands", fields, from, filter, sort);
-
+            
+            // - Devices
             fields = "dev.*";
             from = "ir_devices dev";
             filter = null;
             sort = "device_name";
             this.AddSelectStatement("ir_devices", fields, from, filter, sort);
 
+            // - Command Aliases
             fields = "cmd.*";
             from = "ir_commands cmd";
             filter = null;
@@ -58,6 +61,7 @@ namespace Chetch.Arduino.Infrared
 
             //UPDATES
             this.AddUpdateStatement("ir_devices", "device_name='{0}',device_type='{1}',manufacturer='{2}'", "id={3}");
+            this.AddUpdateStatement("ir_device_commands", "device_id={0},command_id={1},command='{2}',protocol={3},bits={4}", "id={5}");
 
             //Init base
             base.Initialize();
@@ -65,12 +69,12 @@ namespace Chetch.Arduino.Infrared
 
         override public List<DBRow> SelectCommands(String deviceName)
         {
-            return Select("ir_device_commands", "command, command_alias, bits, protocol, repeat_count", deviceName);
+            return Select("ir_device_commands", "id, command, command_alias, bits, protocol", deviceName);
         }
 
         protected override ArduinoCommand CreateCommand(string deviceName, DBRow row)
         {
-            var command = new ArduinoCommand((String)row["command_alias"], (uint)row["repeat_count"]);
+            var command = new ArduinoCommand((String)row["command_alias"]);
             command.Type = ArduinoCommand.CommandType.SEND;
             switch (Encoding)
             {
@@ -148,6 +152,22 @@ namespace Chetch.Arduino.Infrared
                     break;
             }
             return Insert("ir_device_commands", deviceId.ToString(), aliasId.ToString(), code, protocol.ToString(), bits.ToString());
+        }
+
+        public void UpdateCommand(long devCommandId, long deviceId, long aliasId, long irCode, int protocol, int bits)
+        {
+            String code = "";
+            switch (Encoding)
+            {
+                case IREncoding.HEX:
+                    code = irCode.ToString("X");
+                    break;
+                case IREncoding.LONG:
+                    code = irCode.ToString();
+                    break;
+            }
+
+            Update("ir_device_commands", deviceId.ToString(), aliasId.ToString(), code, protocol.ToString(), bits.ToString(), devCommandId.ToString());
         }
     }
 }

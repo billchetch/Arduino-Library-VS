@@ -8,9 +8,36 @@ namespace Chetch.Arduino.Infrared
 {
     public struct IRCode
     {
-        public long code;
-        public int protocol;
-        public int bits;
+        public long Code;
+        public int Protocol;
+        public int Bits;
+
+        public override string ToString()
+        {
+            return Code.ToString() + " (" + Code.ToString("X") + ") " + Protocol.ToString() + " " + Bits.ToString();
+        }
+    }
+
+    public enum IRProtocol{
+        UNKNOWN = -1,
+        UNUSED = 0,
+        RC5,
+        RC6,
+        NEC,
+        SONY,
+        PANASONIC,
+        JVC,
+        SAMSUNG,
+        WHYNTER,
+        AIWA_RC_T501,
+        LG,
+        SANYO,
+        MITSUBISHI,
+        DISH,
+        SHARP,
+        DENON,
+        PRONTO,
+        LEGO_PF
     }
 
     public class IRDevice : ArduinoDevice
@@ -28,6 +55,7 @@ namespace Chetch.Arduino.Infrared
         }
         public String DeviceType { get; set; } = null;
         public String Manufacturer { get; set; } = null;
+        public IRProtocol Protocol { get; set; } = IRProtocol.UNKNOWN; //TODO: set this to force sending/recording in a different protocol
 
         public IRDevice(String id, String name, IRDB db = null) : base(id, name)
         {

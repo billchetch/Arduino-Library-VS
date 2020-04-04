@@ -27,7 +27,8 @@ namespace Chetch.Arduino
     {
         ALL,
         BASE_ONLY,
-        COMPOUND_ONLY
+        COMPOUND_ONLY,
+        BY_TYPE
     }
 
     public class ArduinoCommand
@@ -50,8 +51,8 @@ namespace Chetch.Arduino
         public CommandType Type { get; set; } = CommandType.NOT_SET; //request to perform a certain command e.g. Send or Delete or Reset etc. etc.
         public List<Object> Arguments { get; set; } = new List<Object>();
         public List<ArduinoCommand> Commands { get; set; } = new List<ArduinoCommand>();
-        public uint Repeat { get; set; } = 1;
-        public int Delay { get; set; } = 0; //delay after command execution in milliseconds
+        public int Delay { get; set; } = 0; //delay in milliseconds between 'child' commands
+        public int Repeat { get; set; } = 1; 
         public bool IsCompound
         {
             get
@@ -66,10 +67,9 @@ namespace Chetch.Arduino
 
         }
 
-        public ArduinoCommand(String commandAlias, uint repeat  = 1)
+        public ArduinoCommand(String commandAlias)
         {
             CommandAlias = commandAlias;
-            Repeat = repeat;
         }
 
         public void AddArgument(Object arg)
@@ -207,6 +207,10 @@ namespace Chetch.Arduino
                 case FilterCommandsOptions.COMPOUND_ONLY:
                     commands = commands.Where<ArduinoCommand>(x => x.IsCompound).ToList();
                     break;
+                case FilterCommandsOptions.BY_TYPE:
+                    throw new NotImplementedException("Not yet implemented");
+                    break;
+
             }
             return commands;
         }
@@ -222,14 +226,16 @@ namespace Chetch.Arduino
             return command;
         }
 
-        public ArduinoCommand AddCommand(String commandAlias,  uint repeat = 1)
+        public ArduinoCommand AddCommand(String commandAlias)
         {
-            return AddCommand(new ArduinoCommand(commandAlias, repeat));
+            return AddCommand(new ArduinoCommand(commandAlias));
         }
 
-        public ArduinoCommand AddCommand(String commandAlias, String[] commandAliases, uint repeat = 1)
+        public ArduinoCommand AddCommand(String commandAlias, String[] commandAliases, int delay = 1, int repeat = 1)
         {
-            var command = new ArduinoCommand(commandAlias, repeat);
+            var command = new ArduinoCommand(commandAlias);
+            command.Delay = delay;
+            command.Repeat = repeat;
             for(int i = 0; i < commandAliases.Length; i++)
             {
                 var c = GetCommand(commandAliases[i]);
@@ -237,6 +243,17 @@ namespace Chetch.Arduino
                 command.Commands.Add(c);
             }
             return AddCommand(command);
+        }
+
+        public ArduinoCommand TryAddCommand(String commandAlias, String commandAliases, int delay = 1, int repeat = 1)
+        {
+            try
+            {
+                return AddCommand(commandAlias, commandAliases.Split(','), delay, repeat);
+            } catch (Exception)
+            {
+                return null;
+            }
         }
 
         virtual public void AddCommands(List<ArduinoCommand> commands)
@@ -262,31 +279,31 @@ namespace Chetch.Arduino
             }
         }
 
-        virtual public void ExecuteCommand(String commandAlias, List<Object> extraArgs = null, bool deep = false)
+        virtual public void ExecuteCommand(String commandAlias, List<Object> extraArgs = null)
         {
             var command = GetCommand(commandAlias);
             if (command == null) throw new Exception("Command with alias " + commandAlias + " does not exist");
-            ExecuteCommand(command, extraArgs, deep);
+            ExecuteCommand(command, extraArgs, false);
         }
 
         virtual protected void ExecuteCommand(ArduinoCommand command, List<Object> extraArgs = null, bool deep = false)
         {
-            for(int i = 0; i < command.Repeat; i++)
+            if(command.Commands.Count > 0)
             {
-                if(command.Commands.Count > 0)
+                for (int i = 0; i < command.Repeat; i++)
                 {
-                    foreach(var ccommand in command.Commands)
+                    foreach (var ccommand in command.Commands)
                     {
                         ExecuteCommand(ccommand, deep ? extraArgs : null, deep);
+                        if (command.Delay > 0)
+                        {
+                            System.Threading.Thread.Sleep(command.Delay);
+                        }
                     }
-                } else
-                {
-                    SendCommand(command, extraArgs);
-                    if(command.Delay > 0)
-                    {
-                        System.Threading.Thread.Sleep(command.Delay);
-                    }
-                }
+                } //end command repeat
+            } else
+            {
+                SendCommand(command, extraArgs);
             }
         }
 

@@ -88,6 +88,7 @@ namespace Chetch.Arduino
         protected ArduinoDeviceManager ADM { get; set; }
         protected String SupportedBoards { get; set; }
         protected Timer timer;
+        private bool _devicesAdded = false;
         
         public ArduinoService(String inboundID) : base(inboundID)
         {
@@ -215,6 +216,13 @@ namespace Chetch.Arduino
         virtual protected void ADMMessageReceived(ADMMessage message, ArduinoDeviceManager Mgr)
         {
             //TODO: stuff in response to messages from the board manager
+            if (ADM != null && !_devicesAdded && ADM.Status == ADMStatus.DEVICE_READY)
+            {
+                AddDevices();
+                _devicesAdded = true;
+            }
         }
+
+        abstract protected void AddDevices();
     }
 }

@@ -12,11 +12,12 @@ namespace Chetch.Arduino.Infrared
         private bool _enabled = false;
         private int _enablePin; //HIGH output means the transmitter is disabled (as there is no voltage across it)
         private int _transmitPin;
-        private ArduinoCommand _repeatCommand = null;
 
         //if last command is same as current command and time diff (millis) between last command and current command
         //is less than RepeatInterval then use _repeatCommand if it exists.
-        protected int RepeatInterval { get; set; } = 200; 
+        private ArduinoCommand _repeatCommand = null;
+        public int RepeatInterval { get; set; } = 200;
+        public bool UseRepeatCommand = true;
         
         public IRTransmitter(String id, String name, int enablePin, int transmitPin, IRDB db = null) : base(id, name, db)
         {
@@ -53,6 +54,23 @@ namespace Chetch.Arduino.Infrared
             _enabled = true;
         }
 
+        override public void ExecuteCommand(String commandAlias, List<Object> extraArgs = null)
+        {
+            if(commandAlias.Length == 2 && uint.TryParse(commandAlias, out _))
+            {
+                //split a 2 digit number in to it's components
+                int d1 = (int)char.GetNumericValue(commandAlias[0]);
+                int d2 = (int)char.GetNumericValue(commandAlias[1]);
+
+                base.ExecuteCommand(d1.ToString(), extraArgs);
+                System.Threading.Thread.Sleep(RepeatInterval * 2);
+                base.ExecuteCommand(d2.ToString(), extraArgs);
+            } else
+            {
+                base.ExecuteCommand(commandAlias, extraArgs);
+            }
+        }
+
         override protected void ExecuteCommand(ArduinoCommand command, List<Object> extraArgs = null, bool deep = false)
         {
             if(!_enabled){
@@ -73,8 +91,13 @@ namespace Chetch.Arduino.Infrared
 
         override protected void SendCommand(ArduinoCommand command, List<Object> extraArgs = null)
         {
+            if(command.Type == ArduinoCommand.CommandType.SEND && Protocol != IRProtocol.UNKNOWN && command.Arguments.Count == 3)
+            {
+                command.Arguments[2] = (int)Protocol;
+            }
+
             var timeDiff = (DateTime.Now.Ticks - LastCommandSentOn) / TimeSpan.TicksPerMillisecond;
-            if (_repeatCommand != null && LastCommandSent != null && LastCommandSent.Equals(command) && timeDiff < RepeatInterval)
+            if (UseRepeatCommand && _repeatCommand != null && LastCommandSent != null && LastCommandSent.Equals(command) && timeDiff < RepeatInterval)
             {
                 base.SendCommand(_repeatCommand, extraArgs);
                 LastCommandSent = command;

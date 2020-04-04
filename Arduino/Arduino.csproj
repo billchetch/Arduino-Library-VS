@@ -30,6 +30,9 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Chetch.Application">
+      <HintPath>..\..\Application\Application\bin\Debug\Chetch.Application.dll</HintPath>
+    </Reference>
     <Reference Include="Chetch.Database">
       <HintPath>..\..\Database\Database\bin\Debug\Chetch.Database.dll</HintPath>
     </Reference>

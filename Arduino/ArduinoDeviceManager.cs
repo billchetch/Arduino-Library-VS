@@ -2,11 +2,12 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
+using System.Threading;
 using Solid.Arduino.Firmata;
 using Solid.Arduino;
 using Chetch.Services;
 using Chetch.Utilities;
+using Chetch.Application;
 
 namespace Chetch.Arduino
 {
@@ -98,6 +99,13 @@ namespace Chetch.Arduino
         }
     }
 
+    
+    /*
+     * ADM
+     * 
+     * 
+     */
+
     public class ArduinoDeviceManager
     {
         private const int CONNECT_TIMEOUT = 10000;
@@ -151,7 +159,6 @@ namespace Chetch.Arduino
                 return _devices != null ? _devices.Count : 0;
             }
         }
-
         private ADMStatus _status;
         private ArduinoSession _session;
         private bool _littleEndian = true; //Should be set in STATUS_RESPONSE message from board
@@ -162,7 +169,12 @@ namespace Chetch.Arduino
         private BoardCapability _boardCapability;
         private Dictionary<int, List<ArduinoDevice>> _pin2device;
         private Action<ADMMessage, ArduinoDeviceManager> _listener;
-        
+
+        //Thread Locks
+        private Object LockSendString = new Object();
+        private Object LockSetDigitalPin = new Object();
+        private Object LockSetDigitalPinMode = new Object();
+
         public ArduinoDeviceManager(ArduinoSession firmata, Action<ADMMessage, ArduinoDeviceManager> listener)
         {
             _status = ADMStatus.CONNECTING;
@@ -432,8 +444,7 @@ namespace Chetch.Arduino
             message.Tag = 0; //TODO: create some kind of perhaps counter-based tagging
             message.TargetID = targetID;
             message.CommandID = (byte)command.Type;
-
-
+            
             List<Object> allArgs = command.Arguments;
             if(extraArgs != null && extraArgs.Count > 0)
             {
@@ -472,21 +483,30 @@ namespace Chetch.Arduino
         public void SendString(String s)
         {
             //System.Diagnostics.Debug.Print("Sending: " + s);
-            _session.SendStringData(s);
+            lock (LockSendString)
+            {
+                _session.SendStringData(s);
+            }
         }
 
         public void SetDigitalPin(int pinNumber, bool value)
         {
-            _session.SetDigitalPin(pinNumber, value);
+            lock(LockSetDigitalPin)
+            {
+                _session.SetDigitalPin(pinNumber, value);
+            }
         }
 
 
         public void SetDigitalPinMode(int pinNumber, PinMode pinMode)
         {
-            _session.SetDigitalPinMode(pinNumber, pinMode);
+            lock (LockSetDigitalPinMode)
+            {
+                _session.SetDigitalPinMode(pinNumber, pinMode);
+            }
         }
 
-        public void IssueCommand(String deviceID, String command, int repeat, int delay, params Object[] args)
+        public bool IssueCommand(String deviceID, String command, int repeat, int delay, params Object[] args)
         {
             var device = GetDevice(deviceID);
             if(device == null)
@@ -501,34 +521,15 @@ namespace Chetch.Arduino
                 extraArgs.AddRange(args);
             }
 
-            for (int i = 0; i < repeat; i++)
-            {
-                device.ExecuteCommand(command, extraArgs, false);
-                if(delay > 0)
-                {
-                    System.Threading.Thread.Sleep(delay);
-                }
-            }
+            //Use ThreadExecutionManager to allow for multi-threading by device but fail if the same device (because ThreadExecutionManager.MaxQueueSize = 1
+            return ThreadExecutionManager<List<Object>>.Execute(device.ID, repeat, delay, device.ExecuteCommand, command, extraArgs);
         }
 
-        public void RequestStatus(String deviceID = null)
+        public void RequestStatus()
         {
             var message = new ADMMessage();
             message.Type = NamedPipeManager.MessageType.STATUS_REQUEST;
-
-            if (deviceID == null)
-            {
-                message.TargetID = 0;
-            }
-            else
-            {
-                var d = GetDevice(deviceID);
-                if (d == null)
-                {
-                    throw new Exception("Cannot find device with ID " + deviceID);
-                }
-                message.TargetID = d.BoardID;
-            }
+            message.TargetID = 0;
             SendMessage(message);
         }
     }

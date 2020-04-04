@@ -20,7 +20,7 @@ namespace Chetch.Arduino.Diagnostics
             ConfigurePin(_ledBuiltInPinNumber, PinMode.Undefined);
         }
 
-        override public void ExecuteCommand(String commandAlias, List<Object> extraArgs = null, bool deep = false)
+        override public void ExecuteCommand(String commandAlias, List<Object> extraArgs = null)
         {
             if (commandAlias == null) throw new Exception("Cannot have a null command alias");
             switch (commandAlias.ToLower())
@@ -36,7 +36,7 @@ namespace Chetch.Arduino.Diagnostics
                     break;
 
                 default:
-                    base.ExecuteCommand(commandAlias, extraArgs, deep);
+                    base.ExecuteCommand(commandAlias, extraArgs);
                     break;
             }
         }

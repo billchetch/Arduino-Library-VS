@@ -83,23 +83,23 @@ namespace Chetch.Arduino.Infrared
 
         virtual public void processCode(String commandName, long code, int protocol, int bits)
         {
-            if (commandName == null || commandName.Length == 0 || _ignoreCodes.Contains(code)) return;
+            if (commandName == null || commandName.Length == 0 || _ignoreCodes.Contains(code) || protocol == (int)IRProtocol.UNKNOWN) return;
 
             IRCode irc = new IRCode();
             if (_irCodes.ContainsKey(commandName))
             {
-                if(_irCodes[commandName].code != code)
+                if(_irCodes[commandName].Code != code)
                 {
-                    irc.code = code;
-                    irc.protocol = protocol;
-                    irc.bits = bits;
+                    irc.Code = code;
+                    irc.Protocol = protocol;
+                    irc.Bits = bits;
                     _unknownCodes[code] = irc;
                 }
             } else
             {
-                irc.code = code;
-                irc.protocol = protocol;
-                irc.bits = bits;
+                irc.Code = code;
+                irc.Protocol = protocol;
+                irc.Bits = bits;
                 _irCodes[commandName] = irc;
             }   
         }
@@ -155,15 +155,20 @@ namespace Chetch.Arduino.Infrared
                 }
                 else
                 {
-                    caid = System.Convert.ToInt64(commandAliases[kv.Key]["id"]);
+                    caid = commandAliases[kv.Key].ID;
                 }
 
                 try { 
-                    DB.InsertCommand(DBID, caid, irc.code, irc.protocol, irc.bits);
+                    DB.InsertCommand(DBID, caid, irc.Code, irc.Protocol, irc.Bits);
                 } catch (Exception e)
                 {
                     //can happen if ir code is a duplicate
                     //Console.WriteLine(e.Message);
+                    var row = DB.SelectCommand(Name, kv.Key);
+                    if (row == null) throw e;
+                    long cmdid = row.ID;
+                    if (cmdid == 0) throw new Exception("No ir command code found in database");
+                    DB.UpdateCommand(cmdid, DBID, caid, irc.Code, irc.Protocol, irc.Bits);
                 }
             }
         }
