@@ -124,7 +124,7 @@ namespace Chetch.Arduino.Infrared
 
             switch (message.Type)
             {
-                case NamedPipeManager.MessageType.DATA:
+                case Messaging.MessageType.DATA:
                     if(message.HasValues("Code","Protocol","Bits"))
                     {
                         long ircode = message.GetLong("Code");

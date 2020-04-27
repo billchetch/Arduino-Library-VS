@@ -320,7 +320,7 @@ namespace Chetch.Arduino
         {
             switch (message.Type)
             {
-                case Chetch.Utilities.NamedPipeManager.MessageType.CONFIGURE_RESPONSE:
+                case Messaging.MessageType.CONFIGURE_RESPONSE:
                     IsConnected = true;
                     OnConnect(message);
                     break;

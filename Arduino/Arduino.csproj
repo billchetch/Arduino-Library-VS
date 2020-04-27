@@ -36,6 +36,9 @@
     <Reference Include="Chetch.Database">
       <HintPath>..\..\Database\Database\bin\Debug\Chetch.Database.dll</HintPath>
     </Reference>
+    <Reference Include="Chetch.Messaging">
+      <HintPath>..\..\Messaging\Messaging\bin\Debug\Chetch.Messaging.dll</HintPath>
+    </Reference>
     <Reference Include="Chetch.Services">
       <HintPath>..\..\Services\Services\bin\Debug\Chetch.Services.dll</HintPath>
     </Reference>
@@ -59,8 +62,6 @@
     <Compile Include="ArduinoCommandsDB.cs" />
     <Compile Include="ArduinoDeviceManager.cs" />
     <Compile Include="ArduinoDevice.cs" />
-    <Compile Include="ArduinoService.cs" />
-    <Compile Include="ArduinoServiceClient.cs" />
     <Compile Include="Diagnostics\DiagnosticsDevice.cs" />
     <Compile Include="Diagnostics\LEDBuiltIn.cs" />
     <Compile Include="Infrared\IRDB.cs" />

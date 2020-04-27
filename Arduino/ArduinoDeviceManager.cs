@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using System.Diagnostics;
 using Solid.Arduino.Firmata;
 using Solid.Arduino;
 using Chetch.Services;
 using Chetch.Utilities;
 using Chetch.Application;
+using Chetch.Messaging;
 
 namespace Chetch.Arduino
 {
@@ -19,7 +21,7 @@ namespace Chetch.Arduino
         DEVICE_READY
     }
 
-    public class ADMMessage : NamedPipeManager.Message
+    public class ADMMessage : Message
     {
         public byte Tag { get; set; } = 0; //can be used to track messages
         public byte TargetID { get; set; } = 0; //ID number on board to determine what is beig targeted
@@ -28,7 +30,7 @@ namespace Chetch.Arduino
         
         public ADMMessage()
         {
-
+            DefaultEncoding = MessageEncoding.BYTES_ARRAY;
         }
 
         public override void AddBytes(List<byte> bytes)
@@ -92,11 +94,6 @@ namespace Chetch.Arduino
         {
             AddArgument(Chetch.Utilities.Convert.ToBytes(s));
         }
-
-        public String Serialize()
-        {
-            return Serialize(NamedPipeManager.MessageEncoding.BYTES_ARRAY);
-        }
     }
 
     
@@ -115,11 +112,18 @@ namespace Chetch.Arduino
         static public ArduinoDeviceManager Connect(String supportedBoards, int timeOut, Action<ADMMessage, ArduinoDeviceManager> listener)
         {
             var boards = supportedBoards.Split(',');
+            if(boards.Length == 0)
+            {
+                throw new Exception("ArduinnoDviceManager:Connect no supportedBoards provided");
+            }
+
+            bool boardPortFound = false;
             foreach (var board in boards)
             {
                 List<String> boardPorts = Chetch.Utilities.SerialPorts.Find(board.Trim());
                 if (boardPorts.Count > 0)
                 {
+                    boardPortFound = true;
                     ISerialConnection connection = new EnhancedSerialConnection(boardPorts[0], SerialBaudRate.Bps_57600);
                     if (connection != null)
                     {
@@ -135,6 +139,11 @@ namespace Chetch.Arduino
                         }
                     }
                 }
+            } //end loop through supportedBoards
+
+            if (!boardPortFound)
+            { 
+                throw new Exception("ArduinnoDviceManager:Connect no board ports found");
             }
 
             return null;
@@ -150,6 +159,7 @@ namespace Chetch.Arduino
             return Connect(supportedBoards, CONNECT_TIMEOUT, null);
         }
 
+        public TraceSource Tracing { get; set; } = null;
 
         public ADMStatus Status { get { return _status; } }
         public int DeviceCount
@@ -196,7 +206,7 @@ namespace Chetch.Arduino
             //so initialise the board
             ADMMessage message = new ADMMessage();
             message.TargetID = 0;
-            message.Type = NamedPipeManager.MessageType.INITIALISE;
+            message.Type = Messaging.MessageType.INITIALISE;
             SendMessage(message);
 
             //and request board status
@@ -206,7 +216,7 @@ namespace Chetch.Arduino
         public void Disconnect()
         {
             _status = ADMStatus.NOT_CONNECTED;
-            _session.Dispose();
+            _session?.Dispose();
         }
 
 
@@ -219,7 +229,7 @@ namespace Chetch.Arduino
 
             try
             {
-                SendString("X");
+                RequestStatus();
             }
             catch (System.IO.IOException e)
             {
@@ -315,7 +325,7 @@ namespace Chetch.Arduino
 
             //send configuration/setup data to board
             var message = new ADMMessage();
-            message.Type = NamedPipeManager.MessageType.CONFIGURE;
+            message.Type = Messaging.MessageType.CONFIGURE;
             device.AddConfig(message);
             SendMessage(message);
             
@@ -370,19 +380,22 @@ namespace Chetch.Arduino
             ADMMessage message = null;
             switch (fmessage.Type)
             {
-                case MessageType.StringData:
+                case Solid.Arduino.Firmata.MessageType.StringData:
                     StringData sd = (StringData)fmessage.Value;
                     try
                     {
-                        message = ADMMessage.Deserialize<ADMMessage>(sd.Text, NamedPipeManager.MessageEncoding.QUERY_STRING);
+                        message = ADMMessage.Deserialize<ADMMessage>(sd.Text, MessageEncoding.QUERY_STRING);
                     } catch (Exception e)
                     {
-                        //TODO: What to do here?
-                        System.Diagnostics.Debug.Print(e.Message);
+                        Tracing?.TraceEvent(TraceEventType.Error, 4000, "Deserializing produced exception {0}: {1}", e.GetType().ToString(), e.Message);
+                        message = new ADMMessage();
+                        message.Type = Messaging.MessageType.ERROR;
+                        message.Value = e.Message;
+                        break;
                     }
                     switch (message.Type)
                     {
-                        case NamedPipeManager.MessageType.STATUS_RESPONSE:
+                        case Messaging.MessageType.STATUS_RESPONSE:
                             if(_status != ADMStatus.DEVICE_READY)
                             {
                                 _status = ADMStatus.DEVICE_READY;
@@ -398,10 +411,10 @@ namespace Chetch.Arduino
                             }
                             break;
 
-                        case NamedPipeManager.MessageType.CONFIGURE_RESPONSE:
+                        case Messaging.MessageType.CONFIGURE_RESPONSE:
                             break;
 
-                        case NamedPipeManager.MessageType.ERROR:
+                        case Messaging.MessageType.ERROR:
                             break;
                     }
 
@@ -415,15 +428,15 @@ namespace Chetch.Arduino
                     }
                     break;
 
-                case MessageType.PinStateResponse:
+                case Solid.Arduino.Firmata.MessageType.PinStateResponse:
                     break;
 
-                case MessageType.DigitalPortState:
+                case Solid.Arduino.Firmata.MessageType.DigitalPortState:
                     DigitalPortState state = (DigitalPortState)fmessage.Value;
                     string binary = System.Convert.ToString(state.Pins, 2);
                     break;
 
-                case MessageType.CapabilityResponse:
+                case Solid.Arduino.Firmata.MessageType.CapabilityResponse:
                     break;
 
                 default:
@@ -440,7 +453,7 @@ namespace Chetch.Arduino
         public void SendCommand(byte targetID, ArduinoCommand command, List<Object> extraArgs = null)
         {
             var message = new ADMMessage();
-            message.Type = NamedPipeManager.MessageType.COMMAND;
+            message.Type = Messaging.MessageType.COMMAND;
             message.Tag = 0; //TODO: create some kind of perhaps counter-based tagging
             message.TargetID = targetID;
             message.CommandID = (byte)command.Type;
@@ -506,7 +519,7 @@ namespace Chetch.Arduino
             }
         }
 
-        public bool IssueCommand(String deviceID, String command, int repeat, int delay, params Object[] args)
+        public void IssueCommand(String deviceID, String command, int repeat, int delay, params Object[] args)
         {
             var device = GetDevice(deviceID);
             if(device == null)
@@ -522,13 +535,21 @@ namespace Chetch.Arduino
             }
 
             //Use ThreadExecutionManager to allow for multi-threading by device but fail if the same device (because ThreadExecutionManager.MaxQueueSize = 1
-            return ThreadExecutionManager<List<Object>>.Execute(device.ID, repeat, delay, device.ExecuteCommand, command, extraArgs);
+            ThreadExecutionManager.Execute<List<Object>>(device.ID, repeat, delay, device.ExecuteCommand, command, extraArgs);
         }
 
         public void RequestStatus()
         {
             var message = new ADMMessage();
-            message.Type = NamedPipeManager.MessageType.STATUS_REQUEST;
+            message.Type = Messaging.MessageType.STATUS_REQUEST;
+            message.TargetID = 0;
+            SendMessage(message);
+        }
+
+        public void Ping()
+        {
+            var message = new ADMMessage();
+            message.Type = Messaging.MessageType.STATUS_REQUEST;
             message.TargetID = 0;
             SendMessage(message);
         }
