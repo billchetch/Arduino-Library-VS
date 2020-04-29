@@ -10,7 +10,7 @@ using Chetch.Messaging;
 
 namespace Chetch.Arduino
 {
-    abstract class ADMService : TCPMessagingClient
+    abstract public class ADMService : TCPMessagingClient
     {
         public enum ADMEvent
         {
