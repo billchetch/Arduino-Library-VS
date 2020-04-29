@@ -151,6 +151,11 @@ namespace Chetch.Arduino
             BoardID = boardID;
         }
 
+        override public String ToString()
+        {
+            return String.Format("{0} {1} {2} {3}", ID, Name, Category.ToString(), IsConnected ? "Connected" : "Not connected");
+        }
+
         public bool IsPinCompatible(ArduinoPin pin)
         {
             if (Pins == null || pin.Mode == PinMode.Undefined) return true;

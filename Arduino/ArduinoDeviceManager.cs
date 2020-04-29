@@ -229,7 +229,7 @@ namespace Chetch.Arduino
 
             try
             {
-                RequestStatus();
+                Ping();
             }
             catch (System.IO.IOException e)
             {
@@ -330,6 +330,11 @@ namespace Chetch.Arduino
             SendMessage(message);
             
             return device;
+        }
+
+        public List<ArduinoDevice> GetDevices()
+        {
+            return _devices.Values.ToList();
         }
 
         public ArduinoDevice GetDevice(String deviceID)
@@ -519,7 +524,12 @@ namespace Chetch.Arduino
             }
         }
 
-        public void IssueCommand(String deviceID, String command, int repeat, int delay, params Object[] args)
+        public void IssueCommand(String deviceID, String command, List<Object> args)
+        {
+            IssueCommand(deviceID, command, 1, 0, args);
+        }
+
+        public void IssueCommand(String deviceID, String command, int repeat, int delay, List<Object> args)
         {
             var device = GetDevice(deviceID);
             if(device == null)
@@ -527,15 +537,11 @@ namespace Chetch.Arduino
                 throw new Exception("Cannot find device with ID " + deviceID);
             }
 
-            List<Object> extraArgs = null;
-            if(args.Length > 0)
-            {
-                extraArgs = new List<Object>();
-                extraArgs.AddRange(args);
-            }
-
-            //Use ThreadExecutionManager to allow for multi-threading by device but fail if the same device (because ThreadExecutionManager.MaxQueueSize = 1
-            ThreadExecutionManager.Execute<List<Object>>(device.ID, repeat, delay, device.ExecuteCommand, command, extraArgs);
+            //Use ThreadExecutionManager to allow for multi-threading by device 
+            int prevSize = ThreadExecutionManager.MaxQueueSize;
+            ThreadExecutionManager.MaxQueueSize = 32;
+            ThreadExecutionManager.Execute<List<Object>>(device.ID, repeat, delay, device.ExecuteCommand, command, args);
+            ThreadExecutionManager.MaxQueueSize = prevSize;
         }
 
         public void RequestStatus()
@@ -552,6 +558,22 @@ namespace Chetch.Arduino
             message.Type = Messaging.MessageType.STATUS_REQUEST;
             message.TargetID = 0;
             SendMessage(message);
+        }
+
+        public void Blink(int repeat = 1, int delay = 0)
+        {
+            if (HasDevice(Diagnostics.LEDBuiltIn.LED_BUILTIN_ID))
+            {
+                var device = (Diagnostics.LEDBuiltIn)GetDevice(Diagnostics.LEDBuiltIn.LED_BUILTIN_ID);
+                if (!device.IsConnected)
+                {
+                    throw new Exception("Device LEDBuiltIn is not connected");
+                }
+                device.Blink(repeat, delay);
+            } else
+            {
+                throw new Exception("Cannot blink as no LEDBuiltIn device available");
+            }
         }
     }
 }

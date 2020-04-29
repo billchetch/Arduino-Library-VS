@@ -62,6 +62,9 @@
     <Compile Include="ArduinoCommandsDB.cs" />
     <Compile Include="ArduinoDeviceManager.cs" />
     <Compile Include="ArduinoDevice.cs" />
+    <Compile Include="ADMService.cs">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Include="Diagnostics\DiagnosticsDevice.cs" />
     <Compile Include="Diagnostics\LEDBuiltIn.cs" />
     <Compile Include="Infrared\IRDB.cs" />
