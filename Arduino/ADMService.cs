@@ -61,7 +61,7 @@ namespace Chetch.Arduino
 
         protected Dictionary<String, ADMListener> Listeners { get; } = new Dictionary<string, ADMListener>();
 
-        abstract protected void AddADMDevices();
+        abstract protected void AddADMDevices(ADMMessage message);
 
 
         public ADMService(String clientName, String clientManagerSource, String serviceSource, String eventLog) : base(clientName, clientManagerSource, serviceSource, eventLog)
@@ -126,9 +126,39 @@ namespace Chetch.Arduino
             base.HendleClientMessage(cnn, message);
         }
 
-        virtual protected void HandleADMCommand(String deviceID, String command, List<Object> args)
+        virtual protected void HandleADMCommand(String deviceID, String command, List<Object> args, Message response)
         {
-            ADM.IssueCommand(deviceID, command, args);
+            if (!ADM.HasDevice(deviceID))
+            {
+                throw new Exception(String.Format("Device {0} has not been added to ADM", deviceID));
+            }
+
+            ArduinoDevice device = null;
+            switch (command)
+            {
+                case "list-commands":
+                    device = ADM.GetDevice(deviceID);
+                    response.AddValue("DeviceID", deviceID);
+                    var cms = device.GetCommands();
+                    response.AddValue("DeviceCommands", cms.Select(i => i.CommandAlias).ToList());
+                    break;
+
+                default:
+                    var commands = command.Split(',');
+                    foreach (var cmd in commands)
+                    {
+                        var tcmd = cmd.Trim();
+                        if (tcmd.Equals("wait", StringComparison.OrdinalIgnoreCase))
+                        {
+                            System.Threading.Thread.Sleep(200);
+                        }
+                        else
+                        {
+                            ADM.IssueCommand(deviceID, tcmd, args);
+                        }
+                    }
+                    break;
+            }
         }
 
         virtual protected void RegisterListener(String clientName, String targets)
@@ -159,6 +189,21 @@ namespace Chetch.Arduino
                 Listeners.Remove(clientName);
                 Tracing?.TraceEvent(TraceEventType.Information, 100, "Deregistered listener {0}", clientName);
             }
+        }
+
+
+        override public void AddCommandHelp(List<String> commandHelp)
+        {
+            base.AddCommandHelp(commandHelp);
+
+            commandHelp.Add("listen/register: Register this client to receive messages from ADM <devices?>.  If devices is blank it will register the client to listen for BOARD messages.");
+            commandHelp.Add("unlisten/deregister: Deregister this client to receive messages from ADM");
+            commandHelp.Add("status: Get status info about this service and the ADM");
+            commandHelp.Add("NOTE .... adm:<device?>:<command1,command2...> <args...> Sends a command (or several) directly to an ADM device (or leave device blank to send to ADM (e.g. adm:blink sends a call to ADM.Blink())");
+            commandHelp.Add("adm:status:  ADM will request board status and add additional information");
+            commandHelp.Add("adm:ping: ADM will ping the board");
+            commandHelp.Add("adm:blink: ADM will blink the built in LED");
+            commandHelp.Add("adm:devices: List devices added to ADM");
         }
 
         override public bool HandleCommand(Connection cnn, Message message, String cmd, List<Object> args, Message response)
@@ -232,13 +277,17 @@ namespace Chetch.Arduino
                                     ADM.Blink(repeat, delay);
                                     break;
 
+                                case "devices":
+                                    response.AddValue("Devices", ADM.GetDevices().Select(i => i.ToString()).ToList());
+                                    break;
+
                                 default:
                                     break;
                             }
                         }
                         else
                         {
-                            HandleADMCommand(tgtcmd[1], tgtcmd[2], args);
+                            HandleADMCommand(tgtcmd[1], tgtcmd[2], args, response);
                         }
 
                         response.Value = "Handled " + cmd;
@@ -367,7 +416,7 @@ namespace Chetch.Arduino
             if (!_devicesAdded && ADM.Status == ADMStatus.DEVICE_READY)
             {
                 Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: Ready to add devices...");
-                AddADMDevices();
+                AddADMDevices(message);
                 Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: Added devices");
                 _devicesAdded = true;
             }

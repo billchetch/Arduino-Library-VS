@@ -18,12 +18,14 @@ namespace Chetch.Arduino.Diagnostics
             _ledBuiltInPinNumber = pin;
 
             ConfigurePin(_ledBuiltInPinNumber, PinMode.Undefined);
+
+            TryAddCommand("blinktest");
+            TryAddCommand("blink");
         }
 
-        override public void ExecuteCommand(String commandAlias, List<Object> extraArgs = null)
+        override protected void SendCommand(ArduinoCommand command, List<Object> extraArgs = null)
         {
-            if (commandAlias == null) throw new Exception("Cannot have a null command alias");
-            switch (commandAlias.ToLower())
+            switch (command.CommandAlias.ToLower())
             {
                 case "blinktest":
                     Blink(10, 100);
@@ -36,7 +38,7 @@ namespace Chetch.Arduino.Diagnostics
                     break;
 
                 default:
-                    base.ExecuteCommand(commandAlias, extraArgs);
+                    base.SendCommand(command, extraArgs);
                     break;
             }
         }

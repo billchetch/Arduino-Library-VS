@@ -197,6 +197,11 @@ namespace Chetch.Arduino
             return _commands.ContainsKey(key) ? _commands[key] : null;
         }
 
+        public bool HasCommand(String commandAlias)
+        {
+            return GetCommand(commandAlias) != null;
+        }
+
         public List<ArduinoCommand> GetCommands(FilterCommandsOptions options = FilterCommandsOptions.ALL)
         {
             List<ArduinoCommand> commands = new List<ArduinoCommand>();
@@ -241,11 +246,14 @@ namespace Chetch.Arduino
             var command = new ArduinoCommand(commandAlias);
             command.Delay = delay;
             command.Repeat = repeat;
-            for(int i = 0; i < commandAliases.Length; i++)
-            {
-                var c = GetCommand(commandAliases[i]);
-                if (c == null) throw new Exception("No command found with alias " + commandAliases[i]);
-                command.Commands.Add(c);
+            if(commandAliases != null)
+            { 
+                for(int i = 0; i < commandAliases.Length; i++)
+                {
+                    var c = GetCommand(commandAliases[i]);
+                    if (c == null) throw new Exception("No command found with alias " + commandAliases[i]);
+                    command.Commands.Add(c);
+                }
             }
             return AddCommand(command);
         }
@@ -254,11 +262,16 @@ namespace Chetch.Arduino
         {
             try
             {
-                return AddCommand(commandAlias, commandAliases.Split(','), delay, repeat);
+                return AddCommand(commandAlias, commandAliases != null ? commandAliases.Split(',') : null, delay, repeat);
             } catch (Exception)
             {
                 return null;
             }
+        }
+
+        public ArduinoCommand TryAddCommand(String commandAlias)
+        {
+            return TryAddCommand(commandAlias, null);
         }
 
         virtual public void AddCommands(List<ArduinoCommand> commands)

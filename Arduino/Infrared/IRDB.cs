@@ -38,21 +38,21 @@ namespace Chetch.Arduino.Infrared
             String from = "ir_device_commands dc INNER JOIN ir_devices d ON dc.device_id=d.id INNER JOIN ir_commands c ON dc.command_id=c.id";
             String filter = "device_name='{0}'";
             String sort = "command_alias";
-            this.AddSelectStatement("ir_device_commands", fields, from, filter, sort);
+            this.AddSelectStatement("ir_device_commands", fields, from, filter, sort, null);
             
             // - Devices
             fields = "dev.*";
             from = "ir_devices dev";
             filter = null;
             sort = "device_name";
-            this.AddSelectStatement("ir_devices", fields, from, filter, sort);
+            this.AddSelectStatement("ir_devices", fields, from, filter, sort, null);
 
             // - Command Aliases
             fields = "cmd.*";
             from = "ir_commands cmd";
             filter = null;
             sort = "command_alias";
-            this.AddSelectStatement("ir_commands", fields, from, filter, sort);
+            this.AddSelectStatement("ir_commands", fields, from, filter, sort, null);
 
             //INSERTS
             this.AddInsertStatement("ir_devices", "device_name='{0}',device_type='{1}',manufacturer='{2}'");

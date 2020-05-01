@@ -392,7 +392,7 @@ namespace Chetch.Arduino
                         message = ADMMessage.Deserialize<ADMMessage>(sd.Text, MessageEncoding.QUERY_STRING);
                     } catch (Exception e)
                     {
-                        Tracing?.TraceEvent(TraceEventType.Error, 4000, "Deserializing produced exception {0}: {1}", e.GetType().ToString(), e.Message);
+                        Tracing?.TraceEvent(TraceEventType.Error, 4000, "Deserializing {0} produced exception {1}: {2}", sd.Text, e.GetType().ToString(), e.Message);
                         message = new ADMMessage();
                         message.Type = Messaging.MessageType.ERROR;
                         message.Value = e.Message;
@@ -535,6 +535,11 @@ namespace Chetch.Arduino
             if(device == null)
             {
                 throw new Exception("Cannot find device with ID " + deviceID);
+            }
+
+            if (!device.HasCommand(command))
+            {
+                throw new Exception(String.Format("Device {0} does not have command {1}", deviceID, command));
             }
 
             //Use ThreadExecutionManager to allow for multi-threading by device 
