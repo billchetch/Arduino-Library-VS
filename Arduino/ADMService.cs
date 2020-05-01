@@ -295,7 +295,7 @@ namespace Chetch.Arduino
                     else
                     {
                         Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADM: Unrecognised command {0}", cmd);
-                        response.Value = "ADM: Unrecognised command {0}";
+                        response.Value = String.Format("ADM: Unrecognised command {0}", cmd);
                     }
                     break;
             }
