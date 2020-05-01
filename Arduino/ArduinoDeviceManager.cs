@@ -532,11 +532,13 @@ namespace Chetch.Arduino
         public void IssueCommand(String deviceID, String command, int repeat, int delay, List<Object> args)
         {
             var device = GetDevice(deviceID);
+            //check has device
             if(device == null)
             {
                 throw new Exception("Cannot find device with ID " + deviceID);
             }
 
+            //check has command
             if (!device.HasCommand(command))
             {
                 throw new Exception(String.Format("Device {0} does not have command {1}", deviceID, command));
