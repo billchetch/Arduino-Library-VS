@@ -58,7 +58,8 @@ namespace Chetch.Arduino.Infrared
         {
             if(commandAlias.Length == 2 && uint.TryParse(commandAlias, out _))
             {
-                //split a 2 digit number in to it's components
+                //split a 2 digit number in to it's components ... this is so we can have commands like 62
+                //without needing to build a new command from '6' and from '2'
                 int d1 = (int)char.GetNumericValue(commandAlias[0]);
                 int d2 = (int)char.GetNumericValue(commandAlias[1]);
 

@@ -44,7 +44,8 @@ namespace Chetch.Arduino
             STOP,
             OPEN,
             CLOSE,
-            RECORD
+            RECORD,
+            SAVE
         }
 
         public String CommandAlias { get; set; }
@@ -52,7 +53,14 @@ namespace Chetch.Arduino
         public List<Object> Arguments { get; set; } = new List<Object>();
         public List<ArduinoCommand> Commands { get; set; } = new List<ArduinoCommand>();
         public int Delay { get; set; } = 0; //delay in milliseconds between 'child' commands
-        public int Repeat { get; set; } = 1; 
+        public int Repeat { get; set; } = 1;
+        public int MinWaitTime
+        {
+            get
+            {
+                return Delay * Repeat;
+            }
+        }
         public bool IsCompound
         {
             get
@@ -156,16 +164,36 @@ namespace Chetch.Arduino
             return String.Format("{0} {1} {2} {3}", ID, Name, Category.ToString(), IsConnected ? "Connected" : "Not connected");
         }
 
+        public bool IsUsingPin(int pinNumber)
+        {
+            if(Pins != null)
+            { 
+                foreach(var p in Pins)
+                {
+                    if(p.PinNumber == pinNumber)
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
         public bool IsPinCompatible(ArduinoPin pin)
         {
-            if (Pins == null || pin.Mode == PinMode.Undefined) return true;
+            return IsPinCompatible(pin.PinNumber, pin.Mode);
+        }
+
+        public bool IsPinCompatible(int pinNumber, PinMode pinMode)
+        {
+            if (Pins == null || pinMode == PinMode.Undefined) return true;
 
             //Check that it doesn't conflict with existing pins
             foreach (var p in Pins)
             {
-                if (p.PinNumber == pin.PinNumber)
+                if (p.PinNumber == pinNumber)
                 {
-                    return (p.Mode == PinMode.Undefined) || (p.Mode == pin.Mode);
+                    return (p.Mode == PinMode.Undefined) || (p.Mode == pinMode);
                 }
             }
 
@@ -327,7 +355,8 @@ namespace Chetch.Arduino
 
         virtual protected void SendCommand(ArduinoCommand command, List<Object> extraArgs = null)
         {
-            if (Mgr == null) throw new Exception("Device has not yet been added to a device manager");
+            if (Mgr == null) throw new Exception(String.Format("Device {0} has not yet been added to a device manager", ToString()));
+            if (!IsConnected) throw new Exception(String.Format("Device {0} is not 'connected' to board", ToString()));
             Mgr.SendCommand(BoardID, command, extraArgs);
             LastCommandSent = command;
             LastCommandSentOn = DateTime.Now.Ticks;
@@ -349,6 +378,7 @@ namespace Chetch.Arduino
 
         virtual protected void OnConnect(ADMMessage message)
         {
+            //ensure that the pins as configured by the device are actually configured the same on the board
             foreach(var pin in Pins)
             {
                 switch(pin.Mode)

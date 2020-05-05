@@ -13,12 +13,13 @@ using Chetch.Messaging;
 
 namespace Chetch.Arduino
 {
-    public enum ADMStatus
+    public enum ADMState
     {
         NOT_CONNECTED,
         CONNECTING,
         CONNECTED,
-        DEVICE_READY
+        DEVICE_READY,
+        DEVICE_CONNECTED
     }
 
     public class ADMMessage : Message
@@ -161,7 +162,17 @@ namespace Chetch.Arduino
 
         public TraceSource Tracing { get; set; } = null;
 
-        public ADMStatus Status { get { return _status; } }
+        private ADMState _state;
+        public ADMState State {
+            get { return _state; }
+            internal set
+            {
+                if(value != _state)
+                {
+                    _state = value;
+                }
+            }
+        }
         public int DeviceCount
         {
             get
@@ -169,7 +180,6 @@ namespace Chetch.Arduino
                 return _devices != null ? _devices.Count : 0;
             }
         }
-        private ADMStatus _status;
         private ArduinoSession _session;
         private bool _littleEndian = true; //Should be set in STATUS_RESPONSE message from board
         private String _boardName; //Should be set in STATUS_RESPONSE message from board
@@ -187,7 +197,7 @@ namespace Chetch.Arduino
 
         public ArduinoDeviceManager(ArduinoSession firmata, Action<ADMMessage, ArduinoDeviceManager> listener)
         {
-            _status = ADMStatus.CONNECTING;
+            State = ADMState.CONNECTING;
 
             _session = firmata;
             _session.MessageReceived += OnMessageReceived;
@@ -200,7 +210,7 @@ namespace Chetch.Arduino
             _boardCapability = _session.GetBoardCapability();
             _pin2device = new Dictionary<int, List<ArduinoDevice>>();
 
-            _status = ADMStatus.CONNECTED;
+            State = ADMState.CONNECTED;
 
             //if here and no exceptions then the connection should be good
             //so initialise the board
@@ -215,16 +225,16 @@ namespace Chetch.Arduino
 
         public void Disconnect()
         {
-            _status = ADMStatus.NOT_CONNECTED;
+            State = ADMState.NOT_CONNECTED;
             _session?.Dispose();
         }
 
 
         public void AssertConnection()
         {
-            if(_status == ADMStatus.NOT_CONNECTED || _status == ADMStatus.CONNECTING)
+            if(State == ADMState.NOT_CONNECTED || State == ADMState.CONNECTING)
             {
-                throw new Exception("Status is " + _status);
+                throw new Exception("Status is " + State);
             }
 
             try
@@ -233,20 +243,20 @@ namespace Chetch.Arduino
             }
             catch (System.IO.IOException e)
             {
-                _status = ADMStatus.NOT_CONNECTED;
+                State = ADMState.NOT_CONNECTED;
                 throw e;
             }
             catch (UnauthorizedAccessException e)
             {
-                _status = ADMStatus.NOT_CONNECTED;
+                State = ADMState.NOT_CONNECTED;
                 throw e;
             }
         }
 
-        public bool IsPinCapable(ArduinoPin pin)
+        public bool IsPinCapable(int pinNumber, PinMode mode)
         {
-            var pinCapability = _boardCapability.Pins[pin.PinNumber];
-            switch (pin.Mode)
+            var pinCapability = _boardCapability.Pins[pinNumber];
+            switch (mode)
             {
                 case PinMode.AnalogInput:
                     return pinCapability.Analog;
@@ -263,11 +273,27 @@ namespace Chetch.Arduino
             return false;
         }
 
+        public bool IsPinCapable(ArduinoPin pin)
+        {
+            return IsPinCapable(pin.PinNumber, pin.Mode);
+        }
+
+        public List<String> ListBoardCapability()
+        {
+            var l2r = new List<String>();
+            foreach(var pc in _boardCapability.Pins)
+            {
+                var s = String.Format("No.: {0}, Analaog: {1}, Digital Input: {2}, Digital Output: {3}, PWM: {4}", pc.PinNumber, pc.Analog, pc.DigitalInput, pc.DigitalOutput, pc.Pwm);
+                l2r.Add(s);
+            }
+            return l2r;
+        }
+
         public ArduinoDevice AddDevice(ArduinoDevice device)
         {
-            if(_status != ADMStatus.DEVICE_READY)
+            if(State != ADMState.DEVICE_READY)
             {
-                throw new Exception("ADM status mut be DEVICE_READY ... currently " + _status);
+                throw new Exception("ADM state mut be DEVICE_READY ... currently " + State);
             }
             if(device.ID == null)
             {
@@ -327,7 +353,7 @@ namespace Chetch.Arduino
             var message = new ADMMessage();
             message.Type = Messaging.MessageType.CONFIGURE;
             device.AddConfig(message);
-            SendMessage(message);
+            SendMessage(message, 100);
             
             return device;
         }
@@ -364,7 +390,7 @@ namespace Chetch.Arduino
 
         public List<ArduinoDevice> GetDevicesByPin(int pinNumber)
         {
-            return _pin2device[pinNumber];
+            return _pin2device.ContainsKey(pinNumber) ? _pin2device[pinNumber] : null;
         }
 
         public ArduinoDevice GetTargetedDevice(ADMMessage message)
@@ -389,7 +415,22 @@ namespace Chetch.Arduino
                     StringData sd = (StringData)fmessage.Value;
                     try
                     {
-                        message = ADMMessage.Deserialize<ADMMessage>(sd.Text, MessageEncoding.QUERY_STRING);
+                        String serialized = sd.Text;
+                        try
+                        {
+                            var sanitised = serialized.Replace("&", String.Empty).Replace("=", String.Empty);
+                            if (!Utilities.Convert.IsUrlEncoded(sanitised))
+                            {
+                                throw new Exception(String.Format("{0} is not URL encoded", sanitised));
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            Tracing?.TraceEvent(TraceEventType.Error, 4000, e.Message);
+                        }
+
+                        message = ADMMessage.Deserialize<ADMMessage>(serialized, MessageEncoding.QUERY_STRING);
+                        message.TargetID = Utilities.Convert.ToByte(message.Target);
                     } catch (Exception e)
                     {
                         Tracing?.TraceEvent(TraceEventType.Error, 4000, "Deserializing {0} produced exception {1}: {2}", sd.Text, e.GetType().ToString(), e.Message);
@@ -401,9 +442,9 @@ namespace Chetch.Arduino
                     switch (message.Type)
                     {
                         case Messaging.MessageType.STATUS_RESPONSE:
-                            if(_status != ADMStatus.DEVICE_READY)
+                            if(State != ADMState.DEVICE_READY)
                             {
-                                _status = ADMStatus.DEVICE_READY;
+                                State = ADMState.DEVICE_READY;
                                 _littleEndian = Chetch.Utilities.Convert.ToBoolean(message.GetValue("LittleEndian"));
                                 _boardName = message.GetString("Board");
 
@@ -423,12 +464,30 @@ namespace Chetch.Arduino
                             break;
                     }
 
-                    if (_status == ADMStatus.DEVICE_READY)
+                    if (State == ADMState.DEVICE_READY || State == ADMState.DEVICE_CONNECTED)
                     {
                         var dev = GetTargetedDevice(message);
                         if (dev != null)
                         {
                             dev.HandleMessage(message);
+                        }
+
+                        if(message.Type == Messaging.MessageType.CONFIGURE_RESPONSE)
+                        {
+                            bool devicesConnected = true;
+                            foreach(var d in _devices.Values)
+                            {
+                                if (!d.IsConnected)
+                                {
+                                    devicesConnected = false;
+                                    break;
+                                }
+                            }
+
+                            if (devicesConnected)
+                            {
+                                State = ADMState.DEVICE_CONNECTED;
+                            }
                         }
                     }
                     break;
@@ -452,7 +511,6 @@ namespace Chetch.Arduino
             {
                 _listener(message, this);
             }
-
         }
 
         public void SendCommand(byte targetID, ArduinoCommand command, List<Object> extraArgs = null)
@@ -490,11 +548,17 @@ namespace Chetch.Arduino
             SendMessage(message);
         }
 
-        public void SendMessage(ADMMessage message)
+        public void SendMessage(ADMMessage message, int sleep = 0)
         {
             if(message != null)
             {
                 SendString(message.Serialize());
+                if(sleep > 0)
+                {
+                    //this is to avoid a problem where we bombard the serial port ... the sleep allows the board
+                    //time to respond
+                    System.Threading.Thread.Sleep(sleep);
+                }
             }
         }
 
@@ -537,32 +601,37 @@ namespace Chetch.Arduino
             {
                 throw new Exception("Cannot find device with ID " + deviceID);
             }
+            if (!device.IsConnected)
+            {
+                throw new Exception(String.Format("Device {0} is not connected", device.ToString()));
+            }
 
             //check has command
-            if (!device.HasCommand(command))
+            ArduinoCommand acmd = device.GetCommand(command);
+            if (acmd == null)
             {
                 throw new Exception(String.Format("Device {0} does not have command {1}", deviceID, command));
             }
 
             //Use ThreadExecutionManager to allow for multi-threading by device 
             int prevSize = ThreadExecutionManager.MaxQueueSize;
-            ThreadExecutionManager.MaxQueueSize = 32;
+            ThreadExecutionManager.MaxQueueSize = acmd.IsCompound ? 1 : 256;
             ThreadExecutionManager.Execute<List<Object>>(device.ID, repeat, delay, device.ExecuteCommand, command, args);
             ThreadExecutionManager.MaxQueueSize = prevSize;
         }
 
-        public void RequestStatus()
+        public void RequestStatus(byte boardID = 0)
         {
             var message = new ADMMessage();
             message.Type = Messaging.MessageType.STATUS_REQUEST;
-            message.TargetID = 0;
+            message.TargetID = boardID;
             SendMessage(message);
         }
 
         public void Ping()
         {
             var message = new ADMMessage();
-            message.Type = Messaging.MessageType.STATUS_REQUEST;
+            message.Type = Messaging.MessageType.PING;
             message.TargetID = 0;
             SendMessage(message);
         }

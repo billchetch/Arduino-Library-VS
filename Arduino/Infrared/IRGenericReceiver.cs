@@ -13,6 +13,15 @@ namespace Chetch.Arduino.Infrared
            //
         }
 
+        override public String Name
+        {
+            set
+            {
+                base.Name = value;
+                if (DB != null) ReadDevice();
+            }
+        }
+
         override public void WriteDevice()
         {
             ReadDevice(); //incase the name has changed (normally derived classes define the name, this class is 'Generic')

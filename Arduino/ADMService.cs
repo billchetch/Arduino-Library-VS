@@ -16,6 +16,7 @@ namespace Chetch.Arduino
         {
             CONNECTED,
             DISCONNECTED,
+            DEVICES_CONNECTED
         }
 
 
@@ -33,17 +34,52 @@ namespace Chetch.Arduino
                 ClientName = clientName;
             }
 
-            public void AddTarget(String target)
+            public void AddTarget(String target, MessageType messageType)
+            {
+                var mt = new List<MessageType>();
+                mt.Add(messageType);
+                AddTarget(target, mt);
+            }
+
+            public void AddTarget(String target, List<MessageType> messageTypes = null)
             {
                 if (!Targets.ContainsKey(target))
                 {
-                    Targets[target] = new List<MessageType>(DefaultMessageTypes);
+                    var mt = new List<MessageType>(DefaultMessageTypes);
+                    if (messageTypes != null && messageTypes.Count > 0)
+                    {
+                        mt.AddRange(messageTypes);
+                    }
+                    Targets[target] = mt;
+                }
+            }
+
+            public bool HasTarget(String target)
+            {
+                return Targets.ContainsKey(target);
+            }
+
+            public List<MessageType> GetTargetTypes(String target)
+            {
+                if (HasTarget(target))
+                {
+                    return Targets[target];
+                } else
+                {
+                    return null;
                 }
             }
 
             public bool CanReceive(ADMMessage message)
             {
-                return message.Sender == null ? false : Targets.ContainsKey(message.Sender);
+                if(message.Sender == null || !HasTarget(message.Sender))
+                {
+                    return false;
+                } else
+                {
+                    var mts = GetTargetTypes(message.Sender);
+                    return (mts != null && mts.Contains(message.Type));
+                }
             }
 
             public override string ToString()
@@ -58,11 +94,12 @@ namespace Chetch.Arduino
         protected String SupportedBoards { get; set; }
         protected Timer _admtimer;
         private bool _devicesAdded = false;
+        private bool _devicesConnected = false;
 
         protected Dictionary<String, ADMListener> Listeners { get; } = new Dictionary<string, ADMListener>();
 
         abstract protected void AddADMDevices(ADMMessage message);
-
+        
 
         public ADMService(String clientName, String clientManagerSource, String serviceSource, String eventLog) : base(clientName, clientManagerSource, serviceSource, eventLog)
         {
@@ -143,6 +180,15 @@ namespace Chetch.Arduino
                     response.AddValue("DeviceCommands", cms.Select(i => i.CommandAlias).ToList());
                     break;
 
+                case "status":
+                    device = ADM.GetDevice(deviceID);
+                    if(device.BoardID == 0)
+                    {
+                        throw new Exception(String.Format("Device {0} does not have a board ID", deviceID));
+                    }
+                    ADM.RequestStatus(device.BoardID);
+                    break;
+
                 default:
                     var commands = command.Split(',');
                     foreach (var cmd in commands)
@@ -161,7 +207,7 @@ namespace Chetch.Arduino
             }
         }
 
-        virtual protected void RegisterListener(String clientName, String targets)
+        virtual protected void RegisterListener(String clientName, String targets, List<MessageType> messageTypes = null)
         {
             var listener = new ADMListener(clientName);
             var tgts2add = new List<String>();
@@ -176,10 +222,17 @@ namespace Chetch.Arduino
 
             foreach (var tgt in tgts2add)
             {
-                listener.AddTarget(tgt.Trim());
+                var ttgt = tgt.Trim();
+                listener.AddTarget(ttgt, messageTypes);
+
+                var mts = listener.GetTargetTypes(ttgt);
+                if (mts != null)
+                {
+                    var types = String.Join(", ", mts.Select(i => i.ToString()).ToList());
+                    Tracing?.TraceEvent(TraceEventType.Information, 100, "Registered {0} to listen to {1} for {2}", clientName, ttgt, types);
+                }
             }
             Listeners[clientName] = listener;
-            Tracing?.TraceEvent(TraceEventType.Information, 100, "Registered listener {0}", listener.ToString());
         }
 
         virtual protected void DeregisterListener(String clientName)
@@ -196,14 +249,17 @@ namespace Chetch.Arduino
         {
             base.AddCommandHelp(commandHelp);
 
-            commandHelp.Add("listen/register: Register this client to receive messages from ADM <devices?>.  If devices is blank it will register the client to listen for BOARD messages.");
+            commandHelp.Add("listen/register: Register this client to receive messages from ADM <board/devices...?> additional <message type?>. ");
             commandHelp.Add("unlisten/deregister: Deregister this client to receive messages from ADM");
             commandHelp.Add("status: Get status info about this service and the ADM");
-            commandHelp.Add("NOTE .... adm:<device?>:<command1,command2...> <args...> Sends a command (or several) directly to an ADM device (or leave device blank to send to ADM (e.g. adm:blink sends a call to ADM.Blink())");
             commandHelp.Add("adm:status:  ADM will request board status and add additional information");
-            commandHelp.Add("adm:ping: ADM will ping the board");
+            commandHelp.Add("adm:ping: ADM will ping the board <repeat?>");
             commandHelp.Add("adm:blink: ADM will blink the built in LED");
-            commandHelp.Add("adm:devices: List devices added to ADM");
+            commandHelp.Add("adm:list-devices: List devices added to ADM");
+            commandHelp.Add("adm:capability: List pin capabilities");
+            commandHelp.Add("adm:setdigitalpin: Set the <pin number> to <true/false>");
+            commandHelp.Add("adm:<device>:wait: Will simply pause fora short while, useful if interspersed with other commands");
+            commandHelp.Add("adm:<device>:list-commands: List device commands");
         }
 
         override public bool HandleCommand(Connection cnn, Message message, String cmd, List<Object> args, Message response)
@@ -216,7 +272,17 @@ namespace Chetch.Arduino
 
                     if (message.Sender != null)
                     {
-                        RegisterListener(message.Sender, targets);
+                        List<MessageType> mts = null;
+                        if(args != null && args.Count > 1)
+                        { 
+                            mts = new List<MessageType>();
+                            for (int i = 1; i < args.Count; i++)
+                            {
+                                MessageType mt = (MessageType)System.Convert.ToInt16(args[i]);
+                                mts.Add(mt);
+                            }
+                        }
+                        RegisterListener(message.Sender, targets, mts);
                         response.Value = String.Format("Registered {0} to listen for messages from {1} ", message.Sender, targets);
                     }
                     else
@@ -237,7 +303,7 @@ namespace Chetch.Arduino
                     break;
 
                 case "status":
-                    response.AddValue("ADMStatus", ADM != null ? ADM.Status.ToString() : "Not created");
+                    response.AddValue("ADMState", ADM != null ? ADM.State.ToString() : "Not created");
                     if (ADM != null)
                     {
                         var devs = ADM.GetDevices();
@@ -252,42 +318,109 @@ namespace Chetch.Arduino
                     var tgtcmd = cmd.Split(':');
                     if (tgtcmd.Length >= 2 && tgtcmd[0].Equals("ADM", StringComparison.OrdinalIgnoreCase))
                     {
-                        if (ADM == null || ADM.Status == ADMStatus.NOT_CONNECTED || ADM.Status == ADMStatus.CONNECTING)
+                        if (ADM == null || ADM.State == ADMState.NOT_CONNECTED || ADM.State == ADMState.CONNECTING)
                         {
                             response.Type = MessageType.ERROR;
                             response.Value = "ADM is not connected";
                             return true;
                         }
 
+                        //handle commands related to the board (i.e. not to a specific added device)
                         if (tgtcmd.Length == 2)
                         {
+                            int repeat; //frequently used var name
+                            int delay; //frequently used var name
                             switch (tgtcmd[1].ToLower())
                             {
                                 case "status":
-                                    ADM.RequestStatus();
+                                    if (Listeners.ContainsKey(message.Sender) && Listeners[message.Sender].HasTarget("BOARD"))
+                                    {
+                                        ADM.RequestStatus();
+                                    } else
+                                    {
+                                        throw new Exception("Cannot receive status response as not listening for BOARD messages");
+                                    }
+                                    
                                     break;
 
                                 case "ping":
-                                    ADM.Ping();
+                                    if (Listeners.ContainsKey(message.Sender) && Listeners[message.Sender].HasTarget("BOARD"))
+                                    {
+                                        repeat = args != null && args.Count > 0 ? System.Convert.ToInt16(args[0]) : 1;
+                                        delay = args != null && args.Count > 1 ? System.Convert.ToInt16(args[1]) : 1000;
+                                        for (int i = 0; i < repeat; i++)
+                                        {
+                                            ADM.Ping();
+                                            System.Threading.Thread.Sleep(delay);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        throw new Exception("Cannot receive ping response as not listening for BOARD messages");
+                                    }
+                                    break;
+
+                                case "pingloadtest":
+                                    repeat = args != null && args.Count > 0 ? System.Convert.ToInt16(args[0]) : 10;
+                                    delay = args != null && args.Count > 1 ? System.Convert.ToInt16(args[1]) : 500;
+                                    for (int i = 0; i < repeat; i++)
+                                    {
+                                        ADM.Ping();
+                                        System.Threading.Thread.Sleep(delay);
+                                    }
                                     break;
 
                                 case "blink":
-                                    int repeat = args != null && args.Count > 0 ? System.Convert.ToInt16(args[0]) : 10;
-                                    int delay = args != null && args.Count > 1 ? System.Convert.ToInt16(args[1]) : 100;
+                                    repeat = args != null && args.Count > 0 ? System.Convert.ToInt16(args[0]) : 10;
+                                    delay = args != null && args.Count > 1 ? System.Convert.ToInt16(args[1]) : 200;
                                     ADM.Blink(repeat, delay);
                                     break;
 
-                                case "devices":
+                                case "capability":
+                                    var lbc = ADM.ListBoardCapability();
+                                    response.AddValue("PinCount: ", lbc.Count);
+                                    response.AddValue("Pins", lbc);
+                                    break;
+
+                                case "setdigitalpin":
+                                    if(args.Count < 2)
+                                    {
+                                        throw new Exception("Insufficient arguments ... must supply a pin number and value");
+                                    }
+                                    int pin =System.Convert.ToInt16(args[0]);
+                                    bool val = Chetch.Utilities.Convert.ToBoolean(args[1]);
+                                    if(!ADM.IsPinCapable(pin, Solid.Arduino.Firmata.PinMode.DigitalOutput))
+                                    {
+                                        throw new Exception(String.Format("Pin {0} is not capabale of digital output", pin));
+                                    }
+                                    if(ADM.GetDevicesByPin(pin) != null)
+                                    {
+                                        throw new Exception(String.Format("Pin {0} is being used by a device", pin));
+                                    }
+                                    ADM.SetDigitalPinMode(pin, Solid.Arduino.Firmata.PinMode.DigitalOutput);
+                                    ADM.SetDigitalPin(pin, val);
+                                    break;
+
+                                case "list-devices":
                                     response.AddValue("Devices", ADM.GetDevices().Select(i => i.ToString()).ToList());
                                     break;
 
                                 default:
+                                    throw new Exception(String.Format("No ADM direct command {0}", tgtcmd[1]));
                                     break;
                             }
                         }
                         else
                         {
-                            HandleADMCommand(tgtcmd[1], tgtcmd[2], args, response);
+                            //handle demand specific to device
+                            try
+                            {
+                                HandleADMCommand(tgtcmd[1], tgtcmd[2], args, response);
+                            } catch (Exception e)
+                            {
+                               Tracing?.TraceEvent(TraceEventType.Error, 0, "Exception: {0}", e.Message);
+                               throw e;
+                            }
                         }
 
                         response.Value = "Handled " + cmd;
@@ -295,7 +428,7 @@ namespace Chetch.Arduino
                     else
                     {
                         Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADM: Unrecognised command {0}", cmd);
-                        response.Value = String.Format("ADM: Unrecognised command {0}", cmd);
+                        throw new Exception(String.Format("ADM: Unrecognised command {0}", cmd));
                     }
                     break;
             }
@@ -344,7 +477,7 @@ namespace Chetch.Arduino
             else
             {
                 _admtimer.Stop();
-                var priorStatus = ADM.Status;
+                var priorState = ADM.State;
                 try
                 {
                     ADM.AssertConnection();
@@ -353,8 +486,9 @@ namespace Chetch.Arduino
                 {
                     //ADM disconnected
                     ADM = null;
+                    _devicesAdded = false;
                     _admtimer.Interval = 5000;
-                    if (priorStatus != ADMStatus.NOT_CONNECTED)
+                    if (priorState != ADMState.NOT_CONNECTED)
                     {
                         var msg = String.Format("ADM: ADM disconnected due to exception {0}: {1}", e.GetType().ToString(), e.Message);
                         Notify(ADMEvent.DISCONNECTED, msg);
@@ -413,12 +547,19 @@ namespace Chetch.Arduino
                 return;
             }
 
-            if (!_devicesAdded && ADM.Status == ADMStatus.DEVICE_READY)
+            if (!_devicesAdded && ADM.State == ADMState.DEVICE_READY)
             {
                 Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: Ready to add devices...");
                 AddADMDevices(message);
                 Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: Added devices");
                 _devicesAdded = true;
+            }
+
+            if (!_devicesConnected && ADM.State == ADMState.DEVICE_CONNECTED)
+            {
+                Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: Devices connected...");
+                OnADMDevicesConnected(message);
+                _devicesConnected = true;
             }
 
             String sender = null;
@@ -441,5 +582,10 @@ namespace Chetch.Arduino
                 SendToListeners(message);
             }
         }
-    }
+
+        virtual protected void OnADMDevicesConnected(ADMMessage message)
+        {
+            Notify(ADMEvent.DEVICES_CONNECTED, "All added devices connected");
+        }
+    } //end class
 }

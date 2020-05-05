@@ -17,6 +17,12 @@ namespace Chetch.Arduino.Infrared
         private Dictionary<long, IRCode> _unknownCodes = new Dictionary<long, IRCode>();
         private List<long> _ignoreCodes = new List<long>(); //codes we ignore
 
+
+        public String IRCommandName
+        {
+            get { return _commandName;  }
+        }
+
         public Dictionary<String, IRCode> IRCodes
         {
             get { return _irCodes;  }
@@ -43,6 +49,11 @@ namespace Chetch.Arduino.Infrared
             cmd.CommandAlias = "Stop";
             cmd.Type = ArduinoCommand.CommandType.STOP;
             AddCommand(cmd);
+
+            cmd = new ArduinoCommand();
+            cmd.CommandAlias = "Save";
+            cmd.Type = ArduinoCommand.CommandType.SAVE;
+            AddCommand(cmd);
         }
 
         override public void ReadDevice()
@@ -62,16 +73,23 @@ namespace Chetch.Arduino.Infrared
             switch (command.Type)
             {
                 case ArduinoCommand.CommandType.START:
+                    _irCodes.Clear();
+                    _unknownCodes.Clear();
                     _receiving = true;
                     if(extraArgs != null && extraArgs.Count > 0)
                     {
                         _commandName = (String)extraArgs[0];
                     }
-
                     break;
+
                 case ArduinoCommand.CommandType.STOP:
                     _receiving = false;
                     break;
+
+                case ArduinoCommand.CommandType.SAVE:
+                    _receiving = false;
+                    WriteIRCodes();
+                    return;
             }
             base.ExecuteCommand(command, extraArgs, deep);
         }
@@ -88,6 +106,8 @@ namespace Chetch.Arduino.Infrared
             IRCode irc = new IRCode();
             if (_irCodes.ContainsKey(commandName))
             {
+                //if there is already an ir code for this command then check if the actual code is different
+                //from the original then store as an 'unkonwn' code for later inspection
                 if(_irCodes[commandName].Code != code)
                 {
                     irc.Code = code;
@@ -115,6 +135,16 @@ namespace Chetch.Arduino.Infrared
             {
                 throw new Exception(commandName + " is not unknown");
             }
+        }
+
+        public void processUnknownCode(String commandName)
+        {
+            if(_unknownCodes.Count != 1)
+            {
+                throw new Exception(String.Format("Cannot process unknown code because there are {0} unknown codes", _unknownCodes.Count));
+            }
+
+            processUnknownCode(commandName, _unknownCodes.Values.First());
         }
 
         public override void HandleMessage(ADMMessage message)
