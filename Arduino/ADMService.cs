@@ -72,7 +72,7 @@ namespace Chetch.Arduino
 
             public bool CanReceive(ADMMessage message)
             {
-                if(message.Sender == null || !HasTarget(message.Sender))
+                if (message.Sender == null || !HasTarget(message.Sender))
                 {
                     return false;
                 } else
@@ -91,6 +91,20 @@ namespace Chetch.Arduino
 
 
         protected ArduinoDeviceManager ADM { get; set; }
+        protected bool IsADMConnected
+        {
+            get
+            {
+                return ADM != null && ADM.State != ADMState.NOT_CONNECTED && ADM.State != ADMState.CONNECTING;
+            }
+        }
+        protected String ADMStateString
+        {
+            get
+            {
+                return ADM != null ? ADM.State.ToString() : "NOT CREATED";
+            }
+        }
         protected String SupportedBoards { get; set; }
         protected Timer _admtimer;
         private bool _devicesAdded = false;
@@ -156,6 +170,16 @@ namespace Chetch.Arduino
         public override void HandleClientError(Connection cnn, Exception e)
         {
             //throw new NotImplementedException();
+        }
+
+        override public void ModifyClientMessage(Connection cnn, Message message)
+        {
+            switch (message.Type)
+            {
+                case MessageType.STATUS_RESPONSE:
+                    message.AddValue("ADMState", ADMStateString);
+                    break;
+            }
         }
 
         public override void HendleClientMessage(Connection cnn, Message message)
@@ -303,7 +327,7 @@ namespace Chetch.Arduino
                     break;
 
                 case "status":
-                    response.AddValue("ADMState", ADM != null ? ADM.State.ToString() : "Not created");
+                    response.AddValue("ADMState", ADMStateString);
                     if (ADM != null)
                     {
                         var devs = ADM.GetDevices();
@@ -318,7 +342,7 @@ namespace Chetch.Arduino
                     var tgtcmd = cmd.Split(':');
                     if (tgtcmd.Length >= 2 && tgtcmd[0].Equals("ADM", StringComparison.OrdinalIgnoreCase))
                     {
-                        if (ADM == null || ADM.State == ADMState.NOT_CONNECTED || ADM.State == ADMState.CONNECTING)
+                        if (!IsADMConnected)
                         {
                             response.Type = MessageType.ERROR;
                             response.Value = "ADM is not connected";
@@ -487,6 +511,7 @@ namespace Chetch.Arduino
                     //ADM disconnected
                     ADM = null;
                     _devicesAdded = false;
+                    _devicesConnected = false;
                     _admtimer.Interval = 5000;
                     if (priorState != ADMState.NOT_CONNECTED)
                     {
