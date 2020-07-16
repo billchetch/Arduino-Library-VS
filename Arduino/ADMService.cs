@@ -182,9 +182,9 @@ namespace Chetch.Arduino
             }
         }
 
-        public override void HendleClientMessage(Connection cnn, Message message)
+        public override void HandleClientMessage(Connection cnn, Message message)
         {
-            base.HendleClientMessage(cnn, message);
+            base.HandleClientMessage(cnn, message);
         }
 
         virtual protected void HandleADMCommand(String deviceID, String command, List<Object> args, Message response)
