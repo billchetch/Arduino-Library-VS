@@ -109,6 +109,7 @@ namespace Chetch.Arduino
         private const int CONNECT_TIMEOUT = 10000;
 
         public const string ARDUINO_MEGA_2560 = "USB-SERIAL CH340";
+        public const string ARDUINO_UNO = "Arduino Uno";
         
         static public ArduinoDeviceManager Connect(String supportedBoards, int timeOut, Action<ADMMessage, ArduinoDeviceManager> listener)
         {
@@ -181,8 +182,9 @@ namespace Chetch.Arduino
             }
         }
         private ArduinoSession _session;
+        public String BoardID { get; internal set; } //Should be set in STATUS_RESPONSE message from board
         private bool _littleEndian = true; //Should be set in STATUS_RESPONSE message from board
-        private String _boardName; //Should be set in STATUS_RESPONSE message from board
+        private String _boardType; //Should be set in STATUS_RESPONSE message from board
         private Dictionary<String, ArduinoDevice> _devices;
         private Dictionary<String, byte> _device2boardID;
         private Dictionary<byte, ArduinoDevice> _boardID2device;
@@ -217,10 +219,11 @@ namespace Chetch.Arduino
             ADMMessage message = new ADMMessage();
             message.TargetID = 0;
             message.Type = Messaging.MessageType.INITIALISE;
-            SendMessage(message);
+            SendMessage(message, 100);
 
             //and request board status
             RequestStatus();
+
         }
 
         public void Disconnect()
@@ -442,17 +445,26 @@ namespace Chetch.Arduino
                     switch (message.Type)
                     {
                         case Messaging.MessageType.STATUS_RESPONSE:
-                            if(State != ADMState.DEVICE_READY)
+                            if (State != ADMState.DEVICE_READY)
                             {
-                                State = ADMState.DEVICE_READY;
-                                _littleEndian = Chetch.Utilities.Convert.ToBoolean(message.GetValue("LittleEndian"));
-                                _boardName = message.GetString("Board");
+                                try {
+                                    _littleEndian = Chetch.Utilities.Convert.ToBoolean(message.GetValue("LE"));
+                                    _boardType = message.GetString("BD");
+                                    BoardID = message.HasValue("BDID") ? message.GetString("BDID") : null;
+                                    State = ADMState.DEVICE_READY;
 
-                                if (!HasDevice(Diagnostics.LEDBuiltIn.LED_BUILTIN_ID) && message.HasValue("LEDBuiltIn"))
+                                    if (!HasDevice(Diagnostics.LEDBuiltIn.LED_BUILTIN_ID) && message.HasValue("LEDBI"))
+                                    {
+                                        int pin = System.Convert.ToUInt16(message.GetValue("LEDBI"));
+                                        var d = new Diagnostics.LEDBuiltIn(pin);
+                                        AddDevice(d);
+                                    }
+                                } catch (Exception e)
                                 {
-                                    int pin = System.Convert.ToUInt16(message.GetValue("LEDBuiltIn"));
-                                    var d = new Diagnostics.LEDBuiltIn(pin);
-                                    AddDevice(d);
+                                    Tracing?.TraceEvent(TraceEventType.Error, 4000, "STATUS_RESPONSE error: {0}, {1}", e.GetType().ToString(), e.Message);
+                                    message = new ADMMessage();
+                                    message.Type = Messaging.MessageType.ERROR;
+                                    message.Value = e.Message;
                                 }
                             }
                             break;
