@@ -101,7 +101,7 @@ namespace Chetch.Arduino
     /*
      * ADM
      * 
-     * 
+     * One instance per board.
      */
 
     public class ArduinoDeviceManager
@@ -110,44 +110,47 @@ namespace Chetch.Arduino
 
         public const string ARDUINO_MEGA_2560 = "USB-SERIAL CH340";
         public const string ARDUINO_UNO = "Arduino Uno";
-        
-        static public ArduinoDeviceManager Connect(String supportedBoards, int timeOut, Action<ADMMessage, ArduinoDeviceManager> listener)
+
+        public const string DEFAULT_BOARD_SET = ARDUINO_MEGA_2560 + "," + ARDUINO_UNO;
+
+        static public List<String> GetBoardPorts(String supportedBoards)
         {
             var boards = supportedBoards.Split(',');
-            if(boards.Length == 0)
+            if (boards.Length == 0)
             {
                 throw new Exception("ArduinnoDviceManager:Connect no supportedBoards provided");
             }
 
-            bool boardPortFound = false;
+            List<String> boardPorts = new List<String>();
             foreach (var board in boards)
             {
-                List<String> boardPorts = Chetch.Utilities.SerialPorts.Find(board.Trim());
-                if (boardPorts.Count > 0)
+                List<String> ports = Chetch.Utilities.SerialPorts.Find(board.Trim());
+                if (ports.Count > 0)
                 {
-                    boardPortFound = true;
-                    ISerialConnection connection = new EnhancedSerialConnection(boardPorts[0], SerialBaudRate.Bps_57600);
-                    if (connection != null)
-                    {
-                        var session = new ArduinoSession(connection, timeOut);
-                        try
-                        {
-                            var mgr = new ArduinoDeviceManager(session, listener);
-                            return mgr;
-                        } catch (Exception e)
-                        {
-                            if (connection.IsOpen) connection.Close();
-                            throw e;
-                        }
-                    }
+                    boardPorts.AddRange(ports);
                 }
-            } //end loop through supportedBoards
-
-            if (!boardPortFound)
-            { 
-                throw new Exception("ArduinnoDviceManager:Connect no board ports found");
             }
+            return boardPorts;
+        }
 
+        static public ArduinoDeviceManager Connect(String port, int timeOut, Action<ADMMessage, ArduinoDeviceManager> listener)
+        {
+            ISerialConnection connection = new EnhancedSerialConnection(port, SerialBaudRate.Bps_57600);
+            if (connection != null)
+            {
+                var session = new ArduinoSession(connection, timeOut);
+                try
+                {
+                    var mgr = new ArduinoDeviceManager(session, listener);
+                    mgr.Port = port;
+                    return mgr;
+                } catch (Exception e)
+                {
+                    if (connection.IsOpen) connection.Close();
+                    throw e;
+                }
+            }
+            
             return null;
         }
 
@@ -174,6 +177,13 @@ namespace Chetch.Arduino
                 }
             }
         }
+        public bool IsConnected
+        {
+            get
+            {
+                return State == ADMState.CONNECTED || State == ADMState.DEVICE_READY || State == ADMState.DEVICE_CONNECTED;
+            }
+        }
         public int DeviceCount
         {
             get
@@ -181,6 +191,7 @@ namespace Chetch.Arduino
                 return _devices != null ? _devices.Count : 0;
             }
         }
+        public String Port { get; set; }
         private ArduinoSession _session;
         public String BoardID { get; internal set; } //Should be set in STATUS_RESPONSE message from board
         private bool _littleEndian = true; //Should be set in STATUS_RESPONSE message from board
@@ -436,7 +447,7 @@ namespace Chetch.Arduino
                         message.TargetID = Utilities.Convert.ToByte(message.Target);
                     } catch (Exception e)
                     {
-                        Tracing?.TraceEvent(TraceEventType.Error, 4000, "Deserializing {0} produced exception {1}: {2}", sd.Text, e.GetType().ToString(), e.Message);
+                        Tracing?.TraceEvent(TraceEventType.Error, 4000, "Deserializing {0} produced exception {1}: {2}", sd.Text, e.GetType(), e.Message);
                         message = new ADMMessage();
                         message.Type = Messaging.MessageType.ERROR;
                         message.Value = e.Message;
@@ -445,31 +456,45 @@ namespace Chetch.Arduino
                     switch (message.Type)
                     {
                         case Messaging.MessageType.STATUS_RESPONSE:
-                            if (State != ADMState.DEVICE_READY)
-                            {
-                                try {
-                                    _littleEndian = Chetch.Utilities.Convert.ToBoolean(message.GetValue("LE"));
-                                    _boardType = message.GetString("BD");
-                                    BoardID = message.HasValue("BDID") ? message.GetString("BDID") : null;
-                                    State = ADMState.DEVICE_READY;
-
-                                    if (!HasDevice(Diagnostics.LEDBuiltIn.LED_BUILTIN_ID) && message.HasValue("LEDBI"))
-                                    {
-                                        int pin = System.Convert.ToUInt16(message.GetValue("LEDBI"));
-                                        var d = new Diagnostics.LEDBuiltIn(pin);
-                                        AddDevice(d);
-                                    }
-                                } catch (Exception e)
+                            try {
+                                _littleEndian = Chetch.Utilities.Convert.ToBoolean(message.GetValue("LE"));
+                                _boardType = message.GetString("BD");
+                                BoardID = message.HasValue("BDID") ? message.GetString("BDID") : null;
+                                if (State == ADMState.CONNECTED)
                                 {
-                                    Tracing?.TraceEvent(TraceEventType.Error, 4000, "STATUS_RESPONSE error: {0}, {1}", e.GetType().ToString(), e.Message);
-                                    message = new ADMMessage();
-                                    message.Type = Messaging.MessageType.ERROR;
-                                    message.Value = e.Message;
+                                    State = ADMState.DEVICE_READY;
                                 }
+
+                                if (!HasDevice(Diagnostics.LEDBuiltIn.LED_BUILTIN_ID) && message.HasValue("LEDBI"))
+                                {
+                                    int pin = System.Convert.ToUInt16(message.GetValue("LEDBI"));
+                                    var d = new Diagnostics.LEDBuiltIn(pin);
+                                    AddDevice(d);
+                                }
+                            } catch (Exception e)
+                            {
+                                Tracing?.TraceEvent(TraceEventType.Error, 4000, "STATUS_RESPONSE error: {0}, {1}", e.GetType(), e.Message);
+                                message = new ADMMessage();
+                                message.Type = Messaging.MessageType.ERROR;
+                                message.Value = e.Message;
                             }
                             break;
 
                         case Messaging.MessageType.CONFIGURE_RESPONSE:
+                            bool devicesConnected = true;
+                            foreach (var d in _devices.Values)
+                            {
+                                if (!d.IsConnected)
+                                {
+                                    devicesConnected = false;
+                                    break;
+                                }
+                            }
+
+                            if (devicesConnected)
+                            {
+                                State = ADMState.DEVICE_CONNECTED;
+                            }
                             break;
 
                         case Messaging.MessageType.ERROR:
@@ -483,24 +508,6 @@ namespace Chetch.Arduino
                         {
                             dev.HandleMessage(message);
                         }
-
-                        if(message.Type == Messaging.MessageType.CONFIGURE_RESPONSE)
-                        {
-                            bool devicesConnected = true;
-                            foreach(var d in _devices.Values)
-                            {
-                                if (!d.IsConnected)
-                                {
-                                    devicesConnected = false;
-                                    break;
-                                }
-                            }
-
-                            if (devicesConnected)
-                            {
-                                State = ADMState.DEVICE_CONNECTED;
-                            }
-                        }
                     }
                     break;
 
@@ -509,7 +516,7 @@ namespace Chetch.Arduino
 
                 case Solid.Arduino.Firmata.MessageType.DigitalPortState:
                     DigitalPortState state = (DigitalPortState)fmessage.Value;
-                    string binary = System.Convert.ToString(state.Pins, 2);
+                    String binary = System.Convert.ToString(state.Pins, 2);
                     break;
 
                 case Solid.Arduino.Firmata.MessageType.CapabilityResponse:
@@ -615,7 +622,7 @@ namespace Chetch.Arduino
             }
             if (!device.IsConnected)
             {
-                throw new Exception(String.Format("Device {0} is not connected", device.ToString()));
+                throw new Exception(String.Format("Device {0} is not connected", device));
             }
 
             //check has command
