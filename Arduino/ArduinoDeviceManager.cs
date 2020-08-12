@@ -191,6 +191,23 @@ namespace Chetch.Arduino
                 return _devices != null ? _devices.Count : 0;
             }
         }
+        public bool DevicesConnected
+        {
+            get
+            {
+                bool devicesConnected = true;
+                foreach (var d in _devices.Values)
+                {
+                    if (!d.IsConnected)
+                    {
+                        devicesConnected = false;
+                        break;
+                    }
+                }
+                return devicesConnected;
+            }
+        }
+
         public String Port { get; set; }
         private ArduinoSession _session;
         public String BoardID { get; internal set; } //Should be set in STATUS_RESPONSE message from board
@@ -481,20 +498,6 @@ namespace Chetch.Arduino
                             break;
 
                         case Messaging.MessageType.CONFIGURE_RESPONSE:
-                            bool devicesConnected = true;
-                            foreach (var d in _devices.Values)
-                            {
-                                if (!d.IsConnected)
-                                {
-                                    devicesConnected = false;
-                                    break;
-                                }
-                            }
-
-                            if (devicesConnected)
-                            {
-                                State = ADMState.DEVICE_CONNECTED;
-                            }
                             break;
 
                         case Messaging.MessageType.ERROR:
@@ -503,10 +506,17 @@ namespace Chetch.Arduino
 
                     if (State == ADMState.DEVICE_READY || State == ADMState.DEVICE_CONNECTED)
                     {
+                        //direct messages to devices
                         var dev = GetTargetedDevice(message);
                         if (dev != null)
                         {
                             dev.HandleMessage(message);
+                        }
+
+                        //we do this test after handling message because the message maybe a CONFIGURE_RESPONSE message which will then set the 'connected' status of the device
+                        if (message.Type == Messaging.MessageType.CONFIGURE_RESPONSE && DevicesConnected)
+                        {
+                            State = ADMState.DEVICE_CONNECTED;
                         }
                     }
                     break;
