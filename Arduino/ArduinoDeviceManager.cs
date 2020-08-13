@@ -538,7 +538,8 @@ namespace Chetch.Arduino
 
                     for (int i = 0; i < 8; i++)
                     {
-                        if((i & pinsChanged) == 0)continue;
+                        int bit2check = (int)Math.Pow(2, i);
+                        if((bit2check & pinsChanged) == 0)continue;
 
                         bool state = portState.IsSet(i);
                         int pinNumber = portState.Port*8 + i; //TODO: this might need to be board dependent
@@ -552,7 +553,7 @@ namespace Chetch.Arduino
                         }
                     }
 
-                    String binary = System.Convert.ToString(pinsChanged, 2);
+                    String binary = System.Convert.ToString(portState.Pins, 2);
                     Debug.Print(binary);
                     break;
 

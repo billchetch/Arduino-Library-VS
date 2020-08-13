@@ -363,6 +363,12 @@ namespace Chetch.Arduino
         }
 
         //messaging
+        virtual protected void Broadcast(ADMMessage message)
+        {
+            message.Sender = ID;
+            Mgr.Broadcast(message);
+        }
+
         virtual public void HandleMessage(ADMMessage message)
         {
             switch (message.Type)
