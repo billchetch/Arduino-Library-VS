@@ -376,6 +376,11 @@ namespace Chetch.Arduino
             }
         }
 
+        virtual public void HandleDigitalPinStateChange(int pinNumber, bool newState)
+        {
+            //a hook
+        }
+
         virtual protected void OnConnect(ADMMessage message)
         {
             //ensure that the pins as configured by the device are actually configured the same on the board

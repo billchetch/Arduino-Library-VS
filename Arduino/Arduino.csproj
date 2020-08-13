@@ -65,16 +65,17 @@
     <Compile Include="ADMService.cs">
       <SubType>Component</SubType>
     </Compile>
-    <Compile Include="Diagnostics\DiagnosticsDevice.cs" />
-    <Compile Include="Diagnostics\LEDBuiltIn.cs" />
-    <Compile Include="Infrared\IRDB.cs" />
-    <Compile Include="Infrared\IRDevice.cs" />
-    <Compile Include="Infrared\IRGenericReceiver.cs" />
-    <Compile Include="Infrared\IRGenericTransmitter.cs" />
-    <Compile Include="Infrared\IRReceiver.cs" />
-    <Compile Include="Infrared\IRSamsungTV.cs" />
-    <Compile Include="Infrared\IRTransmitter.cs" />
-    <Compile Include="Infrared\IRLGHomeTheater.cs" />
+    <Compile Include="Devices\Diagnostics\DiagnosticsDevice.cs" />
+    <Compile Include="Devices\Diagnostics\LEDBuiltIn.cs" />
+    <Compile Include="Devices\Infrared\IRDB.cs" />
+    <Compile Include="Devices\Infrared\IRDevice.cs" />
+    <Compile Include="Devices\Infrared\IRGenericReceiver.cs" />
+    <Compile Include="Devices\Infrared\IRGenericTransmitter.cs" />
+    <Compile Include="Devices\Infrared\IRReceiver.cs" />
+    <Compile Include="Devices\Infrared\IRSamsungTV.cs" />
+    <Compile Include="Devices\Infrared\IRTransmitter.cs" />
+    <Compile Include="Devices\Infrared\IRLGHomeTheater.cs" />
+    <Compile Include="Devices\SwitchSensor.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

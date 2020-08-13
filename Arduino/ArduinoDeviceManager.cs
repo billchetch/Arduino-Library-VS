@@ -218,6 +218,7 @@ namespace Chetch.Arduino
         private Dictionary<byte, ArduinoDevice> _boardID2device;
         private BoardCapability _boardCapability;
         private Dictionary<int, List<ArduinoDevice>> _pin2device;
+        private Dictionary<int, DigitalPortState> _portStates;
         private Action<ADMMessage, ArduinoDeviceManager> _listener;
 
         //Thread Locks
@@ -239,6 +240,7 @@ namespace Chetch.Arduino
 
             _boardCapability = _session.GetBoardCapability();
             _pin2device = new Dictionary<int, List<ArduinoDevice>>();
+            _portStates = new Dictionary<int, DigitalPortState>();
 
             State = ADMState.CONNECTED;
 
@@ -525,8 +527,33 @@ namespace Chetch.Arduino
                     break;
 
                 case Solid.Arduino.Firmata.MessageType.DigitalPortState:
-                    DigitalPortState state = (DigitalPortState)fmessage.Value;
-                    String binary = System.Convert.ToString(state.Pins, 2);
+                    DigitalPortState portState = (DigitalPortState)fmessage.Value;
+                    int pinsChanged;
+                    if (_portStates.ContainsKey(portState.Port)) {
+                        pinsChanged = portState.Pins ^ _portStates[portState.Port].Pins;
+                    } else {
+                        pinsChanged = 255;
+                    }
+                    _portStates[portState.Port] = portState;
+
+                    for (int i = 0; i < 8; i++)
+                    {
+                        if((i & pinsChanged) == 0)continue;
+
+                        bool state = portState.IsSet(i);
+                        int pinNumber = portState.Port*8 + i; //TODO: this might need to be board dependent
+                        var devs = GetDevicesByPin(pinNumber);
+                        if (devs != null)
+                        {
+                            foreach (var dev in devs)
+                            {
+                                dev.HandleDigitalPinStateChange(pinNumber, state);
+                            }
+                        }
+                    }
+
+                    String binary = System.Convert.ToString(pinsChanged, 2);
+                    Debug.Print(binary);
                     break;
 
                 case Solid.Arduino.Firmata.MessageType.CapabilityResponse:
@@ -536,6 +563,11 @@ namespace Chetch.Arduino
                     break;
             }
 
+            Broadcast(message);
+        }
+
+        public void Broadcast(ADMMessage message)
+        {
             if (_listener != null && message != null)
             {
                 _listener(message, this);
@@ -615,6 +647,11 @@ namespace Chetch.Arduino
             {
                 _session.SetDigitalPinMode(pinNumber, pinMode);
             }
+        }
+
+        public void SetDigitalReportMode(int portNumber, Boolean enable)
+        {
+            _session.SetDigitalReportMode(portNumber, enable);
         }
 
         public void IssueCommand(String deviceID, String command, List<Object> args)
