@@ -230,18 +230,18 @@ namespace Chetch.Arduino
         {
             State = ADMState.CONNECTING;
 
-            _session = firmata;
-            _session.MessageReceived += OnMessageReceived;
-            _listener = listener;
-
             _devices = new Dictionary<String, ArduinoDevice>();
             _device2boardID = new Dictionary<String, byte>();
             _boardID2device = new Dictionary<byte, ArduinoDevice>();
 
-            _boardCapability = _session.GetBoardCapability();
             _pin2device = new Dictionary<int, List<ArduinoDevice>>();
             _portStates = new Dictionary<int, DigitalPortState>();
 
+            _session = firmata;
+            _listener = listener;
+            _session.MessageReceived += OnMessageReceived;
+
+            _boardCapability = _session.GetBoardCapability();
             State = ADMState.CONNECTED;
 
             //if here and no exceptions then the connection should be good
@@ -563,9 +563,9 @@ namespace Chetch.Arduino
                         }
                     }
 
-                    String s1 = System.Convert.ToString(portState.Pins, 2);
-                    String s2 = System.Convert.ToString(pinsChanged, 2);
-                    Debug.Print("Pins/2change: " + s1 + "/" + s2);
+                    //String s1 = System.Convert.ToString(portState.Pins, 2);
+                    //String s2 = System.Convert.ToString(pinsChanged, 2);
+                    //Debug.Print("Pins/2change: " + s1 + "/" + s2);
                     break;
 
                 case Solid.Arduino.Firmata.MessageType.CapabilityResponse:

@@ -23,7 +23,7 @@ namespace Chetch.Arduino.Devices
             ConfigurePin(_sensorPin, Solid.Arduino.Firmata.PinMode.DigitalInput); //, initialState ? 1 : 0);
         }
 
-        public SwitchSensor(int pin, int noiseThreshold = 50) : this(pin, noiseThreshold, "switch" + pin, "SwitchSensor")
+        public SwitchSensor(int pin, int noiseThreshold = 0) : this(pin, noiseThreshold, "switch" + pin, "SwitchSensor")
         {
             
         }
@@ -40,12 +40,17 @@ namespace Chetch.Arduino.Devices
             if (pinNumber != _sensorPin) throw new Exception(String.Format("State changed on pin {0} but sensor is attached to pin {1}", pinNumber, _sensorPin));
             if (newState != _latestState)
             {
-                System.Diagnostics.Debug.Print("SwitchSensor " + ID + ": changed state to " + newState);
                 lock (_stateLock)
                 {
                     _latestState = newState;
                 }
-                ThreadExecutionManager.Execute<bool>(ID, VerifyStateChange, _latestState);
+                if (_noiseThreshold > 0)
+                {
+                    ThreadExecutionManager.Execute<bool>(ID, VerifyStateChange, _latestState);
+                } else
+                {
+                    OnStateChange(_latestState);
+                }
             }
         }
 

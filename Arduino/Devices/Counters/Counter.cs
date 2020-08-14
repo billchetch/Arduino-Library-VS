@@ -13,18 +13,18 @@ namespace Chetch.Arduino.Devices.Counters
         {
             get { return CountPerInterval; }
         }
-        public long CountPerMinute
+
+        public double AveragePerSecond
         {
-            get { return CountsPerSample;  }
+            get { return AveragePerInterval; }
         }
 
         public Counter(int pin, int noiseThreshold, String id, String name) : base(pin, noiseThreshold, id, name)
         {
             Interval = 1000;
-            SampleSize = 60;
         }
 
-        public Counter(int pin, int noiseThreshold = 10) : this(pin, noiseThreshold, "counter" + pin, "Counter")
+        public Counter(int pin, int noiseThreshold = 0) : this(pin, noiseThreshold, "counter" + pin, "Counter")
         {
 
         }

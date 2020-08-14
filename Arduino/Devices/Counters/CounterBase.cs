@@ -12,27 +12,11 @@ namespace Chetch.Arduino.Devices
         public long Count { get; internal set; } = 0;
         private Timer _timer = null;
         protected int Interval { get; set; } = 1000; //default timer interval in ms
-        protected int SampleSize { get; set; } = 60; //how many intervals to collect for a sample
         private long _prevCount = 0;
-        private List<long> _counts = new List<long>();
+        private long _intervalCount = 0;
         public long CountPerInterval { get; internal set; } = 0;
+        public double AveragePerInterval{ get; internal set; } = 0;
         public Boolean BroadcastStateChange { get; set; } = false;
-
-        public long CountsPerSample
-        {
-            get
-            {
-                if (_counts.Count == 0)
-                {
-                    return 0;
-                }
-                else
-                {
-                    long n = _counts[_counts.Count - 1] - _counts[0];
-                    return _counts.Count >= SampleSize ? n : (long)((double)(_counts.Count / SampleSize)*(double)n);
-                }
-            }
-        }
 
         public CounterBase(int pin, int noiseThreshold, String id, String name) : base(pin, noiseThreshold, id, name)
         {
@@ -53,7 +37,7 @@ namespace Chetch.Arduino.Devices
             }
             
             Count = 0;
-            _counts.Clear();
+            _intervalCount = 0;
             _timer.Start();
         }
 
@@ -70,18 +54,19 @@ namespace Chetch.Arduino.Devices
         {
             long now = DateTime.Now.Ticks;
 
-            if(_counts.Count >= SampleSize)
-            {
-                _counts.RemoveAt(0);
-            }
-            _counts.Add(Count);
             CountPerInterval = Count - _prevCount;
             _prevCount = Count;
+
+            _intervalCount++;
+            AveragePerInterval = ((AveragePerInterval * (double)(_intervalCount - 1)) + (double)CountPerInterval) / (double)_intervalCount;
         }
 
         protected override void OnStateChange(bool newState)
         {
-            Count++;
+            if (newState)
+            {
+                Count++;
+            }
 
             //Parent method just broadcasts state change... not necessary for a counter
             if (BroadcastStateChange)
