@@ -311,6 +311,16 @@ namespace Chetch.Arduino
             return IsPinCapable(pin.PinNumber, pin.Mode);
         }
 
+        public int GetPortForPin(int pinNumber)
+        {
+            return (int)Math.Floor((double)pinNumber / 8.0);
+        }
+
+        public int GetPinForPort(int portNumber, int pinIndex)
+        {
+            return 8 * portNumber + pinIndex;
+        }
+
         public List<String> ListBoardCapability()
         {
             var l2r = new List<String>();
@@ -542,7 +552,7 @@ namespace Chetch.Arduino
                         if((bit2check & pinsChanged) == 0)continue;
 
                         bool state = portState.IsSet(i);
-                        int pinNumber = portState.Port*8 + i; //TODO: this might need to be board dependent
+                        int pinNumber = GetPinForPort(portState.Port, i); //TODO: this might need to be board dependent
                         var devs = GetDevicesByPin(pinNumber);
                         if (devs != null)
                         {
@@ -553,8 +563,9 @@ namespace Chetch.Arduino
                         }
                     }
 
-                    String binary = System.Convert.ToString(portState.Pins, 2);
-                    Debug.Print(binary);
+                    String s1 = System.Convert.ToString(portState.Pins, 2);
+                    String s2 = System.Convert.ToString(pinsChanged, 2);
+                    Debug.Print("Pins/2change: " + s1 + "/" + s2);
                     break;
 
                 case Solid.Arduino.Firmata.MessageType.CapabilityResponse:

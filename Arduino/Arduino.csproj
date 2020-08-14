@@ -65,6 +65,8 @@
     <Compile Include="ADMService.cs">
       <SubType>Component</SubType>
     </Compile>
+    <Compile Include="Devices\Counters\Counter.cs" />
+    <Compile Include="Devices\Counters\CounterBase.cs" />
     <Compile Include="Devices\Diagnostics\DiagnosticsDevice.cs" />
     <Compile Include="Devices\Diagnostics\LEDBuiltIn.cs" />
     <Compile Include="Devices\Infrared\IRDB.cs" />

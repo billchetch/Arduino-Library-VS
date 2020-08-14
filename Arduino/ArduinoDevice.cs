@@ -397,6 +397,10 @@ namespace Chetch.Arduino
                     case PinMode.DigitalInput:
                     case PinMode.DigitalOutput:
                         Mgr.SetDigitalPinMode(pin.PinNumber, pin.Mode);
+                        if(pin.InitialValue != -1)
+                        {
+                            Mgr.SetDigitalPin(pin.PinNumber, pin.InitialValue > 0);
+                        }
                         break;
                 }
             }
