@@ -20,7 +20,9 @@ namespace Chetch.Arduino
         NOT_SET,
         DIAGNOSTICS,
         IR_TRANSMITTER,
-        IR_RECEIVER
+        IR_RECEIVER,
+        TEMPERATURE_SENSOR,
+        COUNTER
     }
 
     public enum FilterCommandsOptions
@@ -387,23 +389,10 @@ namespace Chetch.Arduino
             //a hook
         }
 
+        //called after the device has been configured on the board
         virtual protected void OnConnect(ADMMessage message)
         {
-            //ensure that the pins as configured by the device are actually configured the same on the board
-            foreach(var pin in Pins)
-            {
-                switch(pin.Mode)
-                {
-                    case PinMode.DigitalInput:
-                    case PinMode.DigitalOutput:
-                        Mgr.SetDigitalPinMode(pin.PinNumber, pin.Mode);
-                        if(pin.InitialValue != -1)
-                        {
-                            Mgr.SetDigitalPin(pin.PinNumber, pin.InitialValue > 0);
-                        }
-                        break;
-                }
-            }
+            //hook
         }
 
         virtual public void AddConfig(ADMMessage message)

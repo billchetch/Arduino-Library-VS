@@ -28,7 +28,9 @@ namespace Chetch.Arduino
         public byte TargetID { get; set; } = 0; //ID number on board to determine what is beig targeted
         public byte CommandID { get; set; } = 0; //Command ID on board ... basically to identify function e.g. Send or Delete ...
         public List<byte[]> Arguments { get; } = new List<byte[]>();
-        
+        public bool LittleEndian { get; set; } = true;
+        public bool CanBroadcast { get; set; } = true;
+
         public ADMMessage()
         {
             DefaultEncoding = MessageEncoding.BYTES_ARRAY;
@@ -94,6 +96,12 @@ namespace Chetch.Arduino
         public void AddArgument(String s)
         {
             AddArgument(Chetch.Utilities.Convert.ToBytes(s));
+        }
+
+        public void AddArgument(int arg)
+        {
+            byte[] bytes = Chetch.Utilities.Convert.ToBytes((ValueType)arg, LittleEndian);
+            AddArgument(bytes);
         }
     }
 
@@ -212,6 +220,7 @@ namespace Chetch.Arduino
         private ArduinoSession _session;
         public String BoardID { get; internal set; } //Should be set in STATUS_RESPONSE message from board
         private bool _littleEndian = true; //Should be set in STATUS_RESPONSE message from board
+        public bool LittleEndian { get { return _littleEndian; } }
         private String _boardType; //Should be set in STATUS_RESPONSE message from board
         private Dictionary<String, ArduinoDevice> _devices;
         private Dictionary<String, byte> _device2boardID;
@@ -392,8 +401,26 @@ namespace Chetch.Arduino
                 _pin2device[dpin.PinNumber].Add(device);
             }
 
+            //configure the pins on the board
+            //TODO: analog pins
+            foreach (var dpin in device.Pins)
+            {
+                switch (dpin.Mode)
+                {
+                    case PinMode.DigitalInput:
+                    case PinMode.DigitalOutput:
+                        SetDigitalPinMode(dpin.PinNumber, dpin.Mode);
+                        if (dpin.InitialValue != -1)
+                        {
+                            SetDigitalPin(dpin.PinNumber, dpin.InitialValue > 0, 100);
+                        }
+                        break;
+                }
+            }
+
             //send configuration/setup data to board
             var message = new ADMMessage();
+            message.LittleEndian = _littleEndian;
             message.Type = Messaging.MessageType.CONFIGURE;
             device.AddConfig(message);
             SendMessage(message, 100);
@@ -580,15 +607,28 @@ namespace Chetch.Arduino
 
         public void Broadcast(ADMMessage message)
         {
-            if (_listener != null && message != null)
+            if (_listener != null && message != null && message.CanBroadcast)
             {
-                _listener(message, this);
+                switch (message.Type)
+                {
+                    case Chetch.Messaging.MessageType.ERROR:
+                        _listener(message, this);
+                        break;
+
+                    default:
+                        if(State == ADMState.DEVICE_READY || State == ADMState.DEVICE_CONNECTED)
+                        {
+                            _listener(message, this);
+                        }
+                        break;
+                }
             }
         }
 
         public void SendCommand(byte targetID, ArduinoCommand command, List<Object> extraArgs = null)
         {
             var message = new ADMMessage();
+            message.LittleEndian = _littleEndian;
             message.Type = Messaging.MessageType.COMMAND;
             message.Tag = 0; //TODO: create some kind of perhaps counter-based tagging
             message.TargetID = targetID;
@@ -621,17 +661,20 @@ namespace Chetch.Arduino
             SendMessage(message);
         }
 
+        private void _sleep(int sleep)
+        {
+            if (sleep > 0)
+            {
+                Thread.Sleep(sleep);
+            }
+        }
+
         public void SendMessage(ADMMessage message, int sleep = 0)
         {
             if(message != null)
             {
                 SendString(message.Serialize());
-                if(sleep > 0)
-                {
-                    //this is to avoid a problem where we bombard the serial port ... the sleep allows the board
-                    //time to respond
-                    System.Threading.Thread.Sleep(sleep);
-                }
+                _sleep(sleep);
             }
         }
 
@@ -644,26 +687,29 @@ namespace Chetch.Arduino
             }
         }
 
-        public void SetDigitalPin(int pinNumber, bool value)
+        public void SetDigitalPin(int pinNumber, bool value, int sleep = 0)
         {
             lock(LockSetDigitalPin)
             {
                 _session.SetDigitalPin(pinNumber, value);
             }
+            _sleep(sleep);
         }
 
 
-        public void SetDigitalPinMode(int pinNumber, PinMode pinMode)
+        public void SetDigitalPinMode(int pinNumber, PinMode pinMode, int sleep = 0)
         {
             lock (LockSetDigitalPinMode)
             {
                 _session.SetDigitalPinMode(pinNumber, pinMode);
             }
+            _sleep(sleep);
         }
 
-        public void SetDigitalReportMode(int portNumber, Boolean enable)
+        public void SetDigitalReportMode(int portNumber, Boolean enable, int sleep = 0)
         {
             _session.SetDigitalReportMode(portNumber, enable);
+            _sleep(sleep);
         }
 
         public void IssueCommand(String deviceID, String command, List<Object> args)

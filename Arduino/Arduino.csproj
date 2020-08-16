@@ -46,7 +46,8 @@
       <HintPath>..\..\Utilities\Utilities\bin\Debug\Chetch.Utilities.dll</HintPath>
     </Reference>
     <Reference Include="Solid.Arduino, Version=1.0.2.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\SolidSoils.Arduino.Client.0.4.0\lib\net45\Solid.Arduino.dll</HintPath>
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\SolidSoils\Arduino\Solid.Arduino\bin\Debug\Solid.Arduino.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -78,12 +79,9 @@
     <Compile Include="Devices\Infrared\IRTransmitter.cs" />
     <Compile Include="Devices\Infrared\IRLGHomeTheater.cs" />
     <Compile Include="Devices\SwitchSensor.cs" />
+    <Compile Include="Devices\Temperature\DS18B20Array.cs" />
+    <Compile Include="Devices\Temperature\TemperatureSensorBase.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="packages.config">
-      <SubType>Designer</SubType>
-    </None>
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

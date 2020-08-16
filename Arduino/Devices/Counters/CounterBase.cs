@@ -11,7 +11,9 @@ namespace Chetch.Arduino.Devices
     {
         public long Count { get; internal set; } = 0;
         private Timer _timer = null;
-        protected int Interval { get; set; } = 1000; //default timer interval in ms
+        public int Interval { get; set; } = 1000; //default timer interval in ms
+        public int SampleSize { get; set; } = 0;
+        private List<long> _counts = new List<long>();
         private long _prevCount = 0;
         private long _intervalCount = 0;
         public long CountPerInterval { get; internal set; } = 0;
@@ -20,7 +22,7 @@ namespace Chetch.Arduino.Devices
 
         public CounterBase(int pin, int noiseThreshold, String id, String name) : base(pin, noiseThreshold, id, name)
         {
-
+            Category = DeviceCategory.COUNTER;
         }
 
         public void Start()
@@ -35,9 +37,9 @@ namespace Chetch.Arduino.Devices
             {
                 _timer.Stop();
             }
-            
+
+            _counts.Clear();
             Count = 0;
-            _intervalCount = 0;
             _timer.Start();
         }
 
@@ -57,8 +59,21 @@ namespace Chetch.Arduino.Devices
             CountPerInterval = Count - _prevCount;
             _prevCount = Count;
 
-            _intervalCount++;
-            AveragePerInterval = ((AveragePerInterval * (double)(_intervalCount - 1)) + (double)CountPerInterval) / (double)_intervalCount;
+            if(SampleSize > 1)
+            {
+                _counts.Add(CountPerInterval);
+                if (_counts.Count > SampleSize)
+                {
+                    AveragePerInterval = AveragePerInterval + (double)(CountPerInterval - _counts[0]) / (double)SampleSize;
+                    _counts.RemoveAt(0);
+                } else
+                {
+                    AveragePerInterval = ((AveragePerInterval * (double)(_counts.Count - 1)) + (double)CountPerInterval) / (double)_counts.Count;
+                }
+            } else
+            {
+                AveragePerInterval = CountPerInterval;
+            }
         }
 
         protected override void OnStateChange(bool newState)
