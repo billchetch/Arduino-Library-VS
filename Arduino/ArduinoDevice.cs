@@ -47,7 +47,8 @@ namespace Chetch.Arduino
             OPEN,
             CLOSE,
             RECORD,
-            SAVE
+            SAVE,
+            READ
         }
 
         public String CommandAlias { get; set; }
@@ -80,6 +81,12 @@ namespace Chetch.Arduino
         public ArduinoCommand(String commandAlias)
         {
             CommandAlias = commandAlias;
+        }
+
+        public ArduinoCommand(String commandAlias, CommandType commandType)
+        {
+            CommandAlias = commandAlias;
+            Type = commandType;
         }
 
         public void AddArgument(Object arg)
@@ -266,9 +273,9 @@ namespace Chetch.Arduino
             return command;
         }
 
-        public ArduinoCommand AddCommand(String commandAlias)
+        public ArduinoCommand AddCommand(String commandAlias, ArduinoCommand.CommandType commandType = ArduinoCommand.CommandType.NOT_SET)
         {
-            return AddCommand(new ArduinoCommand(commandAlias));
+            return AddCommand(new ArduinoCommand(commandAlias, commandType));
         }
 
         public ArduinoCommand AddCommand(String commandAlias, String[] commandAliases, int delay = 1, int repeat = 1)
@@ -299,9 +306,11 @@ namespace Chetch.Arduino
             }
         }
 
-        public ArduinoCommand TryAddCommand(String commandAlias)
+        public ArduinoCommand TryAddCommand(String commandAlias, ArduinoCommand.CommandType commandType = ArduinoCommand.CommandType.NOT_SET)
         {
-            return TryAddCommand(commandAlias, null);
+            ArduinoCommand cmd = TryAddCommand(commandAlias, null);
+            if(cmd != null)cmd.Type = commandType;
+            return cmd;
         }
 
         virtual public void AddCommands(List<ArduinoCommand> commands)
