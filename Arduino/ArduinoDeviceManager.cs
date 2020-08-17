@@ -712,12 +712,12 @@ namespace Chetch.Arduino
             _sleep(sleep);
         }
 
-        public void IssueCommand(String deviceID, String command, List<Object> args)
+        public void IssueCommand(String deviceID, String command, List<Object> args = null)
         {
             IssueCommand(deviceID, command, 1, 0, args);
         }
 
-        public void IssueCommand(String deviceID, String command, int repeat, int delay, List<Object> args)
+        public void IssueCommand(String deviceID, String command, int repeat, int delay, List<Object> args = null)
         {
             var device = GetDevice(deviceID);
             //check has device
@@ -735,6 +735,12 @@ namespace Chetch.Arduino
             if (acmd == null)
             {
                 throw new Exception(String.Format("Device {0} does not have command {1}", deviceID, command));
+            }
+
+            //pass an empty array rather than null ... safety measure here just for the ThreadExecution Manager
+            if(args == null)
+            {
+                args = new List<Object>();
             }
 
             //Use ThreadExecutionManager to allow for multi-threading by device 
