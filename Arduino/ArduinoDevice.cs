@@ -157,7 +157,7 @@ namespace Chetch.Arduino
         public ArduinoDeviceManager Mgr { get; set; }
         protected Sampler Sampler { get; set; }
 
-
+        public double SampledAverage { get { return Sampler == null ? 0 : Sampler.GetAverage(this) ;  } }
         public ArduinoDevice()
         { 
             //Empty constructor
