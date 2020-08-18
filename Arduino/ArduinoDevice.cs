@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Solid.Arduino.Firmata;
+using Chetch.Utilities;
 
 namespace Chetch.Arduino
 {
@@ -22,7 +23,8 @@ namespace Chetch.Arduino
         IR_TRANSMITTER,
         IR_RECEIVER,
         TEMPERATURE_SENSOR,
-        COUNTER
+        COUNTER,
+        RANGE_FINDER
     }
 
     public enum FilterCommandsOptions
@@ -136,8 +138,11 @@ namespace Chetch.Arduino
         }
     }
 
-    public class ArduinoDevice
+    public class ArduinoDevice : ISampleSubject
     {
+        private const int MAX_ID_LENGTH = 8;
+        private const int MAX_NAME_LENGTH = 10;
+
         public String ID { get; internal set; }
         public byte BoardID { get; set; } //ID of 'device' on the arduino board ... used by code on the board to determine what should process the command 
         virtual public String Name { get; set; }
@@ -150,19 +155,29 @@ namespace Chetch.Arduino
         public long LastCommandSentOn { get; internal set; } = 0;
 
         public ArduinoDeviceManager Mgr { get; set; }
+        protected Sampler Sampler { get; set; }
+
 
         public ArduinoDevice()
         { 
             //Empty constructor
         }
 
-        public ArduinoDevice(String name)
+        public ArduinoDevice(String name) : this(null, name)
         {
-            Name = name;
+            
         }
 
         public ArduinoDevice(String id, String name, byte boardID = 0)
         {
+            if(id != null && id.Length > MAX_ID_LENGTH)
+            {
+                throw new ArgumentException(String.Format("{0} exceeds the maximum number {1} characters for an ID", id, MAX_ID_LENGTH));
+            }
+            if (name != null && name.Length > MAX_NAME_LENGTH)
+            {
+                throw new ArgumentException(String.Format("{0} exceeds the maximum number {1} characters for an ID", name, MAX_NAME_LENGTH));
+            }
             ID = id;
             Name = name;
             BoardID = boardID;
@@ -410,6 +425,15 @@ namespace Chetch.Arduino
             message.AddArgument((byte)Category);
             message.AddArgument(ID);
             message.AddArgument(Name);
+            
+#if DEBUG
+            System.Diagnostics.Debug.Print(String.Format("Adding config for device {0} ... ", ID));
+#endif
+        }
+
+        virtual public void RequestSample(Sampler sampler)
+        {
+            Sampler = sampler;
         }
     }
 }

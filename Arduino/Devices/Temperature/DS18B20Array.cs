@@ -25,7 +25,7 @@ namespace Chetch.Arduino.Devices.Temperature
             TryAddCommand("read-temp", ArduinoCommand.CommandType.READ);
         }
 
-        public DS18B20Array(int oneWirePin) : this(oneWirePin, "ds18b20-" + oneWirePin){}
+        public DS18B20Array(int oneWirePin) : this(oneWirePin, "ds18" + oneWirePin){}
 
 
         public override void AddConfig(ADMMessage message)

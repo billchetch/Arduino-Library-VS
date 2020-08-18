@@ -24,7 +24,7 @@ namespace Chetch.Arduino.Devices.Counters
             Interval = 1000;
         }
 
-        public Counter(int pin, int noiseThreshold = 0) : this(pin, noiseThreshold, "counter" + pin, "Counter")
+        public Counter(int pin, int noiseThreshold = 0) : this(pin, noiseThreshold, "ctr" + pin, "Counter")
         {
 
         }

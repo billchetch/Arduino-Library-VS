@@ -115,12 +115,14 @@ namespace Chetch.Arduino
     public class ArduinoDeviceManager
     {
         private const int CONNECT_TIMEOUT = 10000;
+        private const int MAX_SEND_STRING_LENGTH = 32; //maximum string length to send by Firmata
 
         public const string ARDUINO_MEGA_2560 = "USB-SERIAL CH340";
         public const string ARDUINO_UNO = "Arduino Uno";
 
         public const string DEFAULT_BOARD_SET = ARDUINO_MEGA_2560 + "," + ARDUINO_UNO;
 
+        
         static public List<String> GetBoardPorts(String supportedBoards)
         {
             var boards = supportedBoards.Split(',');
@@ -230,6 +232,8 @@ namespace Chetch.Arduino
         private Dictionary<int, DigitalPortState> _portStates;
         private Action<ADMMessage, ArduinoDeviceManager> _listener;
 
+        public Sampler Sampler { get; internal set; } = new Sampler();
+
         //Thread Locks
         private Object LockSendString = new Object();
         private Object LockSetDigitalPin = new Object();
@@ -268,6 +272,7 @@ namespace Chetch.Arduino
         public void Disconnect()
         {
             State = ADMState.NOT_CONNECTED;
+            Sampler.Stop();
             _session?.Dispose();
         }
 
@@ -285,12 +290,12 @@ namespace Chetch.Arduino
             }
             catch (System.IO.IOException e)
             {
-                State = ADMState.NOT_CONNECTED;
+                Disconnect();
                 throw e;
             }
             catch (UnauthorizedAccessException e)
             {
-                State = ADMState.NOT_CONNECTED;
+                Disconnect();
                 throw e;
             }
         }
@@ -550,12 +555,16 @@ namespace Chetch.Arduino
                         if (dev != null)
                         {
                             dev.HandleMessage(message);
+#if DEBUG
+                            Debug.Print(String.Format("Handling message {0} for device {1} ... connected: {2}, memory: {3}", message.Type, dev.ID, dev.IsConnected, message.HasValue("FM") ? message.GetValue("FM") : "N/A"));
+#endif
                         }
 
                         //we do this test after handling message because the message maybe a CONFIGURE_RESPONSE message which will then set the 'connected' status of the device
                         if (message.Type == Messaging.MessageType.CONFIGURE_RESPONSE && DevicesConnected)
                         {
                             State = ADMState.DEVICE_CONNECTED;
+                            Sampler.Start();
                         }
                     }
                     break;
@@ -680,6 +689,18 @@ namespace Chetch.Arduino
 
         public void SendString(String s)
         {
+            if (s == null || s == String.Empty) return;
+
+            if(s.Length > MAX_SEND_STRING_LENGTH)
+            {
+                String msg = String.Format("Cannot send string {0} as it has length {1} > {2}", s, s.Length, MAX_SEND_STRING_LENGTH);
+                Tracing?.TraceEvent(TraceEventType.Error, 0, msg);
+#if DEBUG
+                Debug.Print(msg);
+#endif
+                return;
+            }
+
             //System.Diagnostics.Debug.Print("Sending: " + s);
             lock (LockSendString)
             {
