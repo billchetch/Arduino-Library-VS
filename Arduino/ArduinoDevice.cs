@@ -156,6 +156,7 @@ namespace Chetch.Arduino
 
         public ArduinoDeviceManager Mgr { get; set; }
         protected Sampler Sampler { get; set; }
+        public Measurement.Unit MeasurementUnit { get; set; } = Measurement.Unit.NONE;
 
         public double SampledAverage { get { return Sampler == null ? 0 : Sampler.GetAverage(this) ;  } }
         public ArduinoDevice()
@@ -434,6 +435,12 @@ namespace Chetch.Arduino
         virtual public void RequestSample(Sampler sampler)
         {
             Sampler = sampler;
+        }
+
+        public void ConfigureSampler(int interval, int sampleSize)
+        {
+            if (Mgr == null) throw new Exception("Cannot configure sampling for device before adding to ADM");
+            Mgr.Sampler.Add(this, interval, sampleSize, MeasurementUnit);
         }
     }
 }
