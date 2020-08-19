@@ -437,10 +437,10 @@ namespace Chetch.Arduino
             Sampler = sampler;
         }
 
-        public void ConfigureSampler(int interval, int sampleSize)
+        public void ConfigureSampler(int interval, int sampleSize, Sampler.SamplingOptions samplingOptions = Sampler.SamplingOptions.MEAN)
         {
             if (Mgr == null) throw new Exception("Cannot configure sampling for device before adding to ADM");
-            Mgr.Sampler.Add(this, interval, sampleSize, MeasurementUnit);
+            Mgr.Sampler.Add(this, interval, sampleSize, samplingOptions);
         }
     }
 }
