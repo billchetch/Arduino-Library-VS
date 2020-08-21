@@ -526,10 +526,10 @@ namespace Chetch.Arduino
                                     State = ADMState.DEVICE_READY;
                                 }
 
-                                if (!HasDevice(Diagnostics.LEDBuiltIn.LED_BUILTIN_ID) && message.HasValue("LEDBI"))
+                                if (!HasDevice(Devices.Diagnostics.LEDBuiltIn.LED_BUILTIN_ID) && message.HasValue("LEDBI"))
                                 {
                                     int pin = System.Convert.ToUInt16(message.GetValue("LEDBI"));
-                                    var d = new Diagnostics.LEDBuiltIn(pin);
+                                    var d = new Devices.Diagnostics.LEDBuiltIn(pin);
                                     AddDevice(d);
                                 }
                             } catch (Exception e)
@@ -789,9 +789,9 @@ namespace Chetch.Arduino
 
         public void Blink(int repeat = 1, int delay = 0)
         {
-            if (HasDevice(Diagnostics.LEDBuiltIn.LED_BUILTIN_ID))
+            if (HasDevice(Devices.Diagnostics.LEDBuiltIn.LED_BUILTIN_ID))
             {
-                var device = (Diagnostics.LEDBuiltIn)GetDevice(Diagnostics.LEDBuiltIn.LED_BUILTIN_ID);
+                var device = (Devices.Diagnostics.LEDBuiltIn)GetDevice(Devices.Diagnostics.LEDBuiltIn.LED_BUILTIN_ID);
                 if (!device.IsConnected)
                 {
                     throw new Exception("Device LEDBuiltIn is not connected");
