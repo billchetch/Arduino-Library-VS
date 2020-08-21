@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using System.Timers;
 using Chetch.Utilities;
 
-namespace Chetch.Arduino.Devices
+namespace Chetch.Arduino.Devices.Counters
 {
     public class Counter : SwitchSensor
     {
@@ -15,10 +15,10 @@ namespace Chetch.Arduino.Devices
         public Boolean CountOnState { get; set; } = true;
         public Boolean BroadcastStateChange { get; set; } = false;
 
-        public int AverageCount {
+        public double AverageCount {
             get
             {
-                return System.Convert.ToInt32(SampledAverage);
+                return SampledAverage;
             }
         }
 

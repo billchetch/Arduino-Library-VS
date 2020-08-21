@@ -94,6 +94,7 @@ namespace Chetch.Arduino
         protected String SupportedBoards { get; set; }
         protected Timer _admtimer;
         private Dictionary<String, bool> _devicesConnected = new Dictionary<string, bool>();
+        private bool _noPortsFoundWarning = false; //has a no ports found warning been 'traced' ... a flag to prevent multiple trace/log entries
 
         protected Dictionary<String, ADMListener> Listeners { get; } = new Dictionary<string, ADMListener>();
 
@@ -409,7 +410,7 @@ namespace Chetch.Arduino
                                 }
                                 else
                                 {
-                                    throw new Exception("Cannot receive ping response as not listening for messages from " + adm.BoardID);
+                                    throw new Exception(String.Format("Cannot receive ping response as not listening for messages from {0}", adm.BoardID));
                                 }
                                 break;
 
@@ -501,9 +502,10 @@ namespace Chetch.Arduino
         {
             _admtimer.Stop();
 
+            //get all current ports that have boards connected
             List<String> ports = ArduinoDeviceManager.GetBoardPorts(SupportedBoards);
 
-            //remove any ADMs that are no longer connected to a port
+            //build a list of any ADMs that are no longer connected to one of these ports
             List<String> disconnect = new List<String>();
             foreach(KeyValuePair<String, ArduinoDeviceManager> entry in ADMS)
             {
@@ -523,7 +525,7 @@ namespace Chetch.Arduino
             }   
             
 
-            //now disconnect
+            //now formally disconnect boards that have not been found on any port
             foreach(String key in disconnect)
             {
                 ArduinoDeviceManager adm = ADMS[key];
@@ -533,20 +535,32 @@ namespace Chetch.Arduino
                 _devicesConnected.Remove(key);
             }
 
-            //now we try and connect all the boards that we have not just disconnected
-            foreach(String key in ports)
+            //now we try and connect all the boards that we have not just disconnected but have not yet been connected
+            if (ports.Count > 0)
             {
-                if (disconnect.Contains(key) || ADMS.ContainsKey(key)) continue;
+                _noPortsFoundWarning = false;
+                foreach (String key in ports)
+                {
+                    if (disconnect.Contains(key) || ADMS.ContainsKey(key)) continue;
 
-                try
+                    try
+                    {
+                        Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Attempting to connect board on port {0}", key);
+                        ADMS[key] = ArduinoDeviceManager.Connect(key, HandleADMMessage);
+                        Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Connected board on port {0}", key);
+                        Notify(ADMEvent.CONNECTED, String.Format("Connected ADM to port {0}", key));
+                    }
+                    catch (Exception e)
+                    {
+                        Tracing?.TraceEvent(TraceEventType.Error, 100, "ADM: Failed to connect, exception {0}: {1}", e.GetType().ToString(), e.Message);
+                    }
+                }
+            } else
+            {
+                if (!_noPortsFoundWarning)
                 {
-                    Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Attempting to connect board on port {0}", key);
-                    ADMS[key] = ArduinoDeviceManager.Connect(key, HandleADMMessage);
-                    Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Connected board on port {0}", key);
-                    Notify(ADMEvent.CONNECTED, String.Format("Connected ADM to port {0}", key));
-                } catch (Exception e)
-                {
-                    Tracing?.TraceEvent(TraceEventType.Error, 100, "ADM: Failed to connect, exception {0}: {1}", e.GetType().ToString(), e.Message);
+                    Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADM: No boards connected to any port");
+                    _noPortsFoundWarning = true;
                 }
             }
 
@@ -593,16 +607,16 @@ namespace Chetch.Arduino
         {
             if (adm.State == ADMState.DEVICE_READY && message.Type == Messaging.MessageType.STATUS_RESPONSE)
             {
-                Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: {0} ready to add devices...", adm.BoardID);
+                Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: Ready to add devices to {0} ...", adm.BoardID);
                 AddADMDevices(adm, message);
-                Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: {0} added devices", adm.BoardID);    
+                Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: {0} devices added to {1}. Configuring devices... ", adm.BoardID, adm.DeviceCount);    
             }
 
             if (adm.State == ADMState.DEVICE_CONNECTED && message.Type == Messaging.MessageType.CONFIGURE_RESPONSE)
             {
                 if (!_devicesConnected[adm.Port])
                 {
-                    Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: Devices connected...");
+                    Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: All {0} devices now configured and connected to board {1}", adm.DeviceCount, adm.BoardID);
                     OnADMDevicesConnected(adm, message);
                     _devicesConnected[adm.Port] = true;
                 }
@@ -631,7 +645,9 @@ namespace Chetch.Arduino
 
         virtual protected void OnADMDevicesConnected(ArduinoDeviceManager adm, ADMMessage message)
         {
-            Notify(ADMEvent.DEVICES_CONNECTED, "All added devices connected for " + adm.BoardID);
+            String msg = String.Format("All {0} added devices connected for {1} ", adm.DeviceCount, adm.BoardID);
+            Notify(ADMEvent.DEVICES_CONNECTED, msg);
+            Tracing?.
         }
     } //end class
 }
