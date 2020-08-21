@@ -609,7 +609,7 @@ namespace Chetch.Arduino
             {
                 Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: Ready to add devices to {0} ...", adm.BoardID);
                 AddADMDevices(adm, message);
-                Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: {0} devices added to {1}. Configuring devices... ", adm.BoardID, adm.DeviceCount);    
+                Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: {0} devices added to {1}. Configuring devices... ", adm.DeviceCount, adm.BoardID);    
             }
 
             if (adm.State == ADMState.DEVICE_CONNECTED && message.Type == Messaging.MessageType.CONFIGURE_RESPONSE)
