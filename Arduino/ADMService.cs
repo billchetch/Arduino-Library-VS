@@ -647,7 +647,6 @@ namespace Chetch.Arduino
         {
             String msg = String.Format("All {0} added devices connected for {1} ", adm.DeviceCount, adm.BoardID);
             Notify(ADMEvent.DEVICES_CONNECTED, msg);
-            Tracing?.
         }
     } //end class
 }
