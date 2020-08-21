@@ -128,7 +128,7 @@ namespace Chetch.Arduino
             var boards = supportedBoards.Split(',');
             if (boards.Length == 0)
             {
-                throw new Exception("ArduinnoDviceManager:Connect no supportedBoards provided");
+                throw new Exception("ArduinoDeviceManager:Connect no supportedBoards provided");
             }
 
             List<String> boardPorts = new List<String>();

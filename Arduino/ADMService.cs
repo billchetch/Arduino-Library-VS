@@ -18,8 +18,7 @@ namespace Chetch.Arduino
             DISCONNECTED,
             DEVICES_CONNECTED
         }
-
-
+        
         public class ADMListener
         {
             public static MessageType[] DefaultMessageTypes { get; } = new MessageType[] { MessageType.NOTIFICATION, MessageType.STATUS_RESPONSE, MessageType.INFO, MessageType.WARNING, MessageType.ERROR, MessageType.DATA };
@@ -523,6 +522,7 @@ namespace Chetch.Arduino
                     {
                         try
                         {
+                            //Tracing?.TraceEvent(TraceEventType.Information, 0, "ADM: Asserting connection");
                             entry.Value.AssertConnection();
                         }
                         catch (Exception e)
@@ -538,9 +538,10 @@ namespace Chetch.Arduino
                 {
                     ArduinoDeviceManager adm = ADMS[key];
                     ADMS.Remove(key);
+                    _devicesConnected.Remove(key);
+
                     Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADM: Board {0} on port {1} disconnected", adm.BoardID, key);
                     Notify(ADMEvent.DISCONNECTED, String.Format("{0} disconnected from port {1}", adm.BoardID, key));
-                    _devicesConnected.Remove(key);
                 }
 
                 //now we try and connect all the boards that we have not just disconnected but have not yet been connected
