@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Chetch.Database;
 
-namespace Chetch.Arduino.Infrared
+namespace Chetch.Arduino.Devices.Infrared
 {
     public class IRDB : ArduinoCommandsDB
     {

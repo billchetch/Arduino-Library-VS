@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Solid.Arduino.Firmata;
 
-namespace Chetch.Arduino.Diagnostics
+namespace Chetch.Arduino.Devices.Diagnostics
 {
     public class LEDBuiltIn : DiagnosticsDevice
     {

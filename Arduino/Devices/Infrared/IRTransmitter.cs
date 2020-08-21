@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Solid.Arduino.Firmata;
 
-namespace Chetch.Arduino.Infrared
+namespace Chetch.Arduino.Devices.Infrared
 {
     public abstract class IRTransmitter : IRDevice
     {
