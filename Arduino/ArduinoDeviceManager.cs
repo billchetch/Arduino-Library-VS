@@ -125,21 +125,12 @@ namespace Chetch.Arduino
         
         static public List<String> GetBoardPorts(String supportedBoards)
         {
-            var boards = supportedBoards.Split(',');
-            if (boards.Length == 0)
+            if (supportedBoards == null || supportedBoards == String.Empty)
             {
                 throw new Exception("ArduinoDeviceManager:Connect no supportedBoards provided");
             }
 
-            List<String> boardPorts = new List<String>();
-            foreach (var board in boards)
-            {
-                List<String> ports = Chetch.Utilities.SerialPorts.Find(board.Trim());
-                if (ports.Count > 0)
-                {
-                    boardPorts.AddRange(ports);
-                }
-            }
+            List<String> boardPorts = SerialPorts.Find(supportedBoards.Trim());
             return boardPorts;
         }
 
