@@ -728,6 +728,16 @@ namespace Chetch.Arduino
             IssueCommand(deviceID, command, 1, 0, args);
         }
 
+        public void IssueCommand(String deviceID, String command, int repeat, int delay, params Object[] args)
+        {
+            IssueCommand(deviceID, command, repeat, delay, new List<Object>(args));
+        }
+
+        public void IssueCommand(String deviceID, String command, params Object[] args)
+        {
+            IssueCommand(deviceID, command, 1, 0, new List<Object>(args));
+        }
+
         public void IssueCommand(String deviceID, String command, int repeat, int delay, List<Object> args = null)
         {
             var device = GetDevice(deviceID);

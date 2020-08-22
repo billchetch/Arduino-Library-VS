@@ -352,6 +352,11 @@ namespace Chetch.Arduino
             }
         }
 
+        virtual public void ExecuteCommand(String command, params Object[] args)
+        {
+            ExecuteCommand(command, new List<Object>(args));
+        }
+
         virtual public void ExecuteCommand(String commandAlias, List<Object> extraArgs = null)
         {
             var command = GetCommand(commandAlias);
