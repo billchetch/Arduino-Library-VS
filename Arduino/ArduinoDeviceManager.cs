@@ -476,131 +476,144 @@ namespace Chetch.Arduino
         {
             var fmessage = eventArgs.Value;
             ADMMessage message = null;
-            switch (fmessage.Type)
+            try
             {
-                case Solid.Arduino.Firmata.MessageType.StringData:
-                    StringData sd = (StringData)fmessage.Value;
-                    try
-                    {
-                        String serialized = sd.Text;
+                switch (fmessage.Type)
+                {
+                    case Solid.Arduino.Firmata.MessageType.StringData:
+                        StringData sd = (StringData)fmessage.Value;
                         try
                         {
-                            var sanitised = serialized.Replace("&", String.Empty).Replace("=", String.Empty);
-                            if (!Utilities.Convert.IsUrlEncoded(sanitised))
+                            String serialized = sd.Text;
+                            try
                             {
-                                throw new Exception(String.Format("{0} is not URL encoded", sanitised));
+                                var sanitised = serialized.Replace("&", String.Empty).Replace("=", String.Empty);
+                                if (!Utilities.Convert.IsUrlEncoded(sanitised))
+                                {
+                                    throw new Exception(String.Format("{0} is not URL encoded", sanitised));
+                                }
                             }
+                            catch (Exception e)
+                            {
+                                Tracing?.TraceEvent(TraceEventType.Error, 4000, e.Message);
+                            }
+
+                            message = ADMMessage.Deserialize<ADMMessage>(serialized, MessageEncoding.QUERY_STRING);
+                            message.TargetID = Utilities.Convert.ToByte(message.Target);
                         }
                         catch (Exception e)
                         {
-                            Tracing?.TraceEvent(TraceEventType.Error, 4000, e.Message);
+                            Tracing?.TraceEvent(TraceEventType.Error, 4000, "Deserializing {0} produced exception {1}: {2}", sd.Text, e.GetType(), e.Message);
+                            message = new ADMMessage();
+                            message.Type = Messaging.MessageType.ERROR;
+                            message.Value = e.Message;
+                            break;
                         }
-
-                        message = ADMMessage.Deserialize<ADMMessage>(serialized, MessageEncoding.QUERY_STRING);
-                        message.TargetID = Utilities.Convert.ToByte(message.Target);
-                    } catch (Exception e)
-                    {
-                        Tracing?.TraceEvent(TraceEventType.Error, 4000, "Deserializing {0} produced exception {1}: {2}", sd.Text, e.GetType(), e.Message);
-                        message = new ADMMessage();
-                        message.Type = Messaging.MessageType.ERROR;
-                        message.Value = e.Message;
-                        break;
-                    }
-                    switch (message.Type)
-                    {
-                        case Messaging.MessageType.STATUS_RESPONSE:
-                            try {
-                                LittleEndian = Chetch.Utilities.Convert.ToBoolean(message.GetValue("LE"));
-                                _boardType = message.GetString("BD");
-                                BoardID = message.HasValue("BDID") ? message.GetString("BDID") : null;
-                                if (State == ADMState.CONNECTED)
+                        switch (message.Type)
+                        {
+                            case Messaging.MessageType.STATUS_RESPONSE:
+                                try
                                 {
-                                    State = ADMState.DEVICE_READY;
+                                    LittleEndian = Chetch.Utilities.Convert.ToBoolean(message.GetValue("LE"));
+                                    _boardType = message.GetString("BD");
+                                    BoardID = message.HasValue("BDID") ? message.GetString("BDID") : null;
+                                    if (State == ADMState.CONNECTED)
+                                    {
+                                        State = ADMState.DEVICE_READY;
+                                    }
+
+                                    if (message.HasValue("LEDBI"))
+                                    {
+                                        LEDBIPin = message.GetInt("LEDBI");
+                                    }
                                 }
-
-                                if (message.HasValue("LEDBI"))
+                                catch (Exception e)
                                 {
-                                    LEDBIPin = message.GetInt("LEDBI");
-                                 }
-                            } catch (Exception e)
-                            {
-                                Tracing?.TraceEvent(TraceEventType.Error, 4000, "STATUS_RESPONSE error: {0}, {1}", e.GetType(), e.Message);
-                                message = new ADMMessage();
-                                message.Type = Messaging.MessageType.ERROR;
-                                message.Value = e.Message;
-                            }
-                            break;
+                                    Tracing?.TraceEvent(TraceEventType.Error, 4000, "STATUS_RESPONSE error: {0}, {1}", e.GetType(), e.Message);
+                                    message = new ADMMessage();
+                                    message.Type = Messaging.MessageType.ERROR;
+                                    message.Value = e.Message;
+                                }
+                                break;
 
-                        case Messaging.MessageType.CONFIGURE_RESPONSE:
-                            break;
+                            case Messaging.MessageType.CONFIGURE_RESPONSE:
+                                break;
 
-                        case Messaging.MessageType.ERROR:
-                            break;
-                    }
+                            case Messaging.MessageType.ERROR:
+                                break;
+                        }
 
-                    if (State == ADMState.DEVICE_READY || State == ADMState.DEVICE_CONNECTED)
-                    {
-                        //direct messages to devices
-                        var dev = GetTargetedDevice(message);
-                        if (dev != null)
+                        if (State == ADMState.DEVICE_READY || State == ADMState.DEVICE_CONNECTED)
                         {
-                            dev.HandleMessage(message);
+                            //direct messages to devices
+                            var dev = GetTargetedDevice(message);
+                            if (dev != null)
+                            {
+                                dev.HandleMessage(message);
 #if DEBUG
-                            Debug.Print(String.Format("Handling message {0} for device {1} ... connected: {2}, memory: {3}", message.Type, dev.ID, dev.IsConnected, message.HasValue("FM") ? message.GetValue("FM") : "N/A"));
+                                Debug.Print(String.Format("Handling message {0} for device {1} ... connected: {2}, memory: {3}", message.Type, dev.ID, dev.IsConnected, message.HasValue("FM") ? message.GetValue("FM") : "N/A"));
 #endif
-                        }
+                            }
 
-                        //we do this test after handling message because the message maybe a CONFIGURE_RESPONSE message which will then set the 'connected' status of the device
-                        if (message.Type == Messaging.MessageType.CONFIGURE_RESPONSE && DevicesConnected)
-                        {
-                            State = ADMState.DEVICE_CONNECTED;
-                            Sampler.Start();
-                        }
-                    }
-                    break;
-
-                case Solid.Arduino.Firmata.MessageType.PinStateResponse:
-                    break;
-
-                case Solid.Arduino.Firmata.MessageType.DigitalPortState:
-                    DigitalPortState portState = (DigitalPortState)fmessage.Value;
-                    int pinsChanged;
-                    if (_portStates.ContainsKey(portState.Port)) {
-                        pinsChanged = portState.Pins ^ _portStates[portState.Port].Pins;
-                    } else {
-                        pinsChanged = 255;
-                    }
-                    _portStates[portState.Port] = portState;
-
-                    for (int i = 0; i < 8; i++)
-                    {
-                        int bit2check = (int)Math.Pow(2, i);
-                        if((bit2check & pinsChanged) == 0)continue;
-
-                        bool state = portState.IsSet(i);
-                        int pinNumber = GetPinForPort(portState.Port, i); //TODO: this might need to be board dependent
-                        var devs = GetDevicesByPin(pinNumber);
-                        if (devs != null)
-                        {
-                            foreach (var dev in devs)
+                            //we do this test after handling message because the message maybe a CONFIGURE_RESPONSE message which will then set the 'connected' status of the device
+                            if (message.Type == Messaging.MessageType.CONFIGURE_RESPONSE && DevicesConnected)
                             {
-                                dev.HandleDigitalPinStateChange(pinNumber, state);
+                                State = ADMState.DEVICE_CONNECTED;
+                                Sampler.Start();
                             }
                         }
-                    }
+                        break;
 
-                    //String s1 = System.Convert.ToString(portState.Pins, 2);
-                    //String s2 = System.Convert.ToString(pinsChanged, 2);
-                    //Debug.Print("Pins/2change: " + s1 + "/" + s2);
-                    break;
+                    case Solid.Arduino.Firmata.MessageType.PinStateResponse:
+                        break;
 
-                case Solid.Arduino.Firmata.MessageType.CapabilityResponse:
-                    break;
+                    case Solid.Arduino.Firmata.MessageType.DigitalPortState:
+                        DigitalPortState portState = (DigitalPortState)fmessage.Value;
+                        int pinsChanged;
+                        if (_portStates.ContainsKey(portState.Port))
+                        {
+                            pinsChanged = portState.Pins ^ _portStates[portState.Port].Pins;
+                        }
+                        else
+                        {
+                            pinsChanged = 255;
+                        }
+                        _portStates[portState.Port] = portState;
 
-                default:
-                    break;
+                        for (int i = 0; i < 8; i++)
+                        {
+                            int bit2check = (int)Math.Pow(2, i);
+                            if ((bit2check & pinsChanged) == 0) continue;
+
+                            bool state = portState.IsSet(i);
+                            int pinNumber = GetPinForPort(portState.Port, i); //TODO: this might need to be board dependent
+                            var devs = GetDevicesByPin(pinNumber);
+                            if (devs != null)
+                            {
+                                foreach (var dev in devs)
+                                {
+                                    dev.HandleDigitalPinStateChange(pinNumber, state);
+                                }
+                            }
+                        }
+
+                        //String s1 = System.Convert.ToString(portState.Pins, 2);
+                        //String s2 = System.Convert.ToString(pinsChanged, 2);
+                        //Debug.Print("Pins/2change: " + s1 + "/" + s2);
+                        break;
+
+                    case Solid.Arduino.Firmata.MessageType.CapabilityResponse:
+                        break;
+
+                    default:
+                        break;
+                }
+            } catch (Exception e)
+            {
+                message = new ADMMessage();
+                message.Type = Messaging.MessageType.ERROR;
+                message.Value = e.Message;
             }
-
             Broadcast(message);
         }
 

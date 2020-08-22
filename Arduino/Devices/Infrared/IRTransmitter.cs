@@ -9,6 +9,8 @@ namespace Chetch.Arduino.Devices.Infrared
 {
     public abstract class IRTransmitter : IRDevice
     {
+        public const int BOARD_SPECIFIED = -1;
+
         private bool _enabled = false;
         private int _enablePin; //HIGH output means the transmitter is disabled (as there is no voltage across it)
         private int _transmitPin;
@@ -26,8 +28,10 @@ namespace Chetch.Arduino.Devices.Infrared
             _enablePin = enablePin;
             _transmitPin = transmitPin;
             ConfigurePin(_enablePin, PinMode.DigitalOutput);
-            ConfigurePin(_transmitPin, PinMode.PwmOutput);
-
+            if (transmitPin != BOARD_SPECIFIED)
+            {
+                ConfigurePin(_transmitPin, PinMode.PwmOutput);
+            }
         }
 
         public override void ReadDevice()
@@ -107,6 +111,33 @@ namespace Chetch.Arduino.Devices.Infrared
             {
                 base.SendCommand(command, extraArgs);
             }
+        }
+
+        public override void HandleMessage(ADMMessage message)
+        {
+            //check if the transmit pin is viable
+            if(_transmitPin == BOARD_SPECIFIED && message.HasValue("TP"))
+            {
+                int tp = message.GetInt("TP");
+                if (!Mgr.IsPinCapable(tp, PinMode.PwmOutput))
+                {
+                    throw new Exception(String.Format("Device {0} is using pin {1} which is not capable for PWM output", ID, tp));
+                }
+
+                var devs = Mgr.GetDevicesByPin(tp);
+                foreach(var dev in devs)
+                {
+                    if(dev != this && !dev.IsPinCompatible(tp, PinMode.PwmOutput))
+                    {
+                        throw new Exception(String.Format("Device {0} is using pin {1} which is not compatible with device {2} usage of this pin", ID, tp, dev.ID));
+                    }
+                }
+                _transmitPin = tp;
+                ConfigurePin(tp, PinMode.PwmOutput);
+            }
+
+
+            base.HandleMessage(message);
         }
     }
 }
