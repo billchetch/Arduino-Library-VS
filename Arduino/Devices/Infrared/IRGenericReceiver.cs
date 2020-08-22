@@ -8,10 +8,9 @@ namespace Chetch.Arduino.Devices.Infrared
 {
     public class IRGenericReceiver : IRReceiver
     {
-        public IRGenericReceiver(String id, String name, int receivePin, IRDB db = null) : base(id, name, receivePin, db)
-        {
-           //
-        }
+        public IRGenericReceiver(String id, String name, int receivePin, IRDB db = null) : base(id, name, receivePin, db){}
+
+        public IRGenericReceiver(int receivePin, IRDB db = null) : base(receivePin, db) {}
 
         override public String Name
         {
