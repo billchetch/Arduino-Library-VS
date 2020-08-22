@@ -34,6 +34,8 @@ namespace Chetch.Arduino.Devices.Infrared
             }
         }
 
+        public IRTransmitter(int enablePin, int transmitPin, IRDB db = null) : this("irt" + enablePin, "IRT", enablePin, transmitPin, db) { }
+
         public override void ReadDevice()
         {
             base.ReadDevice();
@@ -125,11 +127,14 @@ namespace Chetch.Arduino.Devices.Infrared
                 }
 
                 var devs = Mgr.GetDevicesByPin(tp);
-                foreach(var dev in devs)
+                if (devs != null)
                 {
-                    if(dev != this && !dev.IsPinCompatible(tp, PinMode.PwmOutput))
+                    foreach (var dev in devs)
                     {
-                        throw new Exception(String.Format("Device {0} is using pin {1} which is not compatible with device {2} usage of this pin", ID, tp, dev.ID));
+                        if (dev != this && !dev.IsPinCompatible(tp, PinMode.PwmOutput))
+                        {
+                            throw new Exception(String.Format("Device {0} is using pin {1} which is not compatible with device {2} usage of this pin", ID, tp, dev.ID));
+                        }
                     }
                 }
                 _transmitPin = tp;

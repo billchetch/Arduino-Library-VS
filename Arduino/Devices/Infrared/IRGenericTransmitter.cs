@@ -17,10 +17,9 @@ namespace Chetch.Arduino.Devices.Infrared
             }
         }
 
-        public IRGenericTransmitter(String id, String name, int enablePin, int transmitPin, IRDB db = null) : base(id, name, enablePin, transmitPin, db)
-        {
+        public IRGenericTransmitter(String id, String name, int enablePin, int transmitPin, IRDB db = null) : base(id, name, enablePin, transmitPin, db){}
 
-        }
+        public IRGenericTransmitter(int enablePin, int transmitPin, IRDB db = null) : base(enablePin, transmitPin, db) { }
 
         public override void AddCommands(List<ArduinoCommand> commands)
         {
