@@ -212,9 +212,10 @@ namespace Chetch.Arduino
         public String Port { get; set; }
         private ArduinoSession _session;
         public String BoardID { get; internal set; } //Should be set in STATUS_RESPONSE message from board
-        private bool _littleEndian = true; //Should be set in STATUS_RESPONSE message from board
-        public bool LittleEndian { get { return _littleEndian; } }
+        public int LEDBIPin { get; internal set; } = -1; //Should be set in STATUS_RESPONSE message from board
+        public bool LittleEndian { get; internal set; } = true;
         private String _boardType; //Should be set in STATUS_RESPONSE message from board
+
         private Dictionary<String, ArduinoDevice> _devices;
         private Dictionary<String, byte> _device2boardID;
         private Dictionary<byte, ArduinoDevice> _boardID2device;
@@ -253,7 +254,7 @@ namespace Chetch.Arduino
             ADMMessage message = new ADMMessage();
             message.TargetID = 0;
             message.Type = Messaging.MessageType.INITIALISE;
-            SendMessage(message, 100);
+            SendMessage(message, 250);
 
             //and request board status
             RequestStatus();
@@ -416,10 +417,10 @@ namespace Chetch.Arduino
 
             //send configuration/setup data to board
             var message = new ADMMessage();
-            message.LittleEndian = _littleEndian;
+            message.LittleEndian = LittleEndian;
             message.Type = Messaging.MessageType.CONFIGURE;
             device.AddConfig(message);
-            SendMessage(message, 100);
+            SendMessage(message, 250); //leave some time for this process to complete to avoid bombarding the board
             
             return device;
         }
@@ -509,7 +510,7 @@ namespace Chetch.Arduino
                     {
                         case Messaging.MessageType.STATUS_RESPONSE:
                             try {
-                                _littleEndian = Chetch.Utilities.Convert.ToBoolean(message.GetValue("LE"));
+                                LittleEndian = Chetch.Utilities.Convert.ToBoolean(message.GetValue("LE"));
                                 _boardType = message.GetString("BD");
                                 BoardID = message.HasValue("BDID") ? message.GetString("BDID") : null;
                                 if (State == ADMState.CONNECTED)
@@ -517,12 +518,10 @@ namespace Chetch.Arduino
                                     State = ADMState.DEVICE_READY;
                                 }
 
-                                if (!HasDevice(Devices.Diagnostics.LEDBuiltIn.LED_BUILTIN_ID) && message.HasValue("LEDBI"))
+                                if (message.HasValue("LEDBI"))
                                 {
-                                    int pin = System.Convert.ToUInt16(message.GetValue("LEDBI"));
-                                    var d = new Devices.Diagnostics.LEDBuiltIn(pin);
-                                    AddDevice(d);
-                                }
+                                    LEDBIPin = message.GetInt("LEDBI");
+                                 }
                             } catch (Exception e)
                             {
                                 Tracing?.TraceEvent(TraceEventType.Error, 4000, "STATUS_RESPONSE error: {0}, {1}", e.GetType(), e.Message);
@@ -628,7 +627,7 @@ namespace Chetch.Arduino
         public void SendCommand(byte targetID, ArduinoCommand command, List<Object> extraArgs = null)
         {
             var message = new ADMMessage();
-            message.LittleEndian = _littleEndian;
+            message.LittleEndian = LittleEndian;
             message.Type = Messaging.MessageType.COMMAND;
             message.Tag = 0; //TODO: create some kind of perhaps counter-based tagging
             message.TargetID = targetID;
@@ -649,7 +648,7 @@ namespace Chetch.Arduino
                 }
                 else if (arg.GetType().IsValueType)
                 {
-                    b = Chetch.Utilities.Convert.ToBytes((ValueType)arg, _littleEndian);
+                    b = Chetch.Utilities.Convert.ToBytes((ValueType)arg, LittleEndian);
                 }
                 else
                 {
