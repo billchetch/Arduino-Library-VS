@@ -56,6 +56,15 @@ namespace Chetch.Arduino.Devices.Infrared
             AddCommand(cmd);
         }
 
+        public IRReceiver(int receivePin, IRDB db = null) : this("irr" + receivePin, "IRR", receivePin, db) { }
+
+        public override void AddConfig(ADMMessage message)
+        {
+            base.AddConfig(message);
+
+            message.AddArgument(_receivePin);
+        }
+
         override public void ReadDevice()
         {
             base.ReadDevice();
