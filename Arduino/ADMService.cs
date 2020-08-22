@@ -618,18 +618,30 @@ namespace Chetch.Arduino
         {
             if (adm.State == ADMState.DEVICE_READY && message.Type == Messaging.MessageType.STATUS_RESPONSE)
             {
-                Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: Ready to add devices to {0} ...", adm.BoardID);
-                AddADMDevices(adm, message);
-                Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: {0} devices added to {1}. Configuring devices... ", adm.DeviceCount, adm.BoardID);    
+                try
+                {
+                    Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: Ready to add devices to {0} ...", adm.BoardID);
+                    AddADMDevices(adm, message);
+                    Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: {0} devices added to {1}. Configuring devices... ", adm.DeviceCount, adm.BoardID);
+                } catch (Exception e)
+                {
+                    Tracing?.TraceEvent(TraceEventType.Error, 100, "ADM: Error adding devices {0} ...", e.Message);
+                }
             }
 
             if (adm.State == ADMState.DEVICE_CONNECTED && message.Type == Messaging.MessageType.CONFIGURE_RESPONSE)
             {
                 if (!_devicesConnected[adm.Port])
                 {
-                    Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: All {0} devices now configured and connected to board {1}", adm.DeviceCount, adm.BoardID);
-                    OnADMDevicesConnected(adm, message);
-                    _devicesConnected[adm.Port] = true;
+                    try
+                    {
+                        Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: All {0} devices now configured and connected to board {1}", adm.DeviceCount, adm.BoardID);
+                        OnADMDevicesConnected(adm, message);
+                        _devicesConnected[adm.Port] = true;
+                    } catch (Exception e)
+                    {
+                        Tracing?.TraceEvent(TraceEventType.Error, 100, "ADM: Error on devices connected {0} ...", e.Message);
+                    }
                 }
             }
 
