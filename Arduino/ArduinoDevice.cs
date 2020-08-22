@@ -422,9 +422,9 @@ namespace Chetch.Arduino
 
         virtual public void AddConfig(ADMMessage message)
         {
+            //add board ID, device category and device name
             message.TargetID = BoardID;
             message.AddArgument((byte)Category);
-            message.AddArgument(ID);
             message.AddArgument(Name);
             
 #if DEBUG
