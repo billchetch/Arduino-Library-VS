@@ -425,6 +425,29 @@ namespace Chetch.Arduino
             return device;
         }
 
+        public void UpdateDevice(ArduinoDevice device)
+        {
+            //check pins
+            foreach (var dpin in device.Pins)
+            {
+                //check that pins have the required capability
+                if (!IsPinCapable(dpin)) throw new Exception("Cannot update device " + device.Name + " as pin " + dpin.PinNumber + " board does not support capability");
+
+                //check no conflict with existing pin usage
+                foreach (var dev in _devices.Values)
+                {
+                    if (dev != device && !dev.IsPinCompatible(dpin)) throw new Exception("Cannot update device " + device.Name + " as it is not pin-compatible with " + dev.Name);
+                }
+            }
+
+            //maybe this was a new pin so needs to be added to the _pin2device maaping
+            foreach (var dpin in device.Pins)
+            {
+                if (!_pin2device.ContainsKey(dpin.PinNumber)) _pin2device[dpin.PinNumber] = new List<ArduinoDevice>();
+                if (!_pin2device[dpin.PinNumber].Contains(device))_pin2device[dpin.PinNumber].Add(device);
+            }
+        }
+
         public List<ArduinoDevice> GetDevices()
         {
             return _devices.Values.ToList();

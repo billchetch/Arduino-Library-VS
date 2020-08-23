@@ -82,16 +82,15 @@ namespace Chetch.Arduino.Devices.Infrared
         {
             if(!_enabled){
                 List<ArduinoDevice> devices = Mgr.GetDevicesByPin(_transmitPin);
-                if (devices != null)
+
+                foreach (var device in devices)
                 {
-                    foreach (var device in devices)
+                    if (device is IRTransmitter && device != this)
                     {
-                        if (device is IRTransmitter && device != this)
-                        {
-                            ((IRTransmitter)device).Disable();
-                        }
+                        ((IRTransmitter)device).Disable();
                     }
                 }
+
                 Enable();
             }
 
@@ -123,24 +122,8 @@ namespace Chetch.Arduino.Devices.Infrared
             if(_transmitPin == BOARD_SPECIFIED && message.HasValue("TP"))
             {
                 int tp = message.GetInt("TP");
-                if (!Mgr.IsPinCapable(tp, PinMode.PwmOutput))
-                {
-                    throw new Exception(String.Format("Device {0} is using pin {1} which is not capable for PWM output", ID, tp));
-                }
-
-                var devs = Mgr.GetDevicesByPin(tp);
-                if (devs != null)
-                {
-                    foreach (var dev in devs)
-                    {
-                        if (dev != this && !dev.IsPinCompatible(tp, PinMode.PwmOutput))
-                        {
-                            throw new Exception(String.Format("Device {0} is using pin {1} which is not compatible with device {2} usage of this pin", ID, tp, dev.ID));
-                        }
-                    }
-                }
-                _transmitPin = tp;
                 ConfigurePin(tp, PinMode.PwmOutput);
+                Mgr.UpdateDevice(this);
             }
 
 
