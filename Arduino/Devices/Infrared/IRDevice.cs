@@ -81,12 +81,12 @@ namespace Chetch.Arduino.Devices.Infrared
             if (DeviceName == null) throw new Exception("No device name given");
 
             DBID = 0;
-            var dev = DB.GetDevice(DeviceName);
+            Database.DBRow dev = DB.GetDevice(DeviceName);
 
             //TODO: make it so that you can choose to overwrite data or not
             if (dev != null)
             {
-                DBID = System.Convert.ToInt64(dev["id"]);
+                DBID = dev.ID;
                 DeviceType = (String)dev["device_type"];
                 Manufacturer = (String)dev["manufacturer"];
             }
