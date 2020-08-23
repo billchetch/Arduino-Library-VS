@@ -82,14 +82,16 @@ namespace Chetch.Arduino.Devices.Infrared
         {
             if(!_enabled){
                 List<ArduinoDevice> devices = Mgr.GetDevicesByPin(_transmitPin);
-                foreach (var device in devices)
+                if (devices != null)
                 {
-                    if (device is IRTransmitter && device != this)
+                    foreach (var device in devices)
                     {
-                        ((IRTransmitter)device).Disable();
+                        if (device is IRTransmitter && device != this)
+                        {
+                            ((IRTransmitter)device).Disable();
+                        }
                     }
                 }
-
                 Enable();
             }
 
