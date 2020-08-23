@@ -8,7 +8,7 @@ namespace Chetch.Arduino.Devices.Infrared
 {
     public class IRSamsungTV : IRTransmitter
     {
-        const String DEVICE_NAME = "Samsung TV";
+        public const String DEVICE_NAME = "Samsung TV";
 
         public IRSamsungTV(String id, int enablePin, int transmitPin, IRDB db) : base(id, "SSTV", enablePin, transmitPin, db)
         {

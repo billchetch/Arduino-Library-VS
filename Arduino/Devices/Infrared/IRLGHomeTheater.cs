@@ -8,7 +8,7 @@ namespace Chetch.Arduino.Devices.Infrared
 {
     public class IRLGHomeTheater : IRTransmitter
     {
-        const String DEVICE_NAME = "LG Home Theater";
+        s const String DEVICE_NAME = "LG Home Theater";
 
         public IRLGHomeTheater(String id, int enablePin, int transmitPin, IRDB db) : base(id, "LGHT", enablePin, transmitPin, db)
         {
