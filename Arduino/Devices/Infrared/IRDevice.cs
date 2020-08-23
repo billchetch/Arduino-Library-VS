@@ -53,6 +53,8 @@ namespace Chetch.Arduino.Devices.Infrared
                 return DBID > 0;
             }
         }
+
+        virtual public String DeviceName { get; set; } = null;
         public String DeviceType { get; set; } = null;
         public String Manufacturer { get; set; } = null;
         public IRProtocol Protocol { get; set; } = IRProtocol.UNKNOWN; //TODO: set this to force sending/recording in a different protocol
@@ -71,7 +73,7 @@ namespace Chetch.Arduino.Devices.Infrared
             if (DB == null) throw new Exception("No database available");
 
             DBID = 0;
-            var dev = DB.GetDevice(Name);
+            var dev = DB.GetDevice(DeviceName);
 
             //TODO: make it so that you can choose to overwrite data or not
             if (dev != null)

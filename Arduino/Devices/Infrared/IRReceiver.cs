@@ -69,7 +69,7 @@ namespace Chetch.Arduino.Devices.Infrared
         {
             base.ReadDevice();
 
-            ArduinoCommand cmd = DB.GetCommand(Name, REPEAT_COMMAND);
+            ArduinoCommand cmd = DB.GetCommand(DeviceName, REPEAT_COMMAND);
             if (cmd != null)
             {
                 long code = System.Convert.ToInt64(cmd.Arguments[0]);
@@ -203,7 +203,7 @@ namespace Chetch.Arduino.Devices.Infrared
                 {
                     //can happen if ir code is a duplicate
                     //Console.WriteLine(e.Message);
-                    var row = DB.SelectCommand(Name, kv.Key);
+                    var row = DB.SelectCommand(DeviceName, kv.Key);
                     if (row == null) throw e;
                     long cmdid = row.ID;
                     if (cmdid == 0) throw new Exception("No ir command code found in database");

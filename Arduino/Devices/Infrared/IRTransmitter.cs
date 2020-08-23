@@ -42,7 +42,7 @@ namespace Chetch.Arduino.Devices.Infrared
             if(DB != null)
             {
                 ClearCommands();
-                AddCommands(DB.GetCommands(Name));
+                AddCommands(DB.GetCommands(DeviceName));
 
                 _repeatCommand = GetCommand(REPEAT_COMMAND);
             }

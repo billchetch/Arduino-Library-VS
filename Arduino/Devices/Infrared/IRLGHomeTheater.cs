@@ -8,11 +8,11 @@ namespace Chetch.Arduino.Devices.Infrared
 {
     public class IRLGHomeTheater : IRTransmitter
     {
-        const String NAME = "LG Home Theater";
+        const String DEVICE_NAME = "LG Home Theater";
 
-        public IRLGHomeTheater(String id, int enablePin, int transmitPin, IRDB db) : base(id, NAME, enablePin, transmitPin, db)
+        public IRLGHomeTheater(String id, int enablePin, int transmitPin, IRDB db) : base(id, "LGHT", enablePin, transmitPin, db)
         {
-           
+            DeviceName = DEVICE_NAME;
         }
 
         public override void AddCommands(List<ArduinoCommand> commands)
