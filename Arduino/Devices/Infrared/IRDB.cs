@@ -15,9 +15,9 @@ namespace Chetch.Arduino.Devices.Infrared
             HEX
         }
 
-        static public IRDB Create(System.Configuration.ApplicationSettingsBase settings, IREncoding encoding = IREncoding.HEX)
+        static public IRDB Create(System.Configuration.ApplicationSettingsBase settings, IREncoding encoding = IREncoding.HEX, String dbnameKey = null)
         {
-            IRDB db = DB.Create<IRDB>(settings);
+            IRDB db = dbnameKey != null ? DB.Create<IRDB>(settings, dbnameKey) : DB.Create<IRDB>(settings);
             db.Encoding = encoding;
             return db;
         }
