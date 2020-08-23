@@ -124,6 +124,7 @@ namespace Chetch.Arduino.Devices.Infrared
                 int tp = message.GetInt("TP");
                 ConfigurePin(tp, PinMode.PwmOutput);
                 Mgr.UpdateDevice(this);
+                _transmitPin = tp;
             }
 
 
