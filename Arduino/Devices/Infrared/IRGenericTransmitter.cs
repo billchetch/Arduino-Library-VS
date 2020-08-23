@@ -8,15 +8,6 @@ namespace Chetch.Arduino.Devices.Infrared
 {
     public class IRGenericTransmitter : IRTransmitter
     {
-        override public String DeviceName
-        {
-            set
-            {
-                base.DeviceName = value;
-                if(DB != null)ReadDevice();
-            }
-        }
-
         public IRGenericTransmitter(String id, String name, int enablePin, int transmitPin, IRDB db = null) : base(id, name, enablePin, transmitPin, db){}
 
         public IRGenericTransmitter(int enablePin, int transmitPin, IRDB db = null) : base(enablePin, transmitPin, db) { }

@@ -54,23 +54,31 @@ namespace Chetch.Arduino.Devices.Infrared
             }
         }
 
-        virtual public String DeviceName { get; set; } = null;
+        private String _deviceName;
+        virtual public String DeviceName {
+            get
+            {
+                return _deviceName;
+            }
+            set
+            {
+                _deviceName = value;
+                if (DB != null && _deviceName != null) ReadDevice();
+            }
+        }
         public String DeviceType { get; set; } = null;
         public String Manufacturer { get; set; } = null;
         public IRProtocol Protocol { get; set; } = IRProtocol.UNKNOWN; //TODO: set this to force sending/recording in a different protocol
 
         public IRDevice(String id, String name, IRDB db = null) : base(id, name)
         {
-            if(db != null)
-            {
-                DB = db;
-                ReadDevice();
-            }
+            DB = db;
         }
-
+        
         virtual public void ReadDevice()
         {
             if (DB == null) throw new Exception("No database available");
+            if (DeviceName == null) throw new Exception("No device name given");
 
             DBID = 0;
             var dev = DB.GetDevice(DeviceName);
