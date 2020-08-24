@@ -197,21 +197,16 @@ namespace Chetch.Arduino
             base.HandleClientMessage(cnn, message);
         }
 
-        virtual protected void HandleADMDeviceCommand(String deviceID, String command, List<Object> args, Message response)
+        virtual protected bool HandleADMDeviceCommand(ArduinoDeviceManager adm, String deviceID, String command, List<Object> args, Message response)
         {
-            HandleADMDeviceCommand(null, command, args, response);
-        }
-
-        virtual protected void HandleADMDeviceCommand(String boardID, String deviceID, String command, List<Object> args, Message response)
-        {
-            ArduinoDeviceManager adm = GetADM(boardID);
-            if (adm == null) throw new Exception("Cannot find ADM with Board ID " + boardID);
+            if (adm == null) throw new Exception("No ADM provided");
             
             if (!adm.HasDevice(deviceID))
             {
                 throw new Exception(String.Format("Device {0} has not been added to ADM", deviceID));
             }
 
+            bool respond = true;
             ArduinoDevice device = null;
             switch (command)
             {
@@ -247,6 +242,7 @@ namespace Chetch.Arduino
                     }
                     break;
             }
+            return respond;
         }
 
         virtual protected void RegisterListener(String clientName, String targets, List<MessageType> messageTypes = null)
@@ -313,6 +309,7 @@ namespace Chetch.Arduino
 
         override public bool HandleCommand(Connection cnn, Message message, String cmd, List<Object> args, Message response)
         {
+            bool respond = true;
             switch (cmd)
             {
                 case "listen":
@@ -470,7 +467,6 @@ namespace Chetch.Arduino
 
                             default:
                                 throw new Exception(String.Format("No ADM direct command {0}", tgtcmd[1]));
-                                break;
                         }
                     }
                     else
@@ -478,7 +474,7 @@ namespace Chetch.Arduino
                         //handle command specific to device
                         try
                         {
-                            HandleADMDeviceCommand(tgtcmd[0], tgtcmd[1], tgtcmd[2], args, response);
+                            respond = HandleADMDeviceCommand(adm, tgtcmd[1], tgtcmd[2], args, response);
                         } catch (Exception e)
                         {
                             Tracing?.TraceEvent(TraceEventType.Error, 0, "Exception: {0}", e.Message);
@@ -491,7 +487,7 @@ namespace Chetch.Arduino
                     break;
             }
 
-            return true;
+            return respond;
         }
 
         //ADM related

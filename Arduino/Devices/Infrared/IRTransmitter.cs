@@ -125,7 +125,6 @@ namespace Chetch.Arduino.Devices.Infrared
                 _transmitPin = tp;
             }
 
-
             base.HandleMessage(message);
         }
     }
