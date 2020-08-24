@@ -9,8 +9,6 @@ namespace Chetch.Arduino.Devices.Infrared
 {
     public abstract class IRTransmitter : IRDevice
     {
-        public const int BOARD_SPECIFIED = -1;
-
         private bool _enabled = false;
         private int _enablePin; //HIGH output means the transmitter is disabled (as there is no voltage across it)
         private int _transmitPin;
@@ -28,7 +26,7 @@ namespace Chetch.Arduino.Devices.Infrared
             _enablePin = enablePin;
             _transmitPin = transmitPin;
             ConfigurePin(_enablePin, PinMode.DigitalOutput);
-            if (transmitPin != BOARD_SPECIFIED)
+            if (transmitPin != ArduinoPin.BOARD_SPECIFIED)
             {
                 ConfigurePin(_transmitPin, PinMode.PwmOutput);
             }
@@ -119,7 +117,7 @@ namespace Chetch.Arduino.Devices.Infrared
         public override void HandleMessage(ADMMessage message)
         {
             //check if the transmit pin is viable
-            if(_transmitPin == BOARD_SPECIFIED && message.HasValue("TP"))
+            if(_transmitPin == ArduinoPin.BOARD_SPECIFIED && message.HasValue("TP"))
             {
                 int tp = message.GetInt("TP");
                 ConfigurePin(tp, PinMode.PwmOutput);

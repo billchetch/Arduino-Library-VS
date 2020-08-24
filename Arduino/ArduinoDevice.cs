@@ -10,6 +10,8 @@ namespace Chetch.Arduino
 {
     public struct ArduinoPin
     {
+        public const int BOARD_SPECIFIED = -1;
+
         public int PinNumber { get; set; }
         public PinMode Mode { get; set; }
         public long InitialValue { get; set; }
