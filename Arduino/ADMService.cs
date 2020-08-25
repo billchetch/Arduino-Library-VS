@@ -303,7 +303,7 @@ namespace Chetch.Arduino
             commandHelp.Add("adm/<board>:list-devices: List devices added to ADM");
             commandHelp.Add("adm/<board>:capability: List pin capabilities");
             commandHelp.Add("adm/<board>:setdigitalpin: Set the <pin number> to <true/false>");
-            commandHelp.Add("adm/<board>:<device>:wait: Will simply pause fora short while, useful if interspersed with other commands");
+            commandHelp.Add("adm/<board>:<device>:wait: Will simply pause for a short while, useful if interspersed with other, comma-seperated, commands");
             commandHelp.Add("adm/<board>:<device>:list-commands: List device commands");
         }
 
