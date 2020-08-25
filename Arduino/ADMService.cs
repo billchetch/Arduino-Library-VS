@@ -298,7 +298,6 @@ namespace Chetch.Arduino
             //adm specific commands related to a board and device
             commandHelp.Add("adm/<board>:status:  ADM will request board status and add additional information");
             commandHelp.Add("adm/<board>:ping: ADM will ping the board <repeat?>");
-            commandHelp.Add("adm/<board>:blink: ADM will blink the built in LED");
             commandHelp.Add("adm/<board>:list-boards: List boards used by this service");
             commandHelp.Add("adm/<board>:list-devices: List devices added to ADM");
             commandHelp.Add("adm/<board>:capability: List pin capabilities");
@@ -428,12 +427,6 @@ namespace Chetch.Arduino
                                 {
                                     throw new Exception("Cannot receive ping response as not listening for messages from " + adm.BoardID);
                                 }
-                                break;
-
-                            case "blink":
-                                repeat = args != null && args.Count > 0 ? System.Convert.ToInt16(args[0]) : 10;
-                                delay = args != null && args.Count > 1 ? System.Convert.ToInt16(args[1]) : 200;
-                                adm.Blink(repeat, delay);
                                 break;
 
                             case "capability":
