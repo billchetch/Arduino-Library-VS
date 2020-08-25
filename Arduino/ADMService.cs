@@ -348,7 +348,7 @@ namespace Chetch.Arduino
                 case "status":
                     if (ADMS != null && ADMS.Count > 0)
                     {
-                        response.AddValue("ADMS", ADMS.Values.Select(i => String.Format("Board {0} on port {1} has state {2}", i.BoardID, i.Port, i.State)).ToList());
+                        response.AddValue("ADMS", ADMS.Values.Select(i => String.Format("Board {0} on port {1} has state {2}, last error: {3}", i.BoardID, i.Port, i.State, i.LastErrorMessage == null ? "n/a" : i.LastErrorMessage.Value)).ToList());
                     } else
                     {
                         response.AddValue("ADMS", "No boards connected");

@@ -208,6 +208,7 @@ namespace Chetch.Arduino
                 return devicesConnected;
             }
         }
+        public ADMMessage LastErrorMessage { get; internal set;  }
 
         public String Port { get; set; }
         private ArduinoSession _session;
@@ -527,10 +528,7 @@ namespace Chetch.Arduino
                         catch (Exception e)
                         {
                             Tracing?.TraceEvent(TraceEventType.Error, 4000, "Deserializing {0} produced exception {1}: {2}", sd.Text, e.GetType(), e.Message);
-                            message = new ADMMessage();
-                            message.Type = Messaging.MessageType.ERROR;
-                            message.Value = e.Message;
-                            break;
+                            throw e;
                         }
                         switch (message.Type)
                         {
@@ -553,9 +551,7 @@ namespace Chetch.Arduino
                                 catch (Exception e)
                                 {
                                     Tracing?.TraceEvent(TraceEventType.Error, 4000, "STATUS_RESPONSE error: {0}, {1}", e.GetType(), e.Message);
-                                    message = new ADMMessage();
-                                    message.Type = Messaging.MessageType.ERROR;
-                                    message.Value = e.Message;
+                                    throw e;
                                 }
                                 break;
 
@@ -572,10 +568,18 @@ namespace Chetch.Arduino
                             var dev = GetTargetedDevice(message);
                             if (dev != null)
                             {
-                                dev.HandleMessage(message);
 #if DEBUG
                                 Debug.Print(String.Format("Handling message {0} for device {1} ... connected: {2}, memory: {3}", message.Type, dev.ID, dev.IsConnected, message.HasValue("FM") ? message.GetValue("FM") : "N/A"));
 #endif
+                                try
+                                {
+                                    dev.HandleMessage(message);
+                                } catch (Exception e)
+                                {
+                                    Tracing?.TraceEvent(TraceEventType.Error, 4000, "Handling message for device {0} produced exception {1}: {2}", dev.ID, e.GetType(), e.Message);
+                                    throw e;
+                                }
+                                
                             }
 
                             //we do this test after handling message because the message maybe a CONFIGURE_RESPONSE message which will then set the 'connected' status of the device
@@ -647,6 +651,7 @@ namespace Chetch.Arduino
                 switch (message.Type)
                 {
                     case Chetch.Messaging.MessageType.ERROR:
+                        LastErrorMessage = message;
                         _listener(message, this);
                         break;
 
