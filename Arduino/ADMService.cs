@@ -605,35 +605,51 @@ namespace Chetch.Arduino
 
         virtual protected void HandleADMMessage(ADMMessage message, ArduinoDeviceManager adm)
         {
-            if (adm.State == ADMState.DEVICE_READY && message.Type == Messaging.MessageType.STATUS_RESPONSE)
+            switch (message.Type)
             {
-                try
-                {
-                    Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: Ready to add devices to {0} ...", adm.BoardID);
-                    AddADMDevices(adm, message);
-                    Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: {0} devices added to {1}. Configuring devices... ", adm.DeviceCount, adm.BoardID);
-                } catch (Exception e)
-                {
-                    Tracing?.TraceEvent(TraceEventType.Error, 100, "ADM: Error adding devices {0} ...", e.Message);
-                }
-            }
+                case MessageType.ERROR:
+                    Tracing?.TraceEvent(TraceEventType.Error, 0, "ADM {0} produced error: {1}", adm.BoardID == null ? "n/a" : adm.BoardID, message.Value);
+                    break;
 
-            if (adm.State == ADMState.DEVICE_CONNECTED && message.Type == Messaging.MessageType.CONFIGURE_RESPONSE)
-            {
-                if (!_devicesConnected[adm.Port])
-                {
-                    try
+                case MessageType.WARNING:
+                    Tracing?.TraceEvent(TraceEventType.Warning, 0, "ADM {0} produced warning: {1}", adm.BoardID == null ? "n/a" : adm.BoardID, message.Value);
+                    break;
+
+                case MessageType.STATUS_RESPONSE:
+                    if (adm.State == ADMState.DEVICE_READY)
                     {
-                        Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: All {0} devices now configured and connected to board {1}", adm.DeviceCount, adm.BoardID);
-                        OnADMDevicesConnected(adm, message);
-                        _devicesConnected[adm.Port] = true;
-                    } catch (Exception e)
-                    {
-                        Tracing?.TraceEvent(TraceEventType.Error, 100, "ADM: Error on devices connected {0} ...", e.Message);
+                        try
+                        {
+                            Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: Ready to add devices to {0} ...", adm.BoardID);
+                            AddADMDevices(adm, message);
+                            Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: {0} devices added to {1}. Configuring devices... ", adm.DeviceCount, adm.BoardID);
+                        }
+                        catch (Exception e)
+                        {
+                            Tracing?.TraceEvent(TraceEventType.Error, 100, "ADM: Error adding devices {0} ...", e.Message);
+                        }
                     }
-                }
+                    break;
+
+                case MessageType.CONFIGURE_RESPONSE:
+                    if (adm.State == ADMState.DEVICE_CONNECTED && !_devicesConnected[adm.Port])
+                    {
+                        try
+                        {
+                            Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: All {0} devices now configured and connected to board {1}", adm.DeviceCount, adm.BoardID);
+                            OnADMDevicesConnected(adm, message);
+                            _devicesConnected[adm.Port] = true;
+                        }
+                        catch (Exception e)
+                        {
+                            Tracing?.TraceEvent(TraceEventType.Error, 100, "ADM: Error on all devices connected {0} ...", e.Message);
+                        }
+                    }
+                    break;
+
             }
 
+            
             String sender = null;
             if (message.TargetID == 0)
             {

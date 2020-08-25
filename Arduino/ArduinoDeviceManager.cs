@@ -225,6 +225,7 @@ namespace Chetch.Arduino
         private Dictionary<int, DigitalPortState> _portStates;
         private Action<ADMMessage, ArduinoDeviceManager> _listener;
 
+        //interval based sampler for providing averages over device values.
         public Sampler Sampler { get; internal set; } = new Sampler();
 
         //Thread Locks
