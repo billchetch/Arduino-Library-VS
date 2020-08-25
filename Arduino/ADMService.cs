@@ -292,8 +292,8 @@ namespace Chetch.Arduino
 
             //general commands related to a service
             commandHelp.Add("listen/register: Register this client to receive messages from ADM <boards/devices...?> additional <message type?>. ");
-            commandHelp.Add("unlisten/deregister: Deregister this client to receive messages from ADM");
-            commandHelp.Add("status: Get status info about this service and the ADM");
+            commandHelp.Add("unlisten/deregister: Deregister this client to receive messages from ADMs");
+            commandHelp.Add("status: Get status info about this service and the ADMs");
 
             //adm specific commands related to a board and device
             commandHelp.Add("adm/<board>:status:  ADM will request board status and add additional information");
@@ -462,7 +462,7 @@ namespace Chetch.Arduino
                                 break;
 
                             case "list-devices":
-                                response.AddValue("Devices", adm.GetDevices().Select(i => i.ToString()).ToList());
+                                response.AddValue("Devices", adm.GetDevices().Select(i => i.ToString(true)).ToList());
                                 break;
 
                             default:

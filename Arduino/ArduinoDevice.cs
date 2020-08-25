@@ -191,6 +191,22 @@ namespace Chetch.Arduino
             return String.Format("{0} {1} {2} {3}", ID, Name, Category.ToString(), IsConnected ? "Connected" : "Not connected");
         }
 
+        public String ToString(bool listPins)
+        {
+            if (listPins)
+            {
+                String s = "";
+                foreach(var p in Pins)
+                {
+                    s += (s.Length > 0 ? ", " : "") + p.PinNumber + ":" + p.Mode;
+                }
+                return ToString() + " Pins: " + s;
+            } else
+            {
+                return ToString();
+            }
+        }
+
         public bool IsUsingPin(int pinNumber)
         {
             if(Pins != null)
