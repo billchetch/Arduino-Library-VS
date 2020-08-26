@@ -365,6 +365,12 @@ namespace Chetch.Arduino
                         throw new Exception(String.Format("ADM: Unrecognised command {0}", cmd));
                     }
 
+                    //Check that there are any boards connected
+                    if(ADMS.Count == 0)
+                    {
+                        throw new Exception("ADM: No boards connected");
+                    }
+
                     //so this is an ADM command, find the board first
                     ArduinoDeviceManager adm = GetADM(tgtcmd[0]);
                     
