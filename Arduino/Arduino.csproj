@@ -80,6 +80,7 @@
     <Compile Include="Devices\Infrared\IRLGHomeTheater.cs" />
     <Compile Include="Devices\RangeFinders\JSN_SR04T.cs" />
     <Compile Include="Devices\RangeFinders\RangeFinderBase.cs" />
+    <Compile Include="Devices\Switch.cs" />
     <Compile Include="Devices\SwitchSensor.cs" />
     <Compile Include="Devices\Temperature\DS18B20Array.cs" />
     <Compile Include="Devices\Temperature\TemperatureSensorBase.cs" />

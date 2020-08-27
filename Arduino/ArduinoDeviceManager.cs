@@ -216,6 +216,7 @@ namespace Chetch.Arduino
         public int LEDBIPin { get; internal set; } = -1; //Should be set in STATUS_RESPONSE message from board
         public bool LittleEndian { get; internal set; } = true;
         private String _boardType; //Should be set in STATUS_RESPONSE message from board
+        public int MaxDevices { get; internal set; } = 0;
 
         private Dictionary<String, ArduinoDevice> _devices;
         private Dictionary<String, byte> _device2boardID;
@@ -353,6 +354,10 @@ namespace Chetch.Arduino
             if (_devices.ContainsKey(device.ID))
             {
                 throw new Exception("Cannot add this device because there is already a device with ID " + device.ID);
+            }
+            if(_devices.Count >= MaxDevices)
+            {
+                throw new Exception(String.Format("Cannot add this device because there are already a max of {0} devices.", MaxDevices));
             }
 
             //if no board ID is given then autogenerate one
@@ -539,6 +544,7 @@ namespace Chetch.Arduino
                                     LittleEndian = Chetch.Utilities.Convert.ToBoolean(message.GetValue("LE"));
                                     _boardType = message.GetString("BD");
                                     BoardID = message.HasValue("BDID") ? message.GetString("BDID") : null;
+                                    MaxDevices = message.HasValue("MD") ? message.GetInt("MD") : 0;
                                     if (State == ADMState.CONNECTED)
                                     {
                                         State = ADMState.DEVICE_READY;

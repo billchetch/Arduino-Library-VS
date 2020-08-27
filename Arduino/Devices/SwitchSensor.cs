@@ -15,12 +15,20 @@ namespace Chetch.Arduino.Devices
         private bool _latestState = false;
         private int _noiseThreshold; //time delay in mills for acceptable state change
         private Object _stateLock = new Object();
+
+        public bool Enabled { get; protected set; } = false;
         
+        public bool IsOn { get { return State; } }
+        public bool IsOff { get { return !State;  } }
+
         public SwitchSensor(int pin, int noiseThreshold, String id, String name) : base(id, name)
         {
             _sensorPin = pin;
             _noiseThreshold = noiseThreshold;
-            ConfigurePin(_sensorPin, Solid.Arduino.Firmata.PinMode.DigitalInput); //, initialState ? 1 : 0);
+            ConfigurePin(_sensorPin, PinMode.DigitalInput); //, initialState ? 1 : 0);
+
+            TryAddCommand("enable");
+            TryAddCommand("disable");
         }
 
         public SwitchSensor(int pin, int noiseThreshold = 0) : this(pin, noiseThreshold, "switch" + pin, "SwitchSensor")
@@ -38,6 +46,8 @@ namespace Chetch.Arduino.Devices
         public override void HandleDigitalPinStateChange(int pinNumber, bool newState)
         {
             if (pinNumber != _sensorPin) throw new Exception(String.Format("State changed on pin {0} but sensor is attached to pin {1}", pinNumber, _sensorPin));
+            if (!Enabled) return;
+
             if (newState != _latestState)
             {
                 lock (_stateLock)
@@ -82,6 +92,31 @@ namespace Chetch.Arduino.Devices
             message.Type = Messaging.MessageType.DATA;
             message.AddValue("State", newState);
             Broadcast(message);
+        }
+
+        public override void HandleMessage(ADMMessage message)
+        {
+            if(message.Type == Messaging.MessageType.CONFIGURE_RESPONSE)
+            {
+                Enabled = true;
+            }
+            base.HandleMessage(message);
+        }
+
+        protected override void ExecuteCommand(ArduinoCommand command, List<object> extraArgs = null, bool deep = false)
+        {
+            switch (command.CommandAlias.ToLower())
+            {
+                case "enable":
+                    Enabled = true;
+                    break;
+                case "disable":
+                    Enabled = false;
+                    break;
+                default:
+                    base.ExecuteCommand(command, extraArgs, deep);
+                    break;
+            }
         }
     }
 }
