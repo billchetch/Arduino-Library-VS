@@ -244,6 +244,11 @@ namespace Chetch.Arduino
             return true;
         }
 
+        protected ArduinoPin ConfigurePin(int pinNumber, PinMode pinMode, bool initialValue)
+        {
+            return ConfigurePin(pinNumber, pinMode, initialValue ? 1 : 0);
+        }
+
         protected ArduinoPin ConfigurePin(int pinNumber, PinMode pinMode, long initialValue = -1)
         {
             ArduinoPin pin = new ArduinoPin();

@@ -25,7 +25,7 @@ namespace Chetch.Arduino.Devices
         {
             _sensorPin = pin;
             _noiseThreshold = noiseThreshold;
-            ConfigurePin(_sensorPin, PinMode.DigitalInput); //, initialState ? 1 : 0);
+            ConfigurePin(_sensorPin, PinMode.DigitalInput, State); //, initialState ? 1 : 0);
 
             TryAddCommand("enable");
             TryAddCommand("disable");

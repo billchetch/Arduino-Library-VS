@@ -19,7 +19,7 @@ namespace Chetch.Arduino.Devices
         public Switch(int pin, String id, String name) : base(id, name)
         {
             _pin = pin;
-            ConfigurePin(_pin, PinMode.DigitalOutput);
+            ConfigurePin(_pin, PinMode.DigitalOutput, State);
         }
 
         public Switch(int pin) : this(pin, "switch" + pin, "SWITCH") { }
