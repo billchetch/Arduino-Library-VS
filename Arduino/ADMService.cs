@@ -421,7 +421,7 @@ namespace Chetch.Arduino
                 HandleADMMessage(message, adm);
             } catch (Exception e)
             {
-                Tracing?.TraceEvent(TraceEventType.Error, 100, "ADM Error: {0}", e.Message);
+                Tracing?.TraceEvent(TraceEventType.Error, 100, "HandleADMMessage Error: {0}", e.Message);
             }
         }
 
@@ -463,7 +463,7 @@ namespace Chetch.Arduino
             if (message.TargetID > 0)
             {
                 dev = adm.GetDeviceByBoardID(message.TargetID);
-            }else if(message.Sender != null || message.Sender != String.Empty)
+            }else if(message.Sender != null && message.Sender != String.Empty)
             {
                 dev = adm.GetDevice(message.Sender);
             }
