@@ -459,7 +459,14 @@ namespace Chetch.Arduino
 
             
             message.AddValue("BoardID", adm.BoardID);
-            var dev = adm.GetDeviceByBoardID(message.TargetID);
+            ArduinoDevice dev = null;
+            if (message.TargetID > 0)
+            {
+                dev = adm.GetDeviceByBoardID(message.TargetID);
+            }else if(message.Sender != null || message.Sender != String.Empty)
+            {
+                dev = adm.GetDevice(message.Sender);
+            }
             message.AddValue("DeviceID", dev != null ? dev.ID : "");
             Broadcast(message);
         }
