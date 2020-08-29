@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Chetch.Arduino.Devices.Buzzers
 {
-    class Buzzer : Switch
+    public class Buzzer : Switch
     {
         private System.Timers.Timer _silenceTimer;
         private bool _silenced = false;
