@@ -298,7 +298,10 @@ namespace Chetch.Arduino
                         }
                     }
 
-                    response.Value = "Handled " + cmd;
+                    if (response.Value == null || response.Value == String.Empty)
+                    {
+                        response.Value = "Handled " + cmd;
+                    }
                     
                     break;
             }

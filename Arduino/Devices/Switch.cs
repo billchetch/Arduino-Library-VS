@@ -12,7 +12,7 @@ namespace Chetch.Arduino.Devices
         public bool IsON { get { return State; } }
         public bool IsOff { get { return !State; } }
 
-        public bool State { get; internal set; } = false;
+        public bool State { get; protected set; } = false;
 
         private int _pin = 0;
 
@@ -24,16 +24,21 @@ namespace Chetch.Arduino.Devices
 
         public Switch(int pin) : this(pin, "switch" + pin, "SWITCH") { }
 
-        public void On()
+        protected void SetPin(bool state)
         {
-            State = true;
-            Mgr.SetDigitalPin(_pin, State);
+            Mgr.SetDigitalPin(_pin, state);
         }
 
-        public void Off()
+        virtual public void On()
+        {
+            State = true;
+            SetPin(State);
+        }
+
+        virtual public void Off()
         {
             State = false;
-            Mgr.SetDigitalPin(_pin, State);
+            SetPin(State);
         }
     }
 }

@@ -66,6 +66,7 @@
     <Compile Include="ADMService.cs">
       <SubType>Component</SubType>
     </Compile>
+    <Compile Include="Devices\Buzzers\Buzzer.cs" />
     <Compile Include="Devices\Counters\Counter.cs" />
     <Compile Include="Devices\Counters\RPMCounter.cs" />
     <Compile Include="Devices\Diagnostics\DiagnosticsDevice.cs" />
