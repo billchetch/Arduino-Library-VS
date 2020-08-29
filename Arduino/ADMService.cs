@@ -458,25 +458,10 @@ namespace Chetch.Arduino
             }
 
             
-            String sender = null;
-            if (message.TargetID == 0)
-            {
-                sender = adm.BoardID;
-            }
-            else
-            {
-                var dev = adm.GetDeviceByBoardID(message.TargetID);
-                if (dev != null)
-                {
-                    sender = adm.BoardID + ":" + dev.ID;
-                }
-            }
-
-            if (sender != null)
-            {
-                message.Sender = sender;
-                Broadcast(message);
-            }
+            message.AddValue("BoardID", adm.BoardID);
+            var dev = adm.GetDeviceByBoardID(message.TargetID);
+            message.AddValue("DeviceID", dev != null ? dev.ID : "");
+            Broadcast(message);
         }
 
         virtual protected void OnADMDevicesConnected(ArduinoDeviceManager adm, ADMMessage message)
