@@ -71,7 +71,7 @@ namespace Chetch.Arduino
                 base.OnStart(args);
 
                 //fire up the ADM service
-                Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Starting ADM service with supported boards {0} and allowed ports {1}", SupportedBoards, AllowedPorts == null ? " all " : AllowedPorts);
+                Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Starting ADM service with supported boards {0} and allowed ports {1}", SupportedBoards, AllowedPorts == null || AllowedPorts == String.Empty ? " all " : AllowedPorts);
 
                 //create timer
                 _admtimer = new System.Timers.Timer();
