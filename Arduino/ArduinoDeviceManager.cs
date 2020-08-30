@@ -123,7 +123,7 @@ namespace Chetch.Arduino
         public const string DEFAULT_BOARD_SET = ARDUINO_MEGA_2560 + "," + ARDUINO_UNO;
 
         
-        static public List<String> GetBoardPorts(String supportedBoards)
+        static public List<String> GetBoardPorts(String supportedBoards, String allowedPorts = null)
         {
             if (supportedBoards == null || supportedBoards == String.Empty)
             {
@@ -131,7 +131,36 @@ namespace Chetch.Arduino
             }
 
             List<String> boardPorts = SerialPorts.Find(supportedBoards.Trim());
-            return boardPorts;
+
+            if (allowedPorts != null)
+            {
+                String[] parts = allowedPorts.Split(',');
+                List<String> expandedAllowedPorts = new List<String>();
+                foreach (String portRange in parts)
+                {
+                    String[] rangeParts = portRange.Split('-');
+                    if (rangeParts.Length == 2)
+                    {
+                        int start = System.Convert.ToInt16(rangeParts[0]);
+                        int end = System.Convert.ToInt16(rangeParts[1]);
+                        for(int i = start; i <= end; i++)
+                        {
+                            expandedAllowedPorts.Add("COM" + i);
+                        }
+                    } else
+                    {
+                        expandedAllowedPorts.Add("COM" + rangeParts[0]);
+                    }
+                }
+                List<String> ports2return = new List<String>();
+                foreach(var p in boardPorts)
+                {
+                    if (expandedAllowedPorts.Contains(p)) ports2return.Add(p);
+                }
+                return ports2return;
+            } else {
+                return boardPorts;
+            }
         }
 
         static public ArduinoDeviceManager Connect(String port, int timeOut, Action<ADMMessage, ArduinoDeviceManager> listener)

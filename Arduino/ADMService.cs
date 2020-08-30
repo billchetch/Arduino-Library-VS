@@ -22,6 +22,7 @@ namespace Chetch.Arduino
         //map of port names to arduino device managers
         protected Dictionary<String, ArduinoDeviceManager> ADMS { get; } = new Dictionary<String, ArduinoDeviceManager>();
         protected String SupportedBoards { get; set; }
+        protected String AllowedPorts { get; set; }
         protected Timer _admtimer;
         private Dictionary<String, bool> _devicesConnected = new Dictionary<string, bool>();
         private bool _noPortsFoundWarning = false; //has a no ports found warning been 'traced' ... a flag to prevent multiple trace/log entries
@@ -70,7 +71,7 @@ namespace Chetch.Arduino
                 base.OnStart(args);
 
                 //fire up the ADM service
-                Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Starting ADM service");
+                Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Starting ADM service with supported boards {0} and allowed ports {1}", SupportedBoards, AllowedPorts == null ? " all " : AllowedPorts);
 
                 //create timer
                 _admtimer = new System.Timers.Timer();
@@ -323,7 +324,7 @@ namespace Chetch.Arduino
             lock(_lockMonitorADM)
             {
                 //get all current ports that have boards connected
-                List<String> ports = ArduinoDeviceManager.GetBoardPorts(SupportedBoards);
+                List<String> ports = ArduinoDeviceManager.GetBoardPorts(SupportedBoards, AllowedPorts);
 
                 //build a list of any ADMs that are no longer connected to one of these ports
                 List<String> disconnect = new List<String>();
