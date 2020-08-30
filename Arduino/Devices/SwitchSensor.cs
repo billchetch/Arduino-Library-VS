@@ -103,7 +103,7 @@ namespace Chetch.Arduino.Devices
             base.HandleMessage(message);
         }
 
-        protected override void ExecuteCommand(ArduinoCommand command, List<object> extraArgs = null, bool deep = false)
+        protected override void ExecuteCommand(ArduinoCommand command, ExecutionArguments xargs)
         {
             switch (command.CommandAlias.ToLower())
             {
@@ -114,7 +114,7 @@ namespace Chetch.Arduino.Devices
                     Enabled = false;
                     break;
                 default:
-                    base.ExecuteCommand(command, extraArgs, deep);
+                    base.ExecuteCommand(command, xargs);
                     break;
             }
         }

@@ -23,7 +23,7 @@ namespace Chetch.Arduino.Devices.Diagnostics
             TryAddCommand("blink");
         }
 
-        override protected void SendCommand(ArduinoCommand command, List<Object> extraArgs = null)
+        override protected void ExecuteCommand(ArduinoCommand command, ExecutionArguments xargs)
         {
             switch (command.CommandAlias.ToLower())
             {
@@ -32,13 +32,13 @@ namespace Chetch.Arduino.Devices.Diagnostics
                     break;
 
                 case "blink":
-                    int repeat = extraArgs.Count > 0 ? System.Convert.ToInt16(extraArgs[0]) : 1;
-                    int delay = extraArgs.Count > 1 ? System.Convert.ToInt16(extraArgs[1]) : 1000;
+                    int repeat = xargs.GetInt(0, 1);
+                    int delay = xargs.GetInt(1, 1000);
                     Blink(repeat, delay);
                     break;
 
                 default:
-                    base.SendCommand(command, extraArgs);
+                    base.SendCommand(command, xargs);
                     break;
             }
         }

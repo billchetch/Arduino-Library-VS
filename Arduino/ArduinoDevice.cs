@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Solid.Arduino.Firmata;
 using Chetch.Utilities;
+using Chetch.Application;
 
 namespace Chetch.Arduino
 {
@@ -52,7 +53,8 @@ namespace Chetch.Arduino
             CLOSE,
             RECORD,
             SAVE,
-            READ
+            READ,
+            TEST
         }
 
         public String CommandAlias { get; set; }
@@ -61,6 +63,7 @@ namespace Chetch.Arduino
         public List<ArduinoCommand> Commands { get; set; } = new List<ArduinoCommand>();
         public int Delay { get; set; } = 0; //delay in milliseconds between 'child' commands
         public int Repeat { get; set; } = 1;
+        public bool ExpectsResponse { get; set; } = false;
         public int MinWaitTime
         {
             get
@@ -140,6 +143,37 @@ namespace Chetch.Arduino
         }
     }
 
+    public class ExecutionArguments
+    {
+        public List<Object> Arguments;
+        public byte Tag = 0;
+        public bool Deep = false;
+
+        public ExecutionArguments(List<Object> args, byte tag = 0, bool deep = false)
+        {
+            Arguments = args;
+            Tag = tag;
+            Deep = deep;
+        }
+
+        public Object GetValue(int idx)
+        {
+            return Arguments.Count > idx ? Arguments[idx] : null;
+        }
+
+        public int GetInt(int idx, int defaultValue = 0)
+        {
+            Object v = GetValue(idx);
+            return v == null ? defaultValue : System.Convert.ToInt32(v);
+        }
+
+        public String GetString(int idx, String defaultValue = null)
+        {
+            Object v = GetValue(idx);
+            return v == null ? defaultValue : v.ToString();
+        }
+    }
+
     public class ArduinoDevice : ISampleSubject
     {
         private const int MAX_ID_LENGTH = 8;
@@ -166,10 +200,7 @@ namespace Chetch.Arduino
             //Empty constructor
         }
 
-        public ArduinoDevice(String name) : this(null, name)
-        {
-            
-        }
+        public ArduinoDevice(String name) : this(null, name) { }
 
         public ArduinoDevice(String id, String name, byte boardID = 0)
         {
@@ -334,21 +365,25 @@ namespace Chetch.Arduino
             return AddCommand(command);
         }
 
-        public ArduinoCommand TryAddCommand(String commandAlias, String commandAliases, int delay = 1, int repeat = 1)
+        public ArduinoCommand TryAddCommand(String commandAlias, String commandAliases, int delay = 1, int repeat = 1, ArduinoCommand.CommandType commandType = ArduinoCommand.CommandType.NOT_SET, bool expectsResponse = false)
         {
             try
             {
-                return AddCommand(commandAlias, commandAliases != null ? commandAliases.Split(',') : null, delay, repeat);
+                ArduinoCommand cmd = AddCommand(commandAlias, commandAliases != null ? commandAliases.Split(',') : null, delay, repeat);
+                cmd.Type = commandType;
+                cmd.ExpectsResponse = expectsResponse;
+                return cmd;
             } catch (Exception)
             {
                 return null;
             }
         }
 
-        public ArduinoCommand TryAddCommand(String commandAlias, ArduinoCommand.CommandType commandType = ArduinoCommand.CommandType.NOT_SET)
+        public ArduinoCommand TryAddCommand(String commandAlias, ArduinoCommand.CommandType commandType = ArduinoCommand.CommandType.NOT_SET, bool expectsResponse = false)
         {
             ArduinoCommand cmd = TryAddCommand(commandAlias, null);
             if(cmd != null)cmd.Type = commandType;
+            cmd.ExpectsResponse = expectsResponse;
             return cmd;
         }
 
@@ -375,19 +410,53 @@ namespace Chetch.Arduino
             }
         }
 
-        virtual public void ExecuteCommand(String command, params Object[] args)
+        virtual public byte ThreadExecuteCommand(String command, int repeat, int delay, List<Object> args)
         {
-            ExecuteCommand(command, new List<Object>(args));
+            //check has command
+            ArduinoCommand acmd = GetCommand(command);
+            if (acmd == null)
+            {
+                throw new Exception(String.Format("Device {0} does not have command {1}", ID, command));
+            }
+
+            //pass an empty array rather than null ... safety measure here just for the ThreadExecution Manager
+            if (args == null)
+            {
+                args = new List<Object>();
+            }
+
+            byte tag = acmd.ExpectsResponse ? ADMMessage.CreateNewTag() : (byte)0;
+            ExecutionArguments xargs = new ExecutionArguments(args, tag);
+
+            //Use ThreadExecutionManager to allow for multi-threading by device 
+            int prevSize = ThreadExecutionManager.MaxQueueSize;
+            ThreadExecutionManager.MaxQueueSize = acmd.IsCompound ? 1 : 256;
+            ThreadExecutionState xs = ThreadExecutionManager.Execute<ExecutionArguments>(ID, repeat, delay, ExecuteCommand, command, xargs);
+            ThreadExecutionManager.MaxQueueSize = prevSize;
+            if(xs == null)
+            {
+                ADMMessage.ReleaseTag(tag);
+                tag = 0;
+            }
+            
+            return tag;
         }
 
-        virtual public void ExecuteCommand(String commandAlias, List<Object> extraArgs = null)
+        public void ExecuteCommand(String command, params Object[] args)
+        {
+            ExecutionArguments xargs = new ExecutionArguments(new List<Object>(args));
+            ExecuteCommand(command, xargs);
+        }
+
+        virtual public void ExecuteCommand(String commandAlias, ExecutionArguments xargs)
         {
             var command = GetCommand(commandAlias);
             if (command == null) throw new Exception("Command with alias " + commandAlias + " does not exist");
-            ExecuteCommand(command, extraArgs, false);
+
+            ExecuteCommand(command, xargs);
         }
 
-        virtual protected void ExecuteCommand(ArduinoCommand command, List<Object> extraArgs = null, bool deep = false)
+        virtual protected void ExecuteCommand(ArduinoCommand command, ExecutionArguments xargs)
         {
             if(command.Commands.Count > 0)
             {
@@ -395,7 +464,7 @@ namespace Chetch.Arduino
                 {
                     foreach (var ccommand in command.Commands)
                     {
-                        ExecuteCommand(ccommand, deep ? extraArgs : null, deep);
+                        ExecuteCommand(ccommand, xargs.Deep ? xargs : null);
                         if (command.Delay > 0)
                         {
                             System.Threading.Thread.Sleep(command.Delay);
@@ -404,15 +473,15 @@ namespace Chetch.Arduino
                 } //end command repeat
             } else
             {
-                SendCommand(command, extraArgs);
+                SendCommand(command, xargs);
             }
         }
 
-        virtual protected void SendCommand(ArduinoCommand command, List<Object> extraArgs = null)
+        virtual protected void SendCommand(ArduinoCommand command, ExecutionArguments xargs = null)
         {
             if (Mgr == null) throw new Exception(String.Format("Device {0} has not yet been added to a device manager", ToString()));
             if (!IsConnected) throw new Exception(String.Format("Device {0} is not 'connected' to board", ToString()));
-            Mgr.SendCommand(BoardID, command, extraArgs);
+            Mgr.SendCommand(BoardID, command, xargs.Arguments, xargs.Tag);
             LastCommandSent = command;
             LastCommandSentOn = DateTime.Now.Ticks;
         }

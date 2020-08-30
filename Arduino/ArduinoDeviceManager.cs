@@ -24,6 +24,27 @@ namespace Chetch.Arduino
 
     public class ADMMessage : Message
     {
+        static bool[] _usedTags = new bool[255];
+        public static void ReleaseTag(byte tag)
+        {
+            if (tag == 0) return;
+            _usedTags[tag] = false;
+        }
+
+        public static byte CreateNewTag()
+        {
+            //start from 1 as we reserve 0 to mean a non-assigned tag
+            for(byte i = 1; i < _usedTags.Length; i++)
+            {
+                if (!_usedTags[i])
+                {
+                    _usedTags[i] = true;
+                    return i;
+                }
+            }
+            throw new Exception("Cannot create tag as all tags are being used");
+        }
+
         public byte Tag { get; set; } = 0; //can be used to track messages
         public byte TargetID { get; set; } = 0; //ID number on board to determine what is beig targeted
         public byte CommandID { get; set; } = 0; //Command ID on board ... basically to identify function e.g. Send or Delete ...
@@ -102,6 +123,16 @@ namespace Chetch.Arduino
         {
             byte[] bytes = Chetch.Utilities.Convert.ToBytes((ValueType)arg, LittleEndian);
             AddArgument(bytes);
+        }
+
+        public override void OnDeserialize(string s, MessageEncoding encoding)
+        {
+            base.OnDeserialize(s, encoding);
+
+            if (HasValue("Tag"))
+            {
+                Tag = GetByte("Tag");
+            }
         }
     }
 
@@ -674,16 +705,22 @@ namespace Chetch.Arduino
                 }
             } catch (Exception e)
             {
+                byte tag = message != null ? message.Tag : (byte)0;
                 message = new ADMMessage();
                 message.Type = Messaging.MessageType.ERROR;
                 message.Value = e.Message;
+                message.Tag = tag;
             }
             Broadcast(message);
         }
 
         public void Broadcast(ADMMessage message)
         {
-            if (_listener != null && message != null && message.CanBroadcast)
+            if (message == null) return;
+
+            ADMMessage.ReleaseTag(message.Tag);
+
+            if (_listener != null && message.CanBroadcast)
             {
                 switch (message.Type)
                 {
@@ -702,13 +739,13 @@ namespace Chetch.Arduino
             }
         }
 
-        public void SendCommand(byte targetID, ArduinoCommand command, List<Object> extraArgs = null)
+        public void SendCommand(byte targetID, ArduinoCommand command, List<Object> extraArgs = null, byte tag = 0)
         {
             var message = new ADMMessage();
             message.LittleEndian = LittleEndian;
             message.Type = Messaging.MessageType.COMMAND;
-            message.Tag = 0; //TODO: create some kind of perhaps counter-based tagging
             message.TargetID = targetID;
+            message.Tag = tag;
             message.CommandID = (byte)command.Type;
             
             List<Object> allArgs = command.Arguments;
@@ -801,22 +838,22 @@ namespace Chetch.Arduino
             _sleep(sleep);
         }
 
-        public void IssueCommand(String deviceID, String command, List<Object> args = null)
+        public byte IssueCommand(String deviceID, String command, List<Object> args = null)
         {
-            IssueCommand(deviceID, command, 1, 0, args);
+            return IssueCommand(deviceID, command, 1, 0, args);
         }
 
-        public void IssueCommand(String deviceID, String command, int repeat, int delay, params Object[] args)
+        public byte IssueCommand(String deviceID, String command, int repeat, int delay, params Object[] args)
         {
-            IssueCommand(deviceID, command, repeat, delay, new List<Object>(args));
+            return IssueCommand(deviceID, command, repeat, delay, new List<Object>(args));
         }
 
-        public void IssueCommand(String deviceID, String command, params Object[] args)
+        public byte IssueCommand(String deviceID, String command, params Object[] args)
         {
-            IssueCommand(deviceID, command, 1, 0, new List<Object>(args));
+            return IssueCommand(deviceID, command, 1, 0, new List<Object>(args));
         }
 
-        public void IssueCommand(String deviceID, String command, int repeat, int delay, List<Object> args = null)
+        public byte IssueCommand(String deviceID, String command, int repeat, int delay, List<Object> args = null)
         {
             var device = GetDevice(deviceID);
             //check has device
@@ -829,40 +866,27 @@ namespace Chetch.Arduino
                 throw new Exception(String.Format("Device {0} is not connected", device));
             }
 
-            //check has command
-            ArduinoCommand acmd = device.GetCommand(command);
-            if (acmd == null)
-            {
-                throw new Exception(String.Format("Device {0} does not have command {1}", deviceID, command));
-            }
-
-            //pass an empty array rather than null ... safety measure here just for the ThreadExecution Manager
-            if(args == null)
-            {
-                args = new List<Object>();
-            }
-
-            //Use ThreadExecutionManager to allow for multi-threading by device 
-            int prevSize = ThreadExecutionManager.MaxQueueSize;
-            ThreadExecutionManager.MaxQueueSize = acmd.IsCompound ? 1 : 256;
-            ThreadExecutionManager.Execute<List<Object>>(device.ID, repeat, delay, device.ExecuteCommand, command, args);
-            ThreadExecutionManager.MaxQueueSize = prevSize;
+            return device.ThreadExecuteCommand(command, repeat, delay, args);
         }
 
-        public void RequestStatus(byte boardID = 0)
+        public byte RequestStatus(byte boardID = 0)
         {
             var message = new ADMMessage();
             message.Type = Messaging.MessageType.STATUS_REQUEST;
+            message.Tag = ADMMessage.CreateNewTag();
             message.TargetID = boardID;
             SendMessage(message);
+            return message.Tag;
         }
 
-        public void Ping()
+        public byte Ping()
         {
             var message = new ADMMessage();
             message.Type = Messaging.MessageType.PING;
             message.TargetID = 0;
+            message.Tag = ADMMessage.CreateNewTag();
             SendMessage(message);
+            return message.Tag;
         }
 
         public void Blink(int repeat = 1, int delay = 0)

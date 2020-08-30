@@ -77,7 +77,7 @@ namespace Chetch.Arduino.Devices.Infrared
             }
         }
 
-        override protected void ExecuteCommand(ArduinoCommand command, List<Object> extraArgs = null, bool deep = false)
+        override protected void ExecuteCommand(ArduinoCommand command, ExecutionArguments xargs)
         {
             switch (command.Type)
             {
@@ -85,9 +85,9 @@ namespace Chetch.Arduino.Devices.Infrared
                     _irCodes.Clear();
                     _unknownCodes.Clear();
                     _receiving = true;
-                    if(extraArgs != null && extraArgs.Count > 0)
+                    if(xargs != null && xargs.Arguments.Count > 0)
                     {
-                        _commandName = (String)extraArgs[0];
+                        _commandName = (String)xargs.Arguments[0];
                     }
                     break;
 
@@ -100,7 +100,7 @@ namespace Chetch.Arduino.Devices.Infrared
                     WriteIRCodes();
                     return;
             }
-            base.ExecuteCommand(command, extraArgs, deep);
+            base.ExecuteCommand(command, xargs);
         }
 
         virtual public void processCode(long code, int protocol, int bits = 32)

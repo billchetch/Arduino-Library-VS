@@ -21,8 +21,8 @@ namespace Chetch.Arduino.Devices.Temperature
             //Also note we are not using PULLUP mode as on testing this didn't work ... requirement is therefore
             //to use a 4.7K resistor bridging the data and power wires to the device.
             ConfigurePin(_oneWirePin, Solid.Arduino.Firmata.PinMode.DigitalInput);
-            
-            TryAddCommand("read-temp", ArduinoCommand.CommandType.READ);
+
+            TryAddCommand("read-temp", ArduinoCommand.CommandType.READ, true);
         }
 
         public DS18B20Array(int oneWirePin) : this(oneWirePin, "ds18" + oneWirePin){}

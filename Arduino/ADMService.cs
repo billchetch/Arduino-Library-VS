@@ -27,6 +27,7 @@ namespace Chetch.Arduino
         private Dictionary<String, bool> _devicesConnected = new Dictionary<string, bool>();
         private bool _noPortsFoundWarning = false; //has a no ports found warning been 'traced' ... a flag to prevent multiple trace/log entries
         private Object _lockMonitorADM = new Object(); //lock so we don't disconnect/connect concurrently
+        private Dictionary<byte, String> _admRequests = new Dictionary<byte, String>();
 
         abstract protected void AddADMDevices(ArduinoDeviceManager adm, ADMMessage message);
         
@@ -107,6 +108,13 @@ namespace Chetch.Arduino
             base.OnStop();
         }
 
+        protected void AddADMRequest(byte tag, String replyTo)
+        {
+            if (tag == 0) throw new ArgumentException("AddADMRequest: Tag cannot be 0");
+            //we intentionally allow for the possibility of this being overwritten by a future request
+            _admRequests[tag] = replyTo;
+        }
+        
         public override void HandleClientError(Connection cnn, Exception e)
         {
             //throw new NotImplementedException();
@@ -138,7 +146,7 @@ namespace Chetch.Arduino
                     {
                         throw new Exception(String.Format("Device {0} does not have a board ID", deviceID));
                     }
-                    adm.RequestStatus(device.BoardID);
+                    AddADMRequest(adm.RequestStatus(device.BoardID), response.Target);
                     break;
 
                 default:
@@ -152,7 +160,8 @@ namespace Chetch.Arduino
                         }
                         else
                         {
-                            adm.IssueCommand(deviceID, tcmd, args);
+                            byte tag = adm.IssueCommand(deviceID, tcmd, args);
+                            if (tag > 0) AddADMRequest(tag, response.Target);
                         }
                     }
                     break;
@@ -171,10 +180,10 @@ namespace Chetch.Arduino
 
             //adm specific commands related to a board and device
             commandHelp.Add("adm/<board>:status:  ADM will request board status and add additional information");
-            commandHelp.Add("adm/<board>:ping: ADM will ping the board <repeat?>");
             commandHelp.Add("adm/<board>:list-boards: List boards used by this service");
             commandHelp.Add("adm/<board>:list-devices: List devices added to ADM");
             commandHelp.Add("adm/<board>:capability: List pin capabilities");
+            commandHelp.Add("adm/<board>:pingloadtest: Send a rapid <number> of pings with <delay> between each.");
             commandHelp.Add("adm/<board>:setdigitalpin: Set the <pin number> to <true/false>");
             commandHelp.Add("adm/<board>:<device>:wait: Will simply pause for a short while, useful if interspersed with other, comma-seperated, commands");
             commandHelp.Add("adm/<board>:<device>:list-commands: List device commands");
@@ -193,7 +202,7 @@ namespace Chetch.Arduino
                     {
                         response.AddValue("ADMS", "No boards connected");
                     }
-                    response.AddValue("Ports", ArduinoDeviceManager.GetBoardPorts(SupportedBoards));
+                    response.AddValue("Ports", ArduinoDeviceManager.GetBoardPorts(SupportedBoards, AllowedPorts));
                     break;
 
                 default:
@@ -230,17 +239,7 @@ namespace Chetch.Arduino
                         switch (tgtcmd[1].ToLower())
                         {
                             case "status":
-                                adm.RequestStatus();
-                                break;
-
-                            case "ping":
-                                repeat = args != null && args.Count > 0 ? System.Convert.ToInt16(args[0]) : 1;
-                                delay = args != null && args.Count > 1 ? System.Convert.ToInt16(args[1]) : 1000;
-                                for (int i = 0; i < repeat; i++)
-                                {
-                                    adm.Ping();
-                                    System.Threading.Thread.Sleep(delay);
-                                }
+                                AddADMRequest(adm.RequestStatus(), response.Target);
                                 break;
 
                             case "pingloadtest":
@@ -472,6 +471,14 @@ namespace Chetch.Arduino
                 dev = adm.GetDevice(message.Sender);
             }
             message.AddValue("DeviceID", dev != null ? dev.ID : "");
+
+            if(message.Tag > 0 && _admRequests.ContainsKey(message.Tag))
+            {
+                message.Target = _admRequests[message.Tag];
+                _admRequests.Remove(message.Tag);
+            }
+
+            //notify other clients listening to this client
             Broadcast(message);
         }
 

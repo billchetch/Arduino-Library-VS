@@ -58,7 +58,7 @@ namespace Chetch.Arduino.Devices.Infrared
             _enabled = true;
         }
 
-        override public void ExecuteCommand(String commandAlias, List<Object> extraArgs = null)
+        override public void ExecuteCommand(String commandAlias, ExecutionArguments xargs)
         {
             if(commandAlias.Length == 2 && uint.TryParse(commandAlias, out _))
             {
@@ -67,16 +67,16 @@ namespace Chetch.Arduino.Devices.Infrared
                 int d1 = (int)char.GetNumericValue(commandAlias[0]);
                 int d2 = (int)char.GetNumericValue(commandAlias[1]);
 
-                base.ExecuteCommand(d1.ToString(), extraArgs);
+                base.ExecuteCommand(d1.ToString(), xargs);
                 System.Threading.Thread.Sleep(RepeatInterval * 2);
-                base.ExecuteCommand(d2.ToString(), extraArgs);
+                base.ExecuteCommand(d2.ToString(), xargs);
             } else
             {
-                base.ExecuteCommand(commandAlias, extraArgs);
+                base.ExecuteCommand(commandAlias, xargs);
             }
         }
 
-        override protected void ExecuteCommand(ArduinoCommand command, List<Object> extraArgs = null, bool deep = false)
+        override protected void ExecuteCommand(ArduinoCommand command, ExecutionArguments xargs)
         {
             if(!_enabled){
                 List<ArduinoDevice> devices = Mgr.GetDevicesByPin(_transmitPin);
@@ -92,10 +92,10 @@ namespace Chetch.Arduino.Devices.Infrared
                 Enable();
             }
 
-            base.ExecuteCommand(command, extraArgs, deep);
+            base.ExecuteCommand(command, xargs);
         }
 
-        override protected void SendCommand(ArduinoCommand command, List<Object> extraArgs = null)
+        override protected void SendCommand(ArduinoCommand command, ExecutionArguments xargs)
         {
             if(command.Type == ArduinoCommand.CommandType.SEND && Protocol != IRProtocol.UNKNOWN && command.Arguments.Count == 3)
             {
@@ -105,12 +105,12 @@ namespace Chetch.Arduino.Devices.Infrared
             var timeDiff = (DateTime.Now.Ticks - LastCommandSentOn) / TimeSpan.TicksPerMillisecond;
             if (UseRepeatCommand && _repeatCommand != null && LastCommandSent != null && LastCommandSent.Equals(command) && timeDiff < RepeatInterval)
             {
-                base.SendCommand(_repeatCommand, extraArgs);
+                base.SendCommand(_repeatCommand, xargs);
                 LastCommandSent = command;
             }
             else
             {
-                base.SendCommand(command, extraArgs);
+                base.SendCommand(command, xargs);
             }
         }
 
