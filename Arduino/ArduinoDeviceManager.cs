@@ -132,7 +132,10 @@ namespace Chetch.Arduino
 
             List<String> boardPorts = SerialPorts.Find(supportedBoards.Trim());
 
-            if (allowedPorts != null)
+            if (allowedPorts == null || allowedPorts == String.Empty || allowedPorts == "*")
+            {
+                return boardPorts;
+            } else
             {
                 String[] parts = allowedPorts.Split(',');
                 List<String> expandedAllowedPorts = new List<String>();
@@ -158,8 +161,6 @@ namespace Chetch.Arduino
                     if (expandedAllowedPorts.Contains(p)) ports2return.Add(p);
                 }
                 return ports2return;
-            } else {
-                return boardPorts;
             }
         }
 
