@@ -141,15 +141,15 @@ namespace Chetch.Arduino
                     String[] rangeParts = portRange.Split('-');
                     if (rangeParts.Length == 2)
                     {
-                        int start = System.Convert.ToInt16(rangeParts[0]);
-                        int end = System.Convert.ToInt16(rangeParts[1]);
+                        int start = System.Convert.ToInt16(rangeParts[0].Replace("COM", ""));
+                        int end = System.Convert.ToInt16(rangeParts[1].Replace("COM", ""));
                         for(int i = start; i <= end; i++)
                         {
                             expandedAllowedPorts.Add("COM" + i);
                         }
                     } else
                     {
-                        expandedAllowedPorts.Add("COM" + rangeParts[0]);
+                        expandedAllowedPorts.Add("COM" + rangeParts[0].Replace("COM", ""));
                     }
                 }
                 List<String> ports2return = new List<String>();
