@@ -18,6 +18,26 @@ namespace Chetch.Arduino
             DISCONNECTED,
             DEVICES_CONNECTED
         }
+
+        public struct ADMRequest
+        {
+            public String Target;
+            public long Requested;
+            private int _ttl;
+
+            public ADMRequest(String target, int ttl = 60*1000)
+            {
+                Target = target;
+                Requested = DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
+                _ttl = ttl;
+            }
+
+            public bool HasExpired()
+            {
+                long nowInMillis = DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
+                return nowInMillis - Requested > _ttl;
+            }
+        }
         
         //map of port names to arduino device managers
         protected Dictionary<String, ArduinoDeviceManager> ADMS { get; } = new Dictionary<String, ArduinoDeviceManager>();
@@ -27,7 +47,7 @@ namespace Chetch.Arduino
         private Dictionary<String, bool> _devicesConnected = new Dictionary<string, bool>();
         private bool _noPortsFoundWarning = false; //has a no ports found warning been 'traced' ... a flag to prevent multiple trace/log entries
         private Object _lockMonitorADM = new Object(); //lock so we don't disconnect/connect concurrently
-        private Dictionary<byte, String> _admRequests = new Dictionary<byte, String>();
+        private Dictionary<byte, ADMRequest> _admRequests = new Dictionary<byte, ADMRequest>();
 
         abstract protected void AddADMDevices(ArduinoDeviceManager adm, ADMMessage message);
         
@@ -112,7 +132,15 @@ namespace Chetch.Arduino
         {
             if (tag == 0) throw new ArgumentException("AddADMRequest: Tag cannot be 0");
             //we intentionally allow for the possibility of this being overwritten by a future request
-            _admRequests[tag] = replyTo;
+            _admRequests[tag] = new ADMRequest(replyTo);
+        }
+
+        protected ADMRequest GetADMRequest(byte tag, bool remove = true)
+        {
+            if (!_admRequests.ContainsKey(tag)) throw new Exception("Cannot find ADM request for tag " + tag);
+            ADMRequest req = _admRequests[tag];
+            if(remove)_admRequests.Remove(tag);
+            return req;
         }
         
         public override void HandleClientError(Connection cnn, Exception e)
@@ -147,6 +175,7 @@ namespace Chetch.Arduino
                         throw new Exception(String.Format("Device {0} does not have a board ID", deviceID));
                     }
                     AddADMRequest(adm.RequestStatus(device.BoardID), response.Target);
+                    respond = false;
                     break;
 
                 default:
@@ -161,15 +190,17 @@ namespace Chetch.Arduino
                         else
                         {
                             byte tag = adm.IssueCommand(deviceID, tcmd, args);
-                            if (tag > 0) AddADMRequest(tag, response.Target);
+                            if (tag > 0)
+                            {
+                                AddADMRequest(tag, response.Target);
+                                respond = false;
+                            }
                         }
                     }
                     break;
             }
             return respond;
         }
-
-        
 
         override public void AddCommandHelp(List<String> commandHelp)
         {
@@ -240,6 +271,7 @@ namespace Chetch.Arduino
                         {
                             case "status":
                                 AddADMRequest(adm.RequestStatus(), response.Target);
+                                respond = false;
                                 break;
 
                             case "pingloadtest":
@@ -250,6 +282,7 @@ namespace Chetch.Arduino
                                     adm.Ping();
                                     System.Threading.Thread.Sleep(delay);
                                 }
+                                respond = false;
                                 break;
 
                             case "capability":
@@ -433,11 +466,11 @@ namespace Chetch.Arduino
             switch (message.Type)
             {
                 case MessageType.ERROR:
-                    Tracing?.TraceEvent(TraceEventType.Error, 0, "ADM {0} produced error: {1}", adm.BoardID == null ? "n/a" : adm.BoardID, message.Value);
+                    Tracing?.TraceEvent(TraceEventType.Error, 100, "ADM {0} produced error: {1}", adm.BoardID == null ? "n/a" : adm.BoardID, message.Value);
                     break;
 
                 case MessageType.WARNING:
-                    Tracing?.TraceEvent(TraceEventType.Warning, 0, "ADM {0} produced warning: {1}", adm.BoardID == null ? "n/a" : adm.BoardID, message.Value);
+                    Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADM {0} produced warning: {1}", adm.BoardID == null ? "n/a" : adm.BoardID, message.Value);
                     break;
 
                 case MessageType.STATUS_RESPONSE:
@@ -474,8 +507,16 @@ namespace Chetch.Arduino
 
             if(message.Tag > 0 && _admRequests.ContainsKey(message.Tag))
             {
-                message.Target = _admRequests[message.Tag];
-                _admRequests.Remove(message.Tag);
+                ADMRequest req = GetADMRequest(message.Tag);
+                if (req.HasExpired())
+                {
+                    Tracing?.TraceEvent(TraceEventType.Warning, 0, "ADM request for tag {0} and target {1} has expired so not returning message of type {2}", message.Tag, req.Target, message.Type);
+                    return;
+                }
+                else
+                {
+                    message.Target = req.Target;
+                }
             }
 
             //notify other clients listening to this client

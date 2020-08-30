@@ -24,21 +24,23 @@ namespace Chetch.Arduino
 
     public class ADMMessage : Message
     {
-        static bool[] _usedTags = new bool[255];
+        const long TTL = 5 * 60 * 1000; //how long in millis a Tag can last for 
+        static long[] _usedTags = new long[255];
         public static void ReleaseTag(byte tag)
         {
             if (tag == 0) return;
-            _usedTags[tag] = false;
+            _usedTags[tag] = 0;
         }
 
         public static byte CreateNewTag()
         {
             //start from 1 as we reserve 0 to mean a non-assigned tag
+            long nowInMillis = DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
             for(byte i = 1; i < _usedTags.Length; i++)
             {
-                if (!_usedTags[i])
+                if (_usedTags[i] == 0 || nowInMillis - _usedTags[i] > TTL)
                 {
-                    _usedTags[i] = true;
+                    _usedTags[i] = nowInMillis;
                     return i;
                 }
             }

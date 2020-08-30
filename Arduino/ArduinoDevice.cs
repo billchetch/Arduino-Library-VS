@@ -182,7 +182,7 @@ namespace Chetch.Arduino
         public String ID { get; internal set; }
         public byte BoardID { get; set; } //ID of 'device' on the arduino board ... used by code on the board to determine what should process the command 
         virtual public String Name { get; set; }
-        public List<ArduinoPin> Pins { get; internal set; }
+        public List<ArduinoPin> Pins { get; internal set; } = new List<ArduinoPin>();
         public DeviceCategory Category { get; set; } = DeviceCategory.NOT_SET;
         public bool IsConnected { get; internal set; } = false;
 
