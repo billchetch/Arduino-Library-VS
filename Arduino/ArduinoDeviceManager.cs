@@ -721,6 +721,7 @@ namespace Chetch.Arduino
             if (message == null) return;
 
             ADMMessage.ReleaseTag(message.Tag);
+            message.Target = null; //clear the target as it may have been used internally but now this is a broadcast so it's not intended for any specific target
 
             if (_listener != null && message.CanBroadcast)
             {
