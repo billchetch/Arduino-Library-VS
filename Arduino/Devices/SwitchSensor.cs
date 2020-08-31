@@ -21,6 +21,8 @@ namespace Chetch.Arduino.Devices
         public bool IsOn { get { return State; } }
         public bool IsOff { get { return !State;  } }
 
+        public Messaging.MessageType BroadcastStateChangeAs { get; set; } = Messaging.MessageType.DATA; //message type to broadcast
+
         public SwitchSensor(int pin, int noiseThreshold, String id, String name) : base(id, name)
         {
             _sensorPin = pin;
@@ -89,7 +91,7 @@ namespace Chetch.Arduino.Devices
         virtual protected void OnStateChange(bool newState)
         {
             ADMMessage message  = new ADMMessage();
-            message.Type = Messaging.MessageType.DATA;
+            message.Type = BroadcastStateChangeAs;
             message.AddValue("State", newState);
             Broadcast(message);
         }
