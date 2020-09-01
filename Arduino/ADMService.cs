@@ -38,6 +38,28 @@ namespace Chetch.Arduino
                 return nowInMillis - Requested > _ttl;
             }
         }
+
+        public class ADMMessageFilter : MessageFilter
+        {
+            String DeviceID;
+
+            public ADMMessageFilter(String deviceID, String clientName, MessageType messageType, Action<Message> onMatched) : base(clientName, messageType, onMatched)
+            {
+                DeviceID = deviceID;
+            }
+
+            protected override bool Matches(Message message)
+            {
+                bool matched = base.Matches(message);
+                if (matched && DeviceID != null)
+                {
+                    return message.HasValue("DeviceID") && DeviceID.Equals(message.GetString("DeviceID"));
+                } else
+                {
+                    return matched;
+                }
+            }
+        }
         
         //map of port names to arduino device managers
         protected Dictionary<String, ArduinoDeviceManager> ADMS { get; } = new Dictionary<String, ArduinoDeviceManager>();
