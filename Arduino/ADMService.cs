@@ -48,6 +48,13 @@ namespace Chetch.Arduino
                 DeviceID = deviceID;
             }
 
+            public ADMMessageFilter(String deviceID, String clientName, Action<Message> onMatched) : base(clientName, onMatched)
+            {
+                DeviceID = deviceID;
+            }
+
+            public ADMMessageFilter(String deviceID, String clientName) : this(deviceID, clientName, null) { }
+
             protected override bool Matches(Message message)
             {
                 bool matched = base.Matches(message);
