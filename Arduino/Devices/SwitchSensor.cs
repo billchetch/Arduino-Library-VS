@@ -105,6 +105,11 @@ namespace Chetch.Arduino.Devices
             base.HandleMessage(message);
         }
 
+        public void Enable(bool enabled = true)
+        {
+            Enabled = enabled;
+        }
+
         protected override void ExecuteCommand(ArduinoCommand command, ExecutionArguments xargs)
         {
             switch (command.CommandAlias.ToLower())

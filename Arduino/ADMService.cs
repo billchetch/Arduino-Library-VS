@@ -44,12 +44,12 @@ namespace Chetch.Arduino
             public String DeviceID { get; internal set; }
             public String ClientName {  get { return Sender;  } } //change name to better fit with subscription ideas
 
-            public ADMMessageFilter(String deviceID, String clientName, MessageType messageType, Action<Message> onMatched) : base(clientName, messageType, onMatched)
+            public ADMMessageFilter(String deviceID, String clientName, MessageType messageType, Action<MessageFilter, Message> onMatched) : base(clientName, messageType, onMatched)
             {
                 DeviceID = deviceID;
             }
 
-            public ADMMessageFilter(String deviceID, String clientName, Action<Message> onMatched) : base(clientName, onMatched)
+            public ADMMessageFilter(String deviceID, String clientName, Action<MessageFilter, Message> onMatched) : base(clientName, onMatched)
             {
                 DeviceID = deviceID;
             }
