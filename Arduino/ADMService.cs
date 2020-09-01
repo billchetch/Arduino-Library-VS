@@ -41,7 +41,8 @@ namespace Chetch.Arduino
 
         public class ADMMessageFilter : MessageFilter
         {
-            String DeviceID;
+            public String DeviceID { get; internal set; }
+            public String ClientName {  get { return Sender;  } } //change name to better fit with subscription ideas
 
             public ADMMessageFilter(String deviceID, String clientName, MessageType messageType, Action<Message> onMatched) : base(clientName, messageType, onMatched)
             {
