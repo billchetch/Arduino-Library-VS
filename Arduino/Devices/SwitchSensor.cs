@@ -11,6 +11,7 @@ namespace Chetch.Arduino.Devices
     public class SwitchSensor : ArduinoDevice
     {
         private int _sensorPin;
+        private bool _rawState = false; //the last reported pin value
         public bool State { get; internal set; } = false; //verified state
         private bool _latestState = false;
         private int _noiseThreshold; //time delay in mills for acceptable state change
@@ -33,10 +34,7 @@ namespace Chetch.Arduino.Devices
             TryAddCommand("disable");
         }
 
-        public SwitchSensor(int pin, int noiseThreshold = 0) : this(pin, noiseThreshold, "switch" + pin, "SwitchSensor")
-        {
-            
-        }
+        public SwitchSensor(int pin, int noiseThreshold = 0) : this(pin, noiseThreshold, "switch" + pin, "SwitchSensor"){ }
 
         protected override void OnConnect(ADMMessage message)
         {
@@ -49,6 +47,7 @@ namespace Chetch.Arduino.Devices
         {
             if (pinNumber != _sensorPin) throw new Exception(String.Format("State changed on pin {0} but sensor is attached to pin {1}", pinNumber, _sensorPin));
             if (!Enabled) return;
+            _rawState = newState;
 
             if (newState != _latestState)
             {
@@ -107,7 +106,16 @@ namespace Chetch.Arduino.Devices
 
         public void Enable(bool enabled = true)
         {
+            if (enabled == Enabled) return; //to avoid triggring stuff twice
+
             Enabled = enabled;
+            if (!Enabled)
+            {
+                State = false;
+            } else if (_rawState)
+            { 
+                HandleDigitalPinStateChange(_sensorPin, _rawState);
+            }
         }
 
         protected override void ExecuteCommand(ArduinoCommand command, ExecutionArguments xargs)
@@ -115,10 +123,10 @@ namespace Chetch.Arduino.Devices
             switch (command.CommandAlias.ToLower())
             {
                 case "enable":
-                    Enabled = true;
+                    Enable(true);
                     break;
                 case "disable":
-                    Enabled = false;
+                    Enable(false);
                     break;
                 default:
                     base.ExecuteCommand(command, xargs);

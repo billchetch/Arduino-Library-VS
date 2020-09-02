@@ -841,13 +841,6 @@ namespace Chetch.Arduino
             _sleep(sleep);
         }
 
-        public PinState GetPinState(int pinNumber, int sleep = 0)
-        {
-            PinState pinState = _session.GetPinState(pinNumber);
-            _sleep(sleep);
-            return pinState;
-        }
-
         public byte IssueCommand(String deviceID, String command, List<Object> args = null)
         {
             return IssueCommand(deviceID, command, 1, 0, args);
