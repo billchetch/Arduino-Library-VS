@@ -112,6 +112,7 @@ namespace Chetch.Arduino.Devices
             if (!Enabled)
             {
                 State = false;
+                _latestState = false;
             } else if (_rawState)
             { 
                 HandleDigitalPinStateChange(_sensorPin, _rawState);
