@@ -38,6 +38,8 @@ namespace Chetch.Arduino.Devices.Buzzers
         public void Silence(int duration)
         {
             if (duration <= 0) throw new ArgumentException("Duration must be a positive number");
+            if (_silenced) return;
+
             _silenceTimer.Interval = duration;
             _silenced = true;
             //so turn off the pin that controls the buzzer but leave the 'Switch State' the same as that
@@ -46,12 +48,17 @@ namespace Chetch.Arduino.Devices.Buzzers
             _silenceTimer.Start();
         }
 
-        private void HandleSilenceTimer(Object sender, System.Timers.ElapsedEventArgs ea)
+        public void Unsilence()
         {
-            //turn off timer and set buzzer pin to whatever the buzzer state really is 
             _silenceTimer.Stop();
             _silenced = false;
             SetPin(State);
+        }
+
+        private void HandleSilenceTimer(Object sender, System.Timers.ElapsedEventArgs ea)
+        {
+            //turn off timer and set buzzer pin to whatever the buzzer state really is 
+            Unsilence();
         }
 
         protected override void ExecuteCommand(ArduinoCommand command, ExecutionArguments xargs)
@@ -60,6 +67,10 @@ namespace Chetch.Arduino.Devices.Buzzers
                 case "silence":
                     int duration = xargs.GetInt(0, 10);
                     Silence(duration);
+                    break;
+
+                case "unsilence":
+                    Unsilence();
                     break;
 
                 default:
