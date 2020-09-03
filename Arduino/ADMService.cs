@@ -12,11 +12,11 @@ namespace Chetch.Arduino
 {
     abstract public class ADMService : TCPMessagingClient
     {
-        public class ADMServiceSchema : MessageSchema
+        public class MessageSchema : Chetch.Messaging.MessageSchema
         {
-            public ADMServiceSchema() { }
+            public MessageSchema() { }
 
-            public ADMServiceSchema(Message message) : base(message) { }
+            public MessageSchema(Message message) : base(message) { }
 
             public void PrepareForBroadcast(ArduinoDeviceManager adm)
             {
@@ -94,7 +94,7 @@ namespace Chetch.Arduino
         {
             public String DeviceID { get; internal set; }
             public String ClientName {  get { return Sender;  } } //change name to better fit with subscription ideas
-            private ADMServiceSchema _schema = new ADMServiceSchema();
+            private MessageSchema _schema = new MessageSchema();
 
 
             public ADMMessageFilter(String deviceID, String clientName, MessageType messageType, Action<MessageFilter, Message> onMatched) : base(clientName, messageType, onMatched)
@@ -243,7 +243,7 @@ namespace Chetch.Arduino
 
             bool respond = true;
             ArduinoDevice device = null;
-            ADMServiceSchema schema = new ADMServiceSchema(response);
+            MessageSchema schema = new MessageSchema(response);
             switch (command)
             {
                 case "list-commands" +
@@ -307,7 +307,7 @@ namespace Chetch.Arduino
         override public bool HandleCommand(Connection cnn, Message message, String cmd, List<Object> args, Message response)
         {
             bool respond = true;
-            ADMServiceSchema schema = new ADMServiceSchema(response);
+            MessageSchema schema = new MessageSchema(response);
 
             switch (cmd)
             {
@@ -586,7 +586,7 @@ namespace Chetch.Arduino
                 }
             }
 
-            var schema = new ADMServiceSchema(message);
+            var schema = new MessageSchema(message);
             schema.PrepareForBroadcast(adm);
 
             //notify other clients listening to this client
