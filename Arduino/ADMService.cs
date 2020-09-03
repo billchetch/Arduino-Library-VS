@@ -45,6 +45,16 @@ namespace Chetch.Arduino
                 return Message.HasValue("BoardID") ? Message.GetString("BoardID") : null;
             }
 
+            public void AddDevices(List<ArduinoDevice> devices)
+            {
+                Dictionary<String, String> d = new Dictionary<String, String>();
+                foreach(var dev in devices)
+                {
+                    d[dev.ID] = dev.ToString();
+                }
+                Message.AddValue("Devices", d);
+            }
+
             public void AddDeviceCommands(ArduinoDevice device)
             {
                 Message.AddValue("DeviceID", device.ID);
@@ -387,7 +397,7 @@ namespace Chetch.Arduino
                                 break;
 
                             case "list-devices":
-                                response.AddValue("Devices", adm.GetDevices().Select(i => i.ToString(true)).ToList());
+                                schema.AddDevices(adm.GetDevices());
                                 break;
 
                             default:
