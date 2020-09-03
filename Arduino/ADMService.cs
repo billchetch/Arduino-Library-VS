@@ -12,6 +12,47 @@ namespace Chetch.Arduino
 {
     abstract public class ADMService : TCPMessagingClient
     {
+        public class ADMServiceSchema : MessageSchema
+        {
+            public ADMServiceSchema() { }
+
+            public ADMServiceSchema(Message message) : base(message) { }
+
+            public void PrepareForBroadcast(ArduinoDeviceManager adm)
+            {
+                ADMMessage message = (ADMMessage)Message;
+
+                message.AddValue("BoardID", adm.BoardID);
+                ArduinoDevice dev = null;
+                if (message.TargetID > 0)
+                {
+                    dev = adm.GetDeviceByBoardID(message.TargetID);
+                }
+                else if (message.Sender != null && message.Sender != String.Empty)
+                {
+                    dev = adm.GetDevice(message.Sender);
+                }
+                message.AddValue("DeviceID", dev != null ? dev.ID : "");
+            }
+
+            public String GetDeviceID()
+            {
+                return Message.HasValue("DeviceID") ? Message.GetString("DeviceID") : null;
+            }
+
+            public String GetBoardID()
+            {
+                return Message.HasValue("BoardID") ? Message.GetString("BoardID") : null;
+            }
+
+            public void AddDeviceCommands(ArduinoDevice device)
+            {
+                Message.AddValue("DeviceID", device.ID);
+                var cms = device.GetCommands();
+                Message.AddValue("DeviceCommands", cms.Select(i => i.CommandAlias).ToList());
+            }
+        }
+
         public enum ADMEvent
         {
             CONNECTED,
@@ -43,6 +84,8 @@ namespace Chetch.Arduino
         {
             public String DeviceID { get; internal set; }
             public String ClientName {  get { return Sender;  } } //change name to better fit with subscription ideas
+            private ADMServiceSchema _schema = new ADMServiceSchema();
+
 
             public ADMMessageFilter(String deviceID, String clientName, MessageType messageType, Action<MessageFilter, Message> onMatched) : base(clientName, messageType, onMatched)
             {
@@ -59,9 +102,11 @@ namespace Chetch.Arduino
             protected override bool Matches(Message message)
             {
                 bool matched = base.Matches(message);
+
                 if (matched && DeviceID != null)
                 {
-                    return message.HasValue("DeviceID") && DeviceID.Equals(message.GetString("DeviceID"));
+                    _schema.Message = message;
+                    return DeviceID.Equals(_schema.GetDeviceID());
                 } else
                 {
                     return matched;
@@ -78,10 +123,9 @@ namespace Chetch.Arduino
         private bool _noPortsFoundWarning = false; //has a no ports found warning been 'traced' ... a flag to prevent multiple trace/log entries
         private Object _lockMonitorADM = new Object(); //lock so we don't disconnect/connect concurrently
         private Dictionary<byte, ADMRequest> _admRequests = new Dictionary<byte, ADMRequest>();
-
+        
         abstract protected void AddADMDevices(ArduinoDeviceManager adm, ADMMessage message);
         
-
         public ADMService(String clientName, String clientManagerSource, String serviceSource, String eventLog) : base(clientName, clientManagerSource, serviceSource, eventLog)
         {
             //empty
@@ -189,13 +233,12 @@ namespace Chetch.Arduino
 
             bool respond = true;
             ArduinoDevice device = null;
+            ADMServiceSchema schema = new ADMServiceSchema(response);
             switch (command)
             {
                 case "list-commands":
                     device = adm.GetDevice(deviceID);
-                    response.AddValue("DeviceID", deviceID);
-                    var cms = device.GetCommands();
-                    response.AddValue("DeviceCommands", cms.Select(i => i.CommandAlias).ToList());
+                    schema.AddDeviceCommands(device);
                     break;
 
                 case "status":
@@ -457,16 +500,9 @@ namespace Chetch.Arduino
         }
 
         //messaging
-        protected ADMMessage CreateMessage(MessageType mtype)
+        protected Message CreateNotification(ADMEvent admEvent, String msg = null)
         {
-            var message = new ADMMessage();
-            message.Type = mtype;
-            return message;
-        }
-
-        protected ADMMessage CreateNotification(ADMEvent admEvent, String msg = null)
-        {
-            var message = CreateMessage(MessageType.NOTIFICATION);
+            var message = new Message(MessageType.NOTIFICATION);
             message.SubType = (int)Server.NotificationEvent.CUSTOM;
             message.AddValue("ADMEvent", admEvent);
             message.Value = msg;
@@ -476,7 +512,7 @@ namespace Chetch.Arduino
 
         protected void Broadcast(ADMEvent admEvent, String msg = null)
         {
-            ADMMessage message = CreateNotification(admEvent, msg);
+            Message message = CreateNotification(admEvent, msg);
             Broadcast(message);
         }
         
@@ -522,19 +558,7 @@ namespace Chetch.Arduino
                     break;
 
             }
-
             
-            message.AddValue("BoardID", adm.BoardID);
-            ArduinoDevice dev = null;
-            if (message.TargetID > 0)
-            {
-                dev = adm.GetDeviceByBoardID(message.TargetID);
-            }else if(message.Sender != null && message.Sender != String.Empty)
-            {
-                dev = adm.GetDevice(message.Sender);
-            }
-            message.AddValue("DeviceID", dev != null ? dev.ID : "");
-
             if(message.Tag > 0 && _admRequests.ContainsKey(message.Tag))
             {
                 ADMRequest req = GetADMRequest(message.Tag);
@@ -548,6 +572,9 @@ namespace Chetch.Arduino
                     message.Target = req.Target;
                 }
             }
+
+            var schema = new ADMServiceSchema(message);
+            schema.PrepareForBroadcast(adm);
 
             //notify other clients listening to this client
             Broadcast(message);
