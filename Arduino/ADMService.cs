@@ -61,6 +61,23 @@ namespace Chetch.Arduino
                 var cms = device.GetCommands();
                 Message.AddValue("DeviceCommands", cms.Select(i => i.CommandAlias).ToList());
             }
+
+            public void AddADMS(Dictionary<String, ArduinoDeviceManager> adms)
+            {
+                if (adms != null && adms.Count > 0)
+                {
+                    Message.AddValue("ADMS", adms.Values.Select(i => String.Format("Board {0} on port {1} has state {2}, last error: {3}", i.BoardID, i.Port, i.State, i.LastErrorMessage == null ? "n/a" : i.LastErrorMessage.Value)).ToList());
+                }
+                else
+                {
+                    Message.AddValue("ADMS", "No boards connected");
+                }
+            }
+
+            public void AddPorts(List<String> ports)
+            {
+                Message.AddValue("Ports", ports);
+            }
         }
 
         public enum ADMEvent
@@ -246,8 +263,7 @@ namespace Chetch.Arduino
             MessageSchema schema = new MessageSchema(response);
             switch (command)
             {
-                case "list-commands" +
-                "":
+                case "list-commands":
                     device = adm.GetDevice(deviceID);
                     schema.AddDeviceCommands(device);
                     break;
@@ -312,14 +328,8 @@ namespace Chetch.Arduino
             switch (cmd)
             {
                 case "status":
-                    if (ADMS != null && ADMS.Count > 0)
-                    {
-                        response.AddValue("ADMS", ADMS.Values.Select(i => String.Format("Board {0} on port {1} has state {2}, last error: {3}", i.BoardID, i.Port, i.State, i.LastErrorMessage == null ? "n/a" : i.LastErrorMessage.Value)).ToList());
-                    } else
-                    {
-                        response.AddValue("ADMS", "No boards connected");
-                    }
-                    response.AddValue("Ports", ArduinoDeviceManager.GetBoardPorts(SupportedBoards, AllowedPorts));
+                    schema.AddADMS(ADMS);
+                    schema.AddPorts(ArduinoDeviceManager.GetBoardPorts(SupportedBoards, AllowedPorts));
                     break;
 
                 default:
