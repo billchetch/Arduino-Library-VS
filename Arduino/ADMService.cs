@@ -236,7 +236,8 @@ namespace Chetch.Arduino
             ADMServiceSchema schema = new ADMServiceSchema(response);
             switch (command)
             {
-                case "list-commands":
+                case "list-commands" +
+                "":
                     device = adm.GetDevice(deviceID);
                     schema.AddDeviceCommands(device);
                     break;
@@ -296,6 +297,8 @@ namespace Chetch.Arduino
         override public bool HandleCommand(Connection cnn, Message message, String cmd, List<Object> args, Message response)
         {
             bool respond = true;
+            ADMServiceSchema schema = new ADMServiceSchema(response);
+
             switch (cmd)
             {
                 case "status":
