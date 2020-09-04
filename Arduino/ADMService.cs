@@ -197,7 +197,7 @@ namespace Chetch.Arduino
 
                 //create timer
                 _admtimer = new System.Timers.Timer();
-                _admtimer.Interval = 1000;
+                _admtimer.Interval = 5000;
                 _admtimer.Elapsed += new System.Timers.ElapsedEventHandler(this.MonitorADM);
                 _admtimer.Start();
                 Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Created ADM monitor timer at intervals of {0}", _admtimer.Interval);
