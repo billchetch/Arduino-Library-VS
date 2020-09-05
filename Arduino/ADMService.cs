@@ -302,22 +302,22 @@ namespace Chetch.Arduino
             return respond;
         }
 
-        override public void AddCommandHelp(List<String> commandHelp)
+        override public void AddCommandHelp()
         {
-            base.AddCommandHelp(commandHelp);
+            base.AddCommandHelp();
 
             //general commands related to a service
-            commandHelp.Add("status: Get status info about this service and the ADMs");
-
+            AddCommandHelp("status", "Get status info about this service and the ADMs");
+            
             //adm specific commands related to a board and device
-            commandHelp.Add("adm/<board>:status:  ADM will request board status and add additional information");
-            commandHelp.Add("adm/<board>:list-boards: List boards used by this service");
-            commandHelp.Add("adm/<board>:list-devices: List devices added to ADM");
-            commandHelp.Add("adm/<board>:capability: List pin capabilities");
-            commandHelp.Add("adm/<board>:pingloadtest: Send a rapid <number> of pings with <delay> between each.");
-            commandHelp.Add("adm/<board>:setdigitalpin: Set the <pin number> to <true/false>");
-            commandHelp.Add("adm/<board>:<device>:wait: Will simply pause for a short while, useful if interspersed with other, comma-seperated, commands");
-            commandHelp.Add("adm/<board>:<device>:list-commands: List device commands");
+            AddCommandHelp("adm/<board>:status",  "ADM will request board status and add additional information");
+            AddCommandHelp("adm/<board>:list-boards", "List boards used by this service");
+            AddCommandHelp("adm/<board>:list-devices", "List devices added to ADM");
+            AddCommandHelp("adm/<board>:capability", "List pin capabilities");
+            AddCommandHelp("adm/<board>:pingloadtest", "Send a rapid <number> of pings with <delay> between each.");
+            AddCommandHelp("adm/<board>:setdigitalpin", "Set the <pin number> to <true/false>");
+            AddCommandHelp("adm/<board>:<device>:wait", "Pause for a short while, useful if interspersed with other, comma-seperated, commands");
+            AddCommandHelp("adm/<board>:<device>:list-commands", "List device commands");
         }
 
         override public bool HandleCommand(Connection cnn, Message message, String cmd, List<Object> args, Message response)
