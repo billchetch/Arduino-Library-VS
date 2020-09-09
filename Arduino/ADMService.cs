@@ -66,6 +66,18 @@ namespace Chetch.Arduino
             {
                 if (adms != null && adms.Count > 0)
                 {
+                    foreach(ArduinoDeviceManager adm in adms.Values)
+                    {
+                        Dictionary<String, String> vals = new Dictionary<string, string>();
+                        vals["BoardID"] = adm.BoardID;
+                        vals["Port"] = adm.Port;
+                        vals["LastError"] = adm.LastErrorMessage == null ? "n/a" : adm.LastErrorMessage.Value;
+                        vals["LastErrorOn"] = adm.LastErrorOn.ToString("yyyy-MM-dd HH:mm:ss");
+                        vals["LastStatusResponseOn"] = adm.LastStatusResponseOn.ToString("yyyy-MM-dd HH:mm:ss");
+                        vals["LastPingResponseOn"] = adm.LastPingResponseOn.ToString("yyyy-MM-dd HH:mm:ss");
+                        vals["AvailableMessageTags"] = Convert.ToString(ADMMessage.AvailableTags());
+                    }
+                    
                     Message.AddValue("ADMS", adms.Values.Select(i => String.Format("Board {0} on port {1} has state {2}, last error: {3}", i.BoardID, i.Port, i.State, i.LastErrorMessage == null ? "n/a" : i.LastErrorMessage.Value)).ToList());
                 }
                 else
@@ -84,17 +96,21 @@ namespace Chetch.Arduino
         {
             CONNECTED,
             DISCONNECTED,
-            DEVICES_CONNECTED
+            DEVICES_CONNECTED,
         }
 
         public struct ADMRequest
         {
+            public ArduinoDeviceManager ADM;
+            public byte Tag;
             public String Target;
             public long Requested;
             private int _ttl;
 
-            public ADMRequest(String target, int ttl = 60*1000)
+            public ADMRequest(ArduinoDeviceManager adm, byte tag, String target, int ttl = 60*1000)
             {
+                ADM = adm;
+                Tag = tag;
                 Target = target;
                 Requested = DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
                 _ttl = ttl;
@@ -149,7 +165,7 @@ namespace Chetch.Arduino
         private Dictionary<String, bool> _devicesConnected = new Dictionary<string, bool>();
         private bool _noPortsFoundWarning = false; //has a no ports found warning been 'traced' ... a flag to prevent multiple trace/log entries
         private Object _lockMonitorADM = new Object(); //lock so we don't disconnect/connect concurrently
-        private Dictionary<byte, ADMRequest> _admRequests = new Dictionary<byte, ADMRequest>();
+        private List<ADMRequest> _admRequests = new List<ADMRequest>();
         
         abstract protected void AddADMDevices(ArduinoDeviceManager adm, ADMMessage message);
         
@@ -229,19 +245,23 @@ namespace Chetch.Arduino
             base.OnStop();
         }
 
-        protected void AddADMRequest(byte tag, String replyTo)
+        protected void AddADMRequest(ArduinoDeviceManager adm, byte tag, String replyTo)
         {
             if (tag == 0) throw new ArgumentException("AddADMRequest: Tag cannot be 0");
             //we intentionally allow for the possibility of this being overwritten by a future request
-            _admRequests[tag] = new ADMRequest(replyTo);
+            _admRequests.Add(new ADMRequest(adm, tag, replyTo));
         }
 
-        protected ADMRequest GetADMRequest(byte tag, bool remove = true)
+        protected ADMRequest GetADMRequest(ArduinoDeviceManager adm, byte tag, bool remove = true)
         {
-            if (!_admRequests.ContainsKey(tag)) throw new Exception("Cannot find ADM request for tag " + tag);
-            ADMRequest req = _admRequests[tag];
-            if(remove)_admRequests.Remove(tag);
-            return req;
+            foreach(ADMRequest req in _admRequests){
+                if(req.ADM == adm && req.Tag == tag)
+                {
+                    return req;
+                }
+            }
+
+            throw new Exception(String.Format("ADM request for board {0} and tag {1} not found", adm.BoardID, tag));
         }
         
         public override void HandleClientError(Connection cnn, Exception e)
@@ -274,7 +294,7 @@ namespace Chetch.Arduino
                     {
                         throw new Exception(String.Format("Device {0} does not have a board ID", deviceID));
                     }
-                    AddADMRequest(adm.RequestStatus(device.BoardID), response.Target);
+                    AddADMRequest(adm, adm.RequestStatus(device.BoardID), response.Target);
                     respond = false;
                     break;
 
@@ -292,7 +312,7 @@ namespace Chetch.Arduino
                             byte tag = adm.IssueCommand(deviceID, tcmd, args);
                             if (tag > 0)
                             {
-                                AddADMRequest(tag, response.Target);
+                                AddADMRequest(adm, tag, response.Target);
                                 respond = false;
                             }
                         }
@@ -314,6 +334,7 @@ namespace Chetch.Arduino
             AddCommandHelp("adm/<board>:list-boards", "List boards used by this service");
             AddCommandHelp("adm/<board>:list-devices", "List devices added to ADM");
             AddCommandHelp("adm/<board>:capability", "List pin capabilities");
+            AddCommandHelp("adm/<board>:disconnect", "Disconnect ADM .. should reconnect shortly after");
             AddCommandHelp("adm/<board>:pingloadtest", "Send a rapid <number> of pings with <delay> between each.");
             AddCommandHelp("adm/<board>:setdigitalpin", "Set the <pin number> to <true/false>");
             AddCommandHelp("adm/<board>:<device>:wait", "Pause for a short while, useful if interspersed with other, comma-seperated, commands");
@@ -366,7 +387,7 @@ namespace Chetch.Arduino
                         switch (tgtcmd[1].ToLower())
                         {
                             case "status":
-                                AddADMRequest(adm.RequestStatus(), response.Target);
+                                AddADMRequest(adm, adm.RequestStatus(), response.Target);
                                 respond = false;
                                 break;
 
@@ -385,6 +406,11 @@ namespace Chetch.Arduino
                                 var lbc = adm.ListBoardCapability();
                                 response.AddValue("PinCount: ", lbc.Count);
                                 response.AddValue("Pins", lbc);
+                                break;
+
+                            case "disconnect":
+                                adm.Disconnect();
+                                Broadcast(ADMEvent.DISCONNECTED, String.Format("{0} disconnected from port {1}", adm.BoardID, adm.Port));
                                 break;
 
                             case "setdigitalpin":
@@ -454,7 +480,7 @@ namespace Chetch.Arduino
                 //get all current ports that have boards connected
                 List<String> ports = ArduinoDeviceManager.GetBoardPorts(SupportedBoards, AllowedPorts);
 
-                //build a list of any ADMs that are no longer connected to one of these ports
+                //build a list of any ADMs that are no longer connected to one of these ports (e.g. USB has been yanked out)
                 List<String> disconnect = new List<String>();
                 foreach (KeyValuePair<String, ArduinoDeviceManager> entry in ADMS)
                 {
@@ -518,7 +544,20 @@ namespace Chetch.Arduino
                         _noPortsFoundWarning = true;
                     }
                 }
-            }
+
+                //here we check how long it has been since the last 'ping' response and force a disconnect ... next time round it should reconnect
+                foreach (ArduinoDeviceManager adm in ADMS.Values)
+                {
+                    if (adm.LastPingResponseOn == null) continue;
+                    long lastPing =(DateTime.Now.Ticks - adm.LastPingResponseOn.Ticks) / TimeSpan.TicksPerSecond;
+                    if(lastPing > 10)
+                    {
+                        Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADM: Last ping for board {0} on port {1} occured {2} seconds ago so disconnecting...", adm.BoardID, adm.Port, lastPing);
+                        adm.Disconnect();
+                    }
+                }
+
+            } //end of monitor lock
             _admtimer.Start();
         }
 
@@ -582,9 +621,9 @@ namespace Chetch.Arduino
 
             }
             
-            if(message.Tag > 0 && _admRequests.ContainsKey(message.Tag))
+            if(message.Tag > 0)
             {
-                ADMRequest req = GetADMRequest(message.Tag);
+                ADMRequest req = GetADMRequest(adm, message.Tag);
                 if (req.HasExpired())
                 {
                     Tracing?.TraceEvent(TraceEventType.Warning, 0, "ADM request for tag {0} and target {1} has expired so not returning message of type {2}", message.Tag, req.Target, message.Type);

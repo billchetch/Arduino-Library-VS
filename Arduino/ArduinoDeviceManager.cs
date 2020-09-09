@@ -47,6 +47,20 @@ namespace Chetch.Arduino
             throw new Exception("Cannot create tag as all tags are being used");
         }
 
+        public static int AvailableTags()
+        {
+            int available = 0;
+            long nowInMillis = DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
+            for (byte i = 1; i < _usedTags.Length; i++)
+            {
+                if (_usedTags[i] == 0 || nowInMillis - _usedTags[i] > TTL)
+                {
+                    available++;
+                }
+            }
+            return available;
+        }
+
         public byte Tag { get; set; } = 0; //can be used to track messages
         public byte TargetID { get; set; } = 0; //ID number on board to determine what is beig targeted
         public byte CommandID { get; set; } = 0; //Command ID on board ... basically to identify function e.g. Send or Delete ...
@@ -272,6 +286,11 @@ namespace Chetch.Arduino
             }
         }
         public ADMMessage LastErrorMessage { get; internal set;  }
+        public DateTime LastErrorOn { get; internal set; }
+        public ADMMessage LastPingResponseMessage { get; internal set; }
+        public DateTime LastPingResponseOn { get; internal set; }
+        public ADMMessage LastStatusResponseMessage { get; internal set; }
+        public DateTime LastStatusResponseOn { get; internal set; }
 
         public String Port { get; set; }
         private ArduinoSession _session;
@@ -623,6 +642,16 @@ namespace Chetch.Arduino
                                     Tracing?.TraceEvent(TraceEventType.Error, 4000, "STATUS_RESPONSE error: {0}, {1}", e.GetType(), e.Message);
                                     throw e;
                                 }
+
+                                //record this
+                                LastStatusResponseMessage = message;
+                                LastStatusResponseOn = DateTime.Now;
+                                break;
+
+                            case Messaging.MessageType.PING_RESPONSE:
+                                //record this
+                                LastPingResponseMessage = message;
+                                LastPingResponseOn = DateTime.Now;
                                 break;
 
                             case Messaging.MessageType.CONFIGURE_RESPONSE:
@@ -713,6 +742,12 @@ namespace Chetch.Arduino
                 message.Value = e.Message;
                 message.Tag = tag;
             }
+
+            if(message.Type == Messaging.MessageType.ERROR)
+            {
+                LastErrorMessage = message;
+                LastErrorOn = DateTime.Now;
+            }
             Broadcast(message);
         }
 
@@ -728,7 +763,6 @@ namespace Chetch.Arduino
                 switch (message.Type)
                 {
                     case Chetch.Messaging.MessageType.ERROR:
-                        LastErrorMessage = message;
                         _listener(message, this);
                         break;
 
