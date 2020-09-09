@@ -554,6 +554,7 @@ namespace Chetch.Arduino
                     {
                         Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADM: Last ping for board {0} on port {1} occured {2} seconds ago so disconnecting...", adm.BoardID, adm.Port, lastPing);
                         adm.Disconnect();
+                        Broadcast(ADMEvent.DISCONNECTED, String.Format("{0} disconnected from port {1}", adm.BoardID, adm.Port));
                     }
                 }
 
