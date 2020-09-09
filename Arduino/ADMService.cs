@@ -76,9 +76,9 @@ namespace Chetch.Arduino
                         vals["LastStatusResponseOn"] = adm.LastStatusResponseOn.ToString("yyyy-MM-dd HH:mm:ss");
                         vals["LastPingResponseOn"] = adm.LastPingResponseOn.ToString("yyyy-MM-dd HH:mm:ss");
                         vals["AvailableMessageTags"] = Convert.ToString(ADMMessage.AvailableTags());
+
+                        Message.AddValue(adm.BoardID, vals);
                     }
-                    
-                    Message.AddValue("ADMS", adms.Values.Select(i => String.Format("Board {0} on port {1} has state {2}, last error: {3}", i.BoardID, i.Port, i.State, i.LastErrorMessage == null ? "n/a" : i.LastErrorMessage.Value)).ToList());
                 }
                 else
                 {
@@ -550,7 +550,7 @@ namespace Chetch.Arduino
                 {
                     if (adm.LastPingResponseMessage == null) continue;
                     long lastPing = (DateTime.Now.Ticks - adm.LastPingResponseOn.Ticks) / TimeSpan.TicksPerSecond;
-                    if(lastPing > 10)
+                    if(lastPing > 15)
                     {
                         Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADM: Last ping for board {0} on port {1} occured {2} seconds ago so disconnecting...", adm.BoardID, adm.Port, lastPing);
                         adm.Disconnect();
