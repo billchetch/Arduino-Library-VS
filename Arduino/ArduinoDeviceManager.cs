@@ -743,8 +743,9 @@ namespace Chetch.Arduino
                 message.Tag = tag;
             }
 
-            if(message.Type == Messaging.MessageType.ERROR)
+            if(message != null && message.Type == Messaging.MessageType.ERROR)
             {
+                //record last error message
                 LastErrorMessage = message;
                 LastErrorOn = DateTime.Now;
             }
