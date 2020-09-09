@@ -548,7 +548,7 @@ namespace Chetch.Arduino
                 //here we check how long it has been since the last 'ping' response and force a disconnect ... next time round it should reconnect
                 foreach (ArduinoDeviceManager adm in ADMS.Values)
                 {
-                    if (adm.LastPingResponseOn == null) continue;
+                    if (adm.LastPingResponseMessage == null) continue;
                     long lastPing =(DateTime.Now.Ticks - adm.LastPingResponseOn.Ticks) / TimeSpan.TicksPerSecond;
                     if(lastPing > 10)
                     {
