@@ -72,9 +72,9 @@ namespace Chetch.Arduino
                         vals["BoardID"] = adm.BoardID;
                         vals["Port"] = adm.Port;
                         vals["LastError"] = adm.LastErrorMessage == null ? "n/a" : adm.LastErrorMessage.Value;
-                        vals["LastErrorOn"] = adm.LastErrorOn.ToString("yyyy-MM-dd HH:mm:ss");
-                        vals["LastStatusResponseOn"] = adm.LastStatusResponseOn.ToString("yyyy-MM-dd HH:mm:ss");
-                        vals["LastPingResponseOn"] = adm.LastPingResponseOn.ToString("yyyy-MM-dd HH:mm:ss");
+                        vals["LastErrorOn"] = adm.LastErrorMessage == null ? "n/a" : adm.LastErrorOn.ToString("yyyy-MM-dd HH:mm:ss");
+                        vals["LastStatusResponseOn"] = adm.LastStatusResponseMessage == null ? "n/a" : adm.LastStatusResponseOn.ToString("yyyy-MM-dd HH:mm:ss");
+                        vals["LastPingResponseOn"] = adm.LastPingResponseMessage == null ? "n/a" : adm.LastPingResponseOn.ToString("yyyy-MM-dd HH:mm:ss");
                         vals["AvailableMessageTags"] = Convert.ToString(ADMMessage.AvailableTags());
 
                         Message.AddValue(adm.BoardID, vals);
