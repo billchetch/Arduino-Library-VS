@@ -549,7 +549,7 @@ namespace Chetch.Arduino
                 foreach (ArduinoDeviceManager adm in ADMS.Values)
                 {
                     if (adm.LastPingResponseMessage == null) continue;
-                    long lastPing =(DateTime.Now.Ticks - adm.LastPingResponseOn.Ticks) / TimeSpan.TicksPerSecond;
+                    long lastPing = (DateTime.Now.Ticks - adm.LastPingResponseOn.Ticks) / TimeSpan.TicksPerSecond;
                     if(lastPing > 10)
                     {
                         Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADM: Last ping for board {0} on port {1} occured {2} seconds ago so disconnecting...", adm.BoardID, adm.Port, lastPing);
