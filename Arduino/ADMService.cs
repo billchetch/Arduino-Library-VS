@@ -99,7 +99,7 @@ namespace Chetch.Arduino
             DEVICES_CONNECTED,
         }
 
-        public struct ADMRequest
+        public class ADMRequest
         {
             public ArduinoDeviceManager ADM;
             public byte Tag;
@@ -254,14 +254,18 @@ namespace Chetch.Arduino
 
         protected ADMRequest GetADMRequest(ArduinoDeviceManager adm, byte tag, bool remove = true)
         {
-            foreach(ADMRequest req in _admRequests){
+            ADMRequest req2return = null;
+            foreach (ADMRequest req in _admRequests){
                 if(req.ADM == adm && req.Tag == tag)
                 {
-                    return req;
+                    req2return = req;
+                    break;
                 }
             }
 
-            throw new Exception(String.Format("ADM request for board {0} and tag {1} not found", adm.BoardID, tag));
+            if (req2return != null) _admRequests.Remove(req2return);
+
+            return req2return;
         }
         
         public override void HandleClientError(Connection cnn, Exception e)
@@ -625,14 +629,17 @@ namespace Chetch.Arduino
             if(message.Tag > 0)
             {
                 ADMRequest req = GetADMRequest(adm, message.Tag);
-                if (req.HasExpired())
+                if (req != null)
                 {
-                    Tracing?.TraceEvent(TraceEventType.Warning, 0, "ADM request for tag {0} and target {1} has expired so not returning message of type {2}", message.Tag, req.Target, message.Type);
-                    return;
-                }
-                else
-                {
-                    message.Target = req.Target;
+                    if (req.HasExpired())
+                    {
+                        Tracing?.TraceEvent(TraceEventType.Warning, 0, "ADM request for tag {0} and target {1} has expired so not returning message of type {2}", message.Tag, req.Target, message.Type);
+                        return;
+                    }
+                    else
+                    {
+                        message.Target = req.Target;
+                    }
                 }
             }
 
