@@ -61,6 +61,7 @@ namespace Chetch.Arduino.Devices.Buzzers
             Unsilence();
             ADMMessage message = new ADMMessage();
             message.Type = Messaging.MessageType.NOTIFICATION;
+            message.AddValue("Silenced", _silenced);
             message.Value = "Silenced timer ended";
             Broadcast(message);
         }
