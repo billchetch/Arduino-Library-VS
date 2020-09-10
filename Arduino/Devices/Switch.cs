@@ -9,7 +9,7 @@ namespace Chetch.Arduino.Devices
 {
     public class Switch : ArduinoDevice
     {
-        public bool IsON { get { return State; } }
+        public bool IsOn { get { return State; } }
         public bool IsOff { get { return !State; } }
 
         public bool State { get; protected set; } = false;
