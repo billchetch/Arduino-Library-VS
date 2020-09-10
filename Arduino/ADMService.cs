@@ -97,6 +97,7 @@ namespace Chetch.Arduino
             CONNECTED,
             DISCONNECTED,
             DEVICES_CONNECTED,
+            MESSAGE
         }
 
         public class ADMRequest
@@ -580,9 +581,14 @@ namespace Chetch.Arduino
         protected void Broadcast(ADMEvent admEvent, String msg = null)
         {
             Message message = CreateNotification(admEvent, msg);
+            Broadcast(admEvent, message);
+        }
+
+        virtual protected void Broadcast(ADMEvent admEvent, Message message)
+        {
             Broadcast(message);
         }
-        
+
         private void TryHandleADMMessage(ADMMessage message, ArduinoDeviceManager adm)
         {
             try
@@ -647,7 +653,7 @@ namespace Chetch.Arduino
             schema.PrepareForBroadcast(adm);
 
             //notify other clients listening to this client
-            Broadcast(message);
+            Broadcast(ADMEvent.MESSAGE, message);
         }
 
         virtual protected void OnADMDevicesConnected(ArduinoDeviceManager adm, ADMMessage message)
