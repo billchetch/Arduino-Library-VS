@@ -59,6 +59,10 @@ namespace Chetch.Arduino.Devices.Buzzers
         {
             //turn off timer and set buzzer pin to whatever the buzzer state really is 
             Unsilence();
+            ADMMessage message = new ADMMessage();
+            message.Type = Messaging.MessageType.NOTIFICATION;
+            message.Value = "Silenced timer ended";
+            Broadcast(message);
         }
 
         protected override void ExecuteCommand(ArduinoCommand command, ExecutionArguments xargs)
