@@ -45,12 +45,12 @@ namespace Chetch.Arduino
                 return Message.HasValue("BoardID") ? Message.GetString("BoardID") : null;
             }
 
-            public void AddDevices(List<ArduinoDevice> devices)
+            public void AddDevices(List<ArduinoDevice> devices, bool listPins = true)
             {
                 Dictionary<String, String> d = new Dictionary<String, String>();
                 foreach(var dev in devices)
                 {
-                    d[dev.ID] = dev.ToString();
+                    d[dev.ID] = dev.ToString(listPins);
                 }
                 Message.AddValue("Devices", d);
             }
@@ -336,8 +336,8 @@ namespace Chetch.Arduino
             
             //adm specific commands related to a board and device
             AddCommandHelp("adm/<board>:status",  "ADM will request board status and add additional information");
-            AddCommandHelp("adm/<board>:list-boards", "List boards used by this service");
             AddCommandHelp("adm/<board>:list-devices", "List devices added to ADM");
+            AddCommandHelp("adm/<board>:list-pins", "List used pins and the devices using them");
             AddCommandHelp("adm/<board>:capability", "List pin capabilities");
             AddCommandHelp("adm/<board>:disconnect", "Disconnect ADM .. should reconnect shortly after");
             AddCommandHelp("adm/<board>:pingloadtest", "Send a rapid <number> of pings with <delay> between each.");
@@ -439,6 +439,10 @@ namespace Chetch.Arduino
 
                             case "list-devices":
                                 schema.AddDevices(adm.GetDevices());
+                                break;
+
+                            case "list-pins":
+
                                 break;
 
                             default:
