@@ -308,9 +308,10 @@ namespace Chetch.Arduino
                     foreach (var cmd in commands)
                     {
                         var tcmd = cmd.Trim();
-                        if (tcmd.Equals("wait", StringComparison.OrdinalIgnoreCase))
+                        if (tcmd.ToLower().IndexOf("wait") == 0)
                         {
-                            System.Threading.Thread.Sleep(200);
+                            int delay = tcmd.Length > 4 ? System.Convert.ToInt16(tcmd.Substring(4, tcmd.Length - 4)) : 200;
+                            System.Threading.Thread.Sleep(delay);
                         }
                         else
                         {
