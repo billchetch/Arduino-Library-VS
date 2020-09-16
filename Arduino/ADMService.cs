@@ -90,7 +90,7 @@ namespace Chetch.Arduino
             {
                 Message.AddValue("Ports", ports);
             }
-        }
+        } //end message schema class
 
         public enum ADMEvent
         {
