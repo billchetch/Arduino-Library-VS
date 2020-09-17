@@ -21,7 +21,8 @@ namespace Chetch.Arduino.Devices.Infrared
 
             AddCommand("Unmute", new String[] { "Volume_up", "Volume_down" });
             AddCommand("Mute", new String[] { "Unmute", "Mute/Unmute" });
-            AddCommand("TestRepeat", new String[] { "Volume_Down", "Volume_Down" }, 1080);
+            AddCommand("MultiRepeat", new String[] { "_REPEAT" }, 20, 50);
+            AddCommand("TestRepeat", new String[] { "Volume_Up", "MultiRepeat"}, 40);
         }
     }
 }

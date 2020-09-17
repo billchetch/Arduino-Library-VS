@@ -46,6 +46,13 @@ namespace Chetch.Arduino.Devices.Infrared
             }
         }
 
+        public override void AddConfig(ADMMessage message)
+        {
+            base.AddConfig(message);
+
+            message.AddArgument(0); //repeat command index
+        }
+
         public void Disable()
         {
             Mgr.SetDigitalPin(_enablePin, true);

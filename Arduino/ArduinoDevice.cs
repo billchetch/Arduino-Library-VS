@@ -464,7 +464,7 @@ namespace Chetch.Arduino
                 {
                     foreach (var ccommand in command.Commands)
                     {
-                        ExecuteCommand(ccommand, xargs.Deep ? xargs : null);
+                        ExecuteCommand(ccommand, xargs != null && xargs.Deep ? xargs : null);
                         if (command.Delay > 0)
                         {
                             System.Threading.Thread.Sleep(command.Delay);
