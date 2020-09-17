@@ -48,7 +48,7 @@ namespace Chetch.Arduino
             public void AddDevices(List<ArduinoDevice> devices, bool listPins = true)
             {
                 Dictionary<String, String> d = new Dictionary<String, String>();
-                foreach(var dev in devices)
+                foreach (var dev in devices)
                 {
                     d[dev.ID] = dev.ToString(listPins);
                 }
@@ -66,7 +66,7 @@ namespace Chetch.Arduino
             {
                 if (adms != null && adms.Count > 0)
                 {
-                    foreach(ArduinoDeviceManager adm in adms.Values)
+                    foreach (ArduinoDeviceManager adm in adms.Values)
                     {
                         Dictionary<String, String> vals = new Dictionary<string, string>();
                         vals["BoardID"] = adm.BoardID;
@@ -108,7 +108,7 @@ namespace Chetch.Arduino
             public long Requested;
             private int _ttl;
 
-            public ADMRequest(ArduinoDeviceManager adm, byte tag, String target, int ttl = 60*1000)
+            public ADMRequest(ArduinoDeviceManager adm, byte tag, String target, int ttl = 60 * 1000)
             {
                 ADM = adm;
                 Tag = tag;
@@ -127,7 +127,7 @@ namespace Chetch.Arduino
         public class ADMMessageFilter : MessageFilter
         {
             public String DeviceID { get; internal set; }
-            public String ClientName {  get { return Sender;  } } //change name to better fit with subscription ideas
+            public String ClientName { get { return Sender; } } //change name to better fit with subscription ideas
             private MessageSchema _schema = new MessageSchema();
 
 
@@ -157,17 +157,20 @@ namespace Chetch.Arduino
                 }
             }
         }
-        
+
         //map of port names to arduino device managers
         protected Dictionary<String, ArduinoDeviceManager> ADMS { get; } = new Dictionary<String, ArduinoDeviceManager>();
         protected String SupportedBoards { get; set; }
         protected String AllowedPorts { get; set; }
+        protected int MaxPingResponseTime { get; set; } = 20; //in seconds
+
         protected Timer _admtimer;
         private Dictionary<String, bool> _devicesConnected = new Dictionary<string, bool>();
         private bool _noPortsFoundWarning = false; //has a no ports found warning been 'traced' ... a flag to prevent multiple trace/log entries
         private Object _lockMonitorADM = new Object(); //lock so we don't disconnect/connect concurrently
         private List<ADMRequest> _admRequests = new List<ADMRequest>();
         
+
         abstract protected void AddADMDevices(ArduinoDeviceManager adm, ADMMessage message);
         
         public ADMService(String clientName, String clientManagerSource, String serviceSource, String eventLog) : base(clientName, clientManagerSource, serviceSource, eventLog)
@@ -560,7 +563,7 @@ namespace Chetch.Arduino
                 {
                     if (adm.LastPingResponseMessage == null) continue;
                     long lastPing = (DateTime.Now.Ticks - adm.LastPingResponseOn.Ticks) / TimeSpan.TicksPerSecond;
-                    if(lastPing > 15)
+                    if(lastPing > MaxPingResponseTime)
                     {
                         Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADM: Last ping for board {0} on port {1} occured {2} seconds ago so disconnecting...", adm.BoardID, adm.Port, lastPing);
                         adm.Disconnect();
