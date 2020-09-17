@@ -19,7 +19,7 @@ namespace Chetch.Arduino.Devices.Infrared
     }
 
     public enum IRProtocol{
-        UNKNOWN = -1,
+        UNKNOWN = -1, //we use this for sending raw command data, using the command as an index for raw data arrays defined arduino side
         UNUSED = 0,
         RC5,
         RC6,

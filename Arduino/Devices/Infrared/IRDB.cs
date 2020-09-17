@@ -87,7 +87,7 @@ namespace Chetch.Arduino.Devices.Infrared
                     break;
             }
             command.AddArgument(Convert.ToUInt16(row["bits"]));
-            command.AddArgument(Convert.ToUInt16(row["protocol"]));
+            command.AddArgument(Convert.ToInt16(row["protocol"]));
             return command;
         }
 
