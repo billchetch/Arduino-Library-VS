@@ -481,7 +481,13 @@ namespace Chetch.Arduino
         {
             if (Mgr == null) throw new Exception(String.Format("Device {0} has not yet been added to a device manager", ToString()));
             if (!IsConnected) throw new Exception(String.Format("Device {0} is not 'connected' to board", ToString()));
-            Mgr.SendCommand(BoardID, command, xargs.Arguments, xargs.Tag);
+            if (xargs == null)
+            {
+                Mgr.SendCommand(BoardID, command);
+            } else
+            {
+                Mgr.SendCommand(BoardID, command, xargs.Arguments, xargs.Tag);
+            }
             LastCommandSent = command;
             LastCommandSentOn = DateTime.Now.Ticks;
         }
