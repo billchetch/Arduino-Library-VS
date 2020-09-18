@@ -29,6 +29,10 @@ namespace Chetch.Arduino.Devices.Infrared
             AddCommand("TestRepeat", new String[] { "Volume_Up", "MultiRepeat"}, 40);
             AddCommand("VURepeat", new String[] { "Volume_Up" }, 35, 50);
             AddCommand("VDRepeat", new String[] { "Volume_Down" }, 35, 50);
+            AddCommand("Bluetooth", new String[] { "Optical", "Function", "Function" }, 400);
+            AddCommand("DVD", new String[] { "Bluetooth", "Function", "Function" }, 400);
+            AddCommand("USB", new String[] { "DVD", "Function" }, 400);
+            AddCommand("AUX", new String[] { "USB", "Function" }, 400);
         }
 
         public override void AddConfig(ADMMessage message)
