@@ -10,7 +10,7 @@ namespace Chetch.Arduino.Devices.Infrared
     {
         public const String DEVICE_NAME = "LG Home Theater";
         public const int REPEAT_COMMAND_INDEX = 0;
-        public const int REPEAT_INTERVAL = 70;
+        public const int REPEAT_INTERVAL = 120;
         
         public IRLGHomeTheater(String id, int enablePin, int transmitPin, IRDB db) : base(id, "LGHT", enablePin, transmitPin, db)
         {
