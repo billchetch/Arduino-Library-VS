@@ -97,11 +97,6 @@ namespace Chetch.Arduino.Devices.Infrared
 
         override protected void SendCommand(ArduinoCommand command, ExecutionArguments xargs)
         {
-            /*if(command.Type == ArduinoCommand.CommandType.SEND && Protocol != IRProtocol.UNKNOWN && command.Arguments.Count == 3)
-            {
-                command.Arguments[2] = (int)Protocol;
-            }
-
             var timeDiff = (DateTime.Now.Ticks - LastCommandSentOn) / TimeSpan.TicksPerMillisecond;
             if (UseRepeatCommand && _repeatCommand != null && LastCommandSent != null && LastCommandSent.Equals(command) && timeDiff < RepeatInterval)
             {
@@ -109,9 +104,9 @@ namespace Chetch.Arduino.Devices.Infrared
                 LastCommandSent = command;
             }
             else
-            {*/
+            {
                 base.SendCommand(command, xargs);
-            //}
+            }
         }
 
         public override void HandleMessage(ADMMessage message)

@@ -25,6 +25,8 @@ namespace Chetch.Arduino.Devices.Infrared
             AddCommand("Mute", new String[] { "Unmute", "Mute/Unmute" });
             AddCommand("MultiRepeat", new String[] { REPEAT_COMMAND }, 30, 50);
             AddCommand("TestRepeat", new String[] { "Volume_Up", "MultiRepeat"}, 40);
+            AddCommand("VURepeat", new String[] { "Volume_Up" }, 35, 50);
+            AddCommand("VDRepeat", new String[] { "Volume_Down" }, 35, 50);
         }
 
         public override void AddConfig(ADMMessage message)

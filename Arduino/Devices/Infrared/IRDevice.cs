@@ -68,8 +68,7 @@ namespace Chetch.Arduino.Devices.Infrared
         }
         public String DeviceType { get; set; } = null;
         public String Manufacturer { get; set; } = null;
-        public IRProtocol Protocol { get; set; } = IRProtocol.UNKNOWN; //TODO: set this to force sending/recording in a different protocol
-
+        
         public IRDevice(String id, String name, IRDB db = null) : base(id, name)
         {
             DB = db;
