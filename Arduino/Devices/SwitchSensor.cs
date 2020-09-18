@@ -34,7 +34,7 @@ namespace Chetch.Arduino.Devices
             TryAddCommand("disable");
         }
 
-        public SwitchSensor(int pin, int noiseThreshold = 0) : this(pin, noiseThreshold, "switch" + pin, "SwitchSensor"){ }
+        public SwitchSensor(int pin, int noiseThreshold = 0) : this(pin, noiseThreshold, "switch" + pin, "SWSensor"){ }
 
         protected override void OnConnect(ADMMessage message)
         {
