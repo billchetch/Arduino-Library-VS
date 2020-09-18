@@ -488,90 +488,97 @@ namespace Chetch.Arduino
         {
             _admtimer.Stop();
 
-            lock(_lockMonitorADM)
+            try
             {
-                //get all current ports that have boards connected
-                List<String> ports = ArduinoDeviceManager.GetBoardPorts(SupportedBoards, AllowedPorts);
-
-                //build a list of any ADMs that are no longer connected to one of these ports (e.g. USB has been yanked out)
-                List<String> disconnect = new List<String>();
-                foreach (KeyValuePair<String, ArduinoDeviceManager> entry in ADMS)
+                lock (_lockMonitorADM)
                 {
-                    if (!ports.Contains(entry.Key))
+                    //get all current ports that have boards connected
+                    List<String> ports = ArduinoDeviceManager.GetBoardPorts(SupportedBoards, AllowedPorts);
+
+                    //build a list of any ADMs that are no longer connected to one of these ports (e.g. USB has been yanked out)
+                    List<String> disconnect = new List<String>();
+                    foreach (KeyValuePair<String, ArduinoDeviceManager> entry in ADMS)
                     {
-                        disconnect.Add(entry.Key);
-                    }
-                    else
-                    {
-                        try
-                        {
-                            //Tracing?.TraceEvent(TraceEventType.Information, 0, "ADM: Asserting connection");
-                            entry.Value.AssertConnection();
-                        }
-                        catch (Exception e)
+                        if (!ports.Contains(entry.Key))
                         {
                             disconnect.Add(entry.Key);
                         }
-                    }
-                }
-
-
-                //now formally disconnect boards that have not been found on any port
-                foreach (String key in disconnect)
-                {
-                    ArduinoDeviceManager adm = ADMS[key];
-                    ADMS.Remove(key);
-                    _devicesConnected.Remove(key);
-
-                    Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADM: Board {0} on port {1} disconnected", adm.BoardID, key);
-                    Broadcast(ADMEvent.DISCONNECTED, String.Format("{0} disconnected from port {1}", adm.BoardID, key));
-                }
-
-                //now we try and connect all the boards that we have not just disconnected but have not yet been connected
-                if (ports.Count > 0)
-                {
-                    _noPortsFoundWarning = false;
-                    foreach (String key in ports)
-                    {
-                        if (disconnect.Contains(key) || ADMS.ContainsKey(key)) continue;
-
-                        try
+                        else
                         {
-                            Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Attempting to connect board on port {0}", key);
-                            ADMS[key] = ArduinoDeviceManager.Connect(key, TryHandleADMMessage);
-                            _devicesConnected[key] = false;
-                            Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Connected board on port {0}", key);
-                            Broadcast(ADMEvent.CONNECTED, String.Format("Connected ADM to port {0}", key));
-                        }
-                        catch (Exception e)
-                        {
-                            Tracing?.TraceEvent(TraceEventType.Error, 100, "ADM: Failed to connect, exception {0}: {1}", e.GetType().ToString(), e.Message);
+                            try
+                            {
+                                //Tracing?.TraceEvent(TraceEventType.Information, 0, "ADM: Asserting connection");
+                                entry.Value.AssertConnection();
+                            }
+                            catch (Exception e)
+                            {
+                                disconnect.Add(entry.Key);
+                            }
                         }
                     }
-                }
-                else
-                {
-                    if (!_noPortsFoundWarning)
-                    {
-                        Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADM: No boards connected to any port");
-                        _noPortsFoundWarning = true;
-                    }
-                }
 
-                //here we check how long it has been since the last 'ping' response and force a disconnect ... next time round it should reconnect
-                foreach (ArduinoDeviceManager adm in ADMS.Values)
-                {
-                    if (adm.LastPingResponseMessage == null) continue;
-                    long lastPing = (DateTime.Now.Ticks - adm.LastPingResponseOn.Ticks) / TimeSpan.TicksPerSecond;
-                    if(lastPing > MaxPingResponseTime)
-                    {
-                        Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADM: Last ping for board {0} on port {1} occured {2} seconds ago so disconnecting...", adm.BoardID, adm.Port, lastPing);
-                        adm.Disconnect();
-                        Broadcast(ADMEvent.DISCONNECTED, String.Format("{0} disconnected from port {1}", adm.BoardID, adm.Port));
-                    }
-                }
 
-            } //end of monitor lock
+                    //now formally disconnect boards that have not been found on any port
+                    foreach (String key in disconnect)
+                    {
+                        ArduinoDeviceManager adm = ADMS[key];
+                        ADMS.Remove(key);
+                        _devicesConnected.Remove(key);
+
+                        Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADM: Board {0} on port {1} disconnected", adm.BoardID, key);
+                        Broadcast(ADMEvent.DISCONNECTED, String.Format("{0} disconnected from port {1}", adm.BoardID, key));
+                    }
+
+                    //now we try and connect all the boards that we have not just disconnected but have not yet been connected
+                    if (ports.Count > 0)
+                    {
+                        _noPortsFoundWarning = false;
+                        foreach (String key in ports)
+                        {
+                            if (disconnect.Contains(key) || ADMS.ContainsKey(key)) continue;
+
+                            try
+                            {
+                                Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Attempting to connect board on port {0}", key);
+                                ADMS[key] = ArduinoDeviceManager.Connect(key, TryHandleADMMessage);
+                                _devicesConnected[key] = false;
+                                Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Connected board on port {0}", key);
+                                Broadcast(ADMEvent.CONNECTED, String.Format("Connected ADM to port {0}", key));
+                            }
+                            catch (Exception e)
+                            {
+                                Tracing?.TraceEvent(TraceEventType.Error, 100, "ADM: Failed to connect, exception {0}: {1}", e.GetType().ToString(), e.Message);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        if (!_noPortsFoundWarning)
+                        {
+                            Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADM: No boards connected to any port");
+                            _noPortsFoundWarning = true;
+                        }
+                    }
+
+                    //here we check how long it has been since the last 'ping' response and force a disconnect ... next time round it should reconnect
+                    foreach (ArduinoDeviceManager adm in ADMS.Values)
+                    {
+                        if (adm.LastPingResponseMessage == null) continue;
+                        long lastPing = (DateTime.Now.Ticks - adm.LastPingResponseOn.Ticks) / TimeSpan.TicksPerSecond;
+                        if (lastPing > MaxPingResponseTime)
+                        {
+                            Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADM: Last ping for board {0} on port {1} occured {2} seconds ago so disconnecting...", adm.BoardID, adm.Port, lastPing);
+                            adm.Disconnect();
+                            Broadcast(ADMEvent.DISCONNECTED, String.Format("{0} disconnected from port {1}", adm.BoardID, adm.Port));
+                        }
+                    }
+
+                } //end of monitor lock
+            } catch (Exception e)
+            {
+                Tracing?.TraceEvent(TraceEventType.Error, 100, "Unknown exception in MonitorADM: {0}, {1}", e.GetType().ToString(), e.Message);
+            }
+
             _admtimer.Start();
         }
 
