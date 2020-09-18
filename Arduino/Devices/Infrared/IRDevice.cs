@@ -75,6 +75,15 @@ namespace Chetch.Arduino.Devices.Infrared
             DB = db;
         }
         
+        protected ArduinoCommand AddRawCommand(String commandAlias, int commandIndex)
+        {
+            ArduinoCommand command = AddCommand(commandAlias, ArduinoCommand.CommandType.SEND);
+            command.AddArgument(commandIndex); //the index board-side to fetch the actual raw command data
+            command.AddArgument(0); //this is normally the 'bits' field so it isn't used
+            command.AddArgument((int)IRProtocol.UNKNOWN); //this is how the board-side identifies it as 
+            return command;
+        }
+
         virtual public void ReadDevice()
         {
             if (DB == null) throw new Exception("No database available");

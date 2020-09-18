@@ -45,14 +45,7 @@ namespace Chetch.Arduino.Devices.Infrared
                 _repeatCommand = GetCommand(REPEAT_COMMAND);
             }
         }
-
-        public override void AddConfig(ADMMessage message)
-        {
-            base.AddConfig(message);
-
-            message.AddArgument(0); //repeat command index
-        }
-
+        
         public void Disable()
         {
             Mgr.SetDigitalPin(_enablePin, true);
@@ -104,7 +97,7 @@ namespace Chetch.Arduino.Devices.Infrared
 
         override protected void SendCommand(ArduinoCommand command, ExecutionArguments xargs)
         {
-            if(command.Type == ArduinoCommand.CommandType.SEND && Protocol != IRProtocol.UNKNOWN && command.Arguments.Count == 3)
+            /*if(command.Type == ArduinoCommand.CommandType.SEND && Protocol != IRProtocol.UNKNOWN && command.Arguments.Count == 3)
             {
                 command.Arguments[2] = (int)Protocol;
             }
@@ -116,9 +109,9 @@ namespace Chetch.Arduino.Devices.Infrared
                 LastCommandSent = command;
             }
             else
-            {
+            {*/
                 base.SendCommand(command, xargs);
-            }
+            //}
         }
 
         public override void HandleMessage(ADMMessage message)
