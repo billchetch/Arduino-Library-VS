@@ -40,6 +40,11 @@ namespace Chetch.Arduino.Devices.Infrared
         LEGO_PF
     }
 
+    public enum RawCommand
+    {
+        REPEAT
+    }
+
     public class IRDevice : ArduinoDevice
     {
         public const String REPEAT_COMMAND = "_REPEAT";
@@ -74,10 +79,10 @@ namespace Chetch.Arduino.Devices.Infrared
             DB = db;
         }
         
-        protected ArduinoCommand AddRawCommand(String commandAlias, int commandIndex)
+        protected ArduinoCommand AddRawCommand(String commandAlias, RawCommand rcmd)
         {
             ArduinoCommand command = AddCommand(commandAlias, ArduinoCommand.CommandType.SEND);
-            command.AddArgument(commandIndex); //the index board-side to fetch the actual raw command data
+            command.AddArgument((int)rcmd); //which raw command do we want to send
             command.AddArgument(0); //this is normally the 'bits' field so it isn't used
             command.AddArgument((int)IRProtocol.UNKNOWN); //this is how the board-side identifies it as 
             return command;
