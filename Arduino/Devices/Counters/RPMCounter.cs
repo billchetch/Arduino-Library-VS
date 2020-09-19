@@ -9,12 +9,14 @@ namespace Chetch.Arduino.Devices.Counters
 {
     public class RPMCounter : Counter
     {
+        public int SampleInterval { get; set; } = 1000; //in ms
+        public int SampleSize { get; set; } = 5;
 
         public double AverageRPM
         {
             get
             {
-                return AverageCount * 60;
+                return AverageCount * 60000/SampleInterval;
             }
         }
 
@@ -28,8 +30,12 @@ namespace Chetch.Arduino.Devices.Counters
         public override void AddConfig(ADMMessage message)
         {
             base.AddConfig(message);
+            if(SampleInterval <= 0 || SampleSize <= 0)
+            {
+                throw new ArgumentException("Incorrect sample argument values");
+            }
 
-            ConfigureSampler(1000, 5);
+            ConfigureSampler(SampleInterval, SampleSize);
         }
     }
 }
