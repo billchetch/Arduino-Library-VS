@@ -13,6 +13,12 @@ namespace Chetch.Arduino.Devices.Temperature
         {
             Sampler _sampler;
             public double Temperature { get; set; }
+            public double AverageTemperature {
+                get
+                {
+                    return _sampler.GetAverage(this);
+                }
+            }
 
             public DS18B20Sensor()
             {
@@ -101,6 +107,20 @@ namespace Chetch.Arduino.Devices.Temperature
             ExecuteCommand(COMMAND_READ_TEMP);
 
             base.RequestSample(sampler);
+        }
+
+        public double GetTemperature(int idx = 0)
+        {
+            if (Sensors.Count <= idx) throw new ArgumentException(String.Format("Index {0} is not valid", idx));
+
+            return Sensors[idx].Temperature;
+        }
+
+        public double GetAverageTemperature(int idx = 0)
+        {
+            if (Sensors.Count <= idx) throw new ArgumentException(String.Format("Index {0} is not valid", idx));
+
+            return Sensors[idx].AverageTemperature;
         }
     } //end class
 }
