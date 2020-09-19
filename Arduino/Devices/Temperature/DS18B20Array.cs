@@ -40,6 +40,8 @@ namespace Chetch.Arduino.Devices.Temperature
             _oneWirePin = oneWirePin;
 
             MeasurementUnit = Measurement.Unit.CELSIUS;
+            SampleInterval = 1000;
+            SampleSize = 3;
 
             //at time of writing (16/08/2020) the firmata support for OneWire was unclear...
             //so the solution is to have OneWire + DallastTemperatures libs installed on the board
