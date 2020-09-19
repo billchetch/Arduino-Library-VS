@@ -192,6 +192,9 @@ namespace Chetch.Arduino
 
         public ArduinoDeviceManager Mgr { get; set; }
         protected Sampler Sampler { get; set; }
+        public int SampleInterval { get; set; } = 0; //in ms
+        public int SampleSize { get; set; } = 0;
+        public Sampler.SamplingOptions SamplingOptions { get; set; } = Sampler.SamplingOptions.MEAN;
         public Measurement.Unit MeasurementUnit { get; set; } = Measurement.Unit.NONE;
 
         public double SampledAverage { get { return Sampler == null ? 0 : Sampler.GetAverage(this) ;  } }
@@ -529,6 +532,11 @@ namespace Chetch.Arduino
             message.TargetID = BoardID;
             message.AddArgument((byte)Category);
             message.AddArgument(Name);
+
+            if(SampleInterval > 0 && SampleSize > 0)
+            {
+                Mgr.Sampler.Add(this, SampleInterval, SampleSize, SamplingOptions);
+            }
             
 #if DEBUG
             System.Diagnostics.Debug.Print(String.Format("Adding config for device {0} ... ", ID));
@@ -538,12 +546,6 @@ namespace Chetch.Arduino
         virtual public void RequestSample(Sampler sampler)
         {
             Sampler = sampler;
-        }
-
-        public void ConfigureSampler(int interval, int sampleSize, Sampler.SamplingOptions samplingOptions = Sampler.SamplingOptions.MEAN)
-        {
-            if (Mgr == null) throw new Exception("Cannot configure sampling for device before adding to ADM");
-            Mgr.Sampler.Add(this, interval, sampleSize, samplingOptions);
         }
     }
 }
