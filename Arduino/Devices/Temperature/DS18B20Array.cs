@@ -10,7 +10,9 @@ namespace Chetch.Arduino.Devices.Temperature
     {
         public const String COMMAND_READ_TEMP = "read-temp";
 
+        public int SensorCount { get; internal set; } = 0;
         private int _oneWirePin;
+        public List<double> Readings = new List<double>();
         
         public DS18B20Array(int oneWirePin, String id) : base(id, "DS18B20")
         {
@@ -36,6 +38,28 @@ namespace Chetch.Arduino.Devices.Temperature
 
             //this should be argument with index 3 (argument values are retrieved by numerical index on the arduino)
             message.AddArgument(_oneWirePin);
+        }
+
+        public override void HandleMessage(ADMMessage message)
+        {
+            if (message.HasValue("SensorCount"))
+            {
+                SensorCount = message.GetInt("SensorCount");
+            }
+
+            if (message.Type == Messaging.MessageType.DATA)
+            {
+                for (int i = 0; i < SensorCount; i++)
+                {
+                    String key = "Temperature-" + i;
+                    if (message.HasValue(key))
+                    {
+                        Readings[i] = message.GetDouble(key);
+                    }
+                }
+            }
+
+            base.HandleMessage(message);
         }
     }
 }
