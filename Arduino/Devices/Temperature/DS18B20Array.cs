@@ -3,20 +3,43 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Chetch.Utilities;
 
 namespace Chetch.Arduino.Devices.Temperature
 {
     public class DS18B20Array : TemperatureSensorBase
     {
+        protected class DS18B20Sensor : ISampleSubject
+        {
+            Sampler _sampler;
+            public double Temperature { get; set; }
+
+            public DS18B20Sensor()
+            {
+            }
+
+            public void RequestSample(Sampler sampler)
+            {
+                _sampler = sampler;
+            }
+
+            public void SetTemperature(double temp)
+            {
+                Temperature = temp;
+                _sampler.ProvideSample(this, temp);
+            }
+        }
+
         public const String COMMAND_READ_TEMP = "read-temp";
 
-        public int SensorCount { get; internal set; } = 0;
         private int _oneWirePin;
-        public List<double> Readings = new List<double>();
+        protected List<DS18B20Sensor> Sensors = new List<DS18B20Sensor>();
         
         public DS18B20Array(int oneWirePin, String id) : base(id, "DS18B20")
         {
             _oneWirePin = oneWirePin;
+
+            MeasurementUnit = Measurement.Unit.CELSIUS;
 
             //at time of writing (16/08/2020) the firmata support for OneWire was unclear...
             //so the solution is to have OneWire + DallastTemperatures libs installed on the board
@@ -42,24 +65,40 @@ namespace Chetch.Arduino.Devices.Temperature
 
         public override void HandleMessage(ADMMessage message)
         {
-            if (message.HasValue("SensorCount"))
+            if (message.HasValue("SensorCount") && Sensors.Count == 0)
             {
-                SensorCount = message.GetInt("SensorCount");
+                int sc = message.GetInt("SensorCount");
+                for (int i = 0; i < sc; i++)
+                {
+                    DS18B20Sensor sensor = new DS18B20Sensor();
+                    Sensors.Add(sensor);
+                    if (SampleInterval > 0 && SampleSize > 0)
+                    {
+                        Sampler.Add(sensor, SampleInterval, SampleSize, SamplingOptions);
+                    }
+                }
             }
 
             if (message.Type == Messaging.MessageType.DATA)
             {
-                for (int i = 0; i < SensorCount; i++)
+                for (int i = 0; i < Sensors.Count; i++)
                 {
                     String key = "Temperature-" + i;
                     if (message.HasValue(key))
                     {
-                        Readings[i] = message.GetDouble(key);
+                        Sensors[i].SetTemperature(message.GetDouble(key));
                     }
                 }
             }
 
             base.HandleMessage(message);
         }
-    }
+
+        public override void RequestSample(Sampler sampler)
+        {
+            ExecuteCommand(COMMAND_READ_TEMP);
+
+            base.RequestSample(sampler);
+        }
+    } //end class
 }
