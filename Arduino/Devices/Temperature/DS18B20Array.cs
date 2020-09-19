@@ -82,7 +82,7 @@ namespace Chetch.Arduino.Devices.Temperature
                     Sensors.Add(sensor);
                     if (SampleInterval > 0 && SampleSize > 0)
                     {
-                        Sampler.Add(sensor, SampleInterval, SampleSize, SamplingOptions);
+                        Mgr.Sampler.Add(sensor, SampleInterval, SampleSize, SamplingOptions);
                     }
                 }
             }
