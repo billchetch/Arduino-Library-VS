@@ -9,11 +9,12 @@ namespace Chetch.Arduino.Devices.Counters
 {
     public class RPMCounter : Counter
     {
+        public double Calibration { get; set; } = 1;
         public double AverageRPM
         {
             get
             {
-                return AverageCount * 60000/SampleInterval;
+                return Calibration * AverageCount * 60000/SampleInterval;
             }
         }
 
