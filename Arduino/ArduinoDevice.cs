@@ -532,15 +532,18 @@ namespace Chetch.Arduino
             message.TargetID = BoardID;
             message.AddArgument((byte)Category);
             message.AddArgument(Name);
-
-            if(SampleInterval > 0 && SampleSize > 0)
-            {
-                Mgr.Sampler.Add(this, SampleInterval, SampleSize, SamplingOptions);
-            }
             
 #if DEBUG
             System.Diagnostics.Debug.Print(String.Format("Adding config for device {0} ... ", ID));
 #endif
+
+            if (SampleInterval > 0 && SampleSize > 0)
+            {
+                Mgr.Sampler.Add(this, SampleInterval, SampleSize, SamplingOptions);
+#if DEBUG
+                System.Diagnostics.Debug.Print(String.Format("Adding to sampler with interval {0} and sample size {1}", SampleInterval, SampleSize));
+#endif
+            }
         }
 
         virtual public void RequestSample(Sampler sampler)
