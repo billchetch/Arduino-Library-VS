@@ -26,7 +26,7 @@ namespace Chetch.Arduino.Devices.Temperature
             public void SetTemperature(double temp)
             {
                 Temperature = temp;
-                _sampler.ProvideSample(this, temp);
+                _sampler?.ProvideSample(this, temp);
             }
         }
 
@@ -65,7 +65,7 @@ namespace Chetch.Arduino.Devices.Temperature
 
         public override void HandleMessage(ADMMessage message)
         {
-            if (message.HasValue("SensorCount") && Sensors.Count == 0)
+            if (message.Type == Messaging.MessageType.CONFIGURE_RESPONSE && message.HasValue("SensorCount") && Sensors.Count == 0)
             {
                 int sc = message.GetInt("SensorCount");
                 for (int i = 0; i < sc; i++)
