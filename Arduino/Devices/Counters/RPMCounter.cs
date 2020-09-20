@@ -20,7 +20,7 @@ namespace Chetch.Arduino.Devices.Counters
             }
         }
 
-        public RPMCounter(int pin, String id, String name) : base(pin, 0, id, name)
+        public RPMCounter(int pin, String id, String name) : base(pin, id, name)
         {
             SampleInterval = 1000; //in ms
             SampleSize = 5;
