@@ -18,7 +18,7 @@ namespace Chetch.Arduino.Devices.Counters
         public double AverageCount {
             get
             {
-                return SampledAverage;
+                return Mgr.Sampler.GetAverage(this);
             }
         }
 

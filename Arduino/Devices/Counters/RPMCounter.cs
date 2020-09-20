@@ -14,7 +14,9 @@ namespace Chetch.Arduino.Devices.Counters
         {
             get
             {
-                return Calibration * AverageCount * 60000/SampleInterval;
+                long durationTotal = Mgr.Sampler.GetDurationTotal(this);
+                double averageRPM = Mgr.Sampler.GetSampleTotal(this) * 60000 / (double)durationTotal;
+                return Calibration * averageRPM;
             }
         }
 

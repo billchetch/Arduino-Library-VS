@@ -197,7 +197,6 @@ namespace Chetch.Arduino
         public Sampler.SamplingOptions SamplingOptions { get; set; } = Sampler.SamplingOptions.MEAN_COUNT;
         public Measurement.Unit MeasurementUnit { get; set; } = Measurement.Unit.NONE;
 
-        public double SampledAverage { get { return Sampler == null ? 0 : Sampler.GetAverage(this) ;  } }
         public ArduinoDevice()
         { 
             //Empty constructor
