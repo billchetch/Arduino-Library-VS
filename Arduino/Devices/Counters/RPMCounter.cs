@@ -22,6 +22,7 @@ namespace Chetch.Arduino.Devices.Counters
         {
             SampleInterval = 1000; //in ms
             SampleSize = 5;
+            SamplingOptions = Sampler.SamplingOptions.MEAN_INTERVAL;
         }
 
         public RPMCounter(int pin) : this(pin, "rpm" + pin, "RPM"){}

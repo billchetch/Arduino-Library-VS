@@ -194,7 +194,7 @@ namespace Chetch.Arduino
         protected Sampler Sampler { get; set; }
         public int SampleInterval { get; set; } = 0; //in ms
         public int SampleSize { get; set; } = 0;
-        public Sampler.SamplingOptions SamplingOptions { get; set; } = Sampler.SamplingOptions.MEAN;
+        public Sampler.SamplingOptions SamplingOptions { get; set; } = Sampler.SamplingOptions.MEAN_COUNT;
         public Measurement.Unit MeasurementUnit { get; set; } = Measurement.Unit.NONE;
 
         public double SampledAverage { get { return Sampler == null ? 0 : Sampler.GetAverage(this) ;  } }
