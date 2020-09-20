@@ -9,7 +9,7 @@ namespace Chetch.Arduino.Devices.Temperature
 {
     public class DS18B20Array : TemperatureSensorBase
     {
-        protected class DS18B20Sensor : ISampleSubject
+        public class DS18B20Sensor : ISampleSubject
         {
             Sampler _sampler;
             public double Temperature { get; set; }
@@ -48,6 +48,7 @@ namespace Chetch.Arduino.Devices.Temperature
             MeasurementUnit = Measurement.Unit.CELSIUS;
             SampleInterval = 1000;
             SampleSize = 3;
+            SamplingOptions = Sampler.SamplingOptions.MEAN_COUNT;
 
             //at time of writing (16/08/2020) the firmata support for OneWire was unclear...
             //so the solution is to have OneWire + DallastTemperatures libs installed on the board
