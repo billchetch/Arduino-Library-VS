@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.Timers;
 using Chetch.Services;
 using Chetch.Messaging;
+using Chetch.Utilities;
 
 namespace Chetch.Arduino
 {
@@ -75,7 +76,7 @@ namespace Chetch.Arduino
                         vals["LastErrorOn"] = adm.LastErrorMessage == null ? "n/a" : adm.LastErrorOn.ToString("yyyy-MM-dd HH:mm:ss");
                         vals["LastStatusResponseOn"] = adm.LastStatusResponseMessage == null ? "n/a" : adm.LastStatusResponseOn.ToString("yyyy-MM-dd HH:mm:ss");
                         vals["LastPingResponseOn"] = adm.LastPingResponseMessage == null ? "n/a" : adm.LastPingResponseOn.ToString("yyyy-MM-dd HH:mm:ss");
-                        vals["AvailableMessageTags"] = Convert.ToString(ADMMessage.AvailableTags());
+                        vals["AvailableMessageTags"] = System.Convert.ToString(ADMMessage.AvailableTags());
 
                         Message.AddValue(adm.BoardID, vals);
                     }
@@ -177,6 +178,20 @@ namespace Chetch.Arduino
         public ADMService(String clientName, String clientManagerSource, String serviceSource, String eventLog) : base(clientName, clientManagerSource, serviceSource, eventLog)
         {
             //empty
+        }
+
+        protected void AddAllowedPorts(String allowedPorts)
+        {
+            if (allowedPorts == null || allowedPorts == String.Empty) return;
+            List<String> p2a = SerialPorts.ExpandComPortRanges(allowedPorts);
+            AllowedPorts.AddRange(p2a);
+        }
+
+        protected void AddDeniedPorts(String deniedPorts)
+        {
+            if (deniedPorts == null || deniedPorts == String.Empty) return;
+            List<String> p2a = SerialPorts.ExpandComPortRanges(deniedPorts);
+            DeniedPorts.AddRange(p2a);
         }
 
         protected ArduinoDeviceManager GetADM(String boardID)
