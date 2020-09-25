@@ -573,8 +573,7 @@ namespace Chetch.Arduino
                             }
                             catch (System.IO.IOException e)
                             {
-                                Tracing?.TraceEvent(TraceEventType.Error, 100, "ADM: Connect causes IO exception {0}: {1} ... adding port {2} to DeniedPorts", e.GetType().ToString(), e.Message, key);
-                                if(!DeniedPorts.Contains(key))DeniedPorts.Add(key);
+                                Tracing?.TraceEvent(TraceEventType.Error, 100, "ADM: Connect causes IO exception {0}: {1} on port {2}", e.GetType().ToString(), e.Message, key);
                             }
                             catch (Exception e)
                             {
@@ -661,8 +660,7 @@ namespace Chetch.Arduino
                 case MessageType.STATUS_RESPONSE:
                     if(RequiredBoards != null && adm.BoardID != null && !RequiredBoards.Split(',').Contains(adm.BoardID))
                     {
-                        Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADM {0} is not a required board ({1}) so adding port {2} to DeniedPorts and disconnecting...", adm.BoardID == null ? "n/a" : adm.BoardID, RequiredBoards, adm.Port);
-                        DeniedPorts.Add(adm.Port);
+                        Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADM {0} is not one of the required boards ({1}).  Disconnecting from port {2}...", adm.BoardID, RequiredBoards, adm.Port);
                         adm.Disconnect();
                         break;
                     }
