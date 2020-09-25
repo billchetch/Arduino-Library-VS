@@ -272,11 +272,6 @@ namespace Chetch.Arduino
             return req2return;
         }
         
-        public override void HandleClientError(Connection cnn, Exception e)
-        {
-            //throw new NotImplementedException();
-        }
-
         virtual protected bool HandleADMDeviceCommand(ArduinoDeviceManager adm, String deviceID, String command, List<Object> args, Message response)
         {
             if (adm == null) throw new Exception("No ADM provided");
@@ -476,8 +471,6 @@ namespace Chetch.Arduino
 
             return respond;
         }
-
-        //ADM related
 
         /// <summary>
         /// Called by a timer
