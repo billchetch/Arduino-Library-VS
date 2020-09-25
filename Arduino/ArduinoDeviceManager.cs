@@ -334,6 +334,11 @@ namespace Chetch.Arduino
         {
             State = ADMState.NOT_CONNECTED;
             Sampler.Stop();
+            foreach(ArduinoDevice dev in _devices.Values)
+            {
+                dev.Disconnect();
+            }
+
             _session?.Dispose();
         }
 

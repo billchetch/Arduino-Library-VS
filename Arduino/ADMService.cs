@@ -596,7 +596,7 @@ namespace Chetch.Arduino
                             }
                         }
                     }
-                    else
+                    else if(ADMS.Count < RequiredBoardsCount)
                     {
                         if (!_noPortsFoundWarning)
                         {

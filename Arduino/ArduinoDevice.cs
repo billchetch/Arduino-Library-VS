@@ -549,5 +549,10 @@ namespace Chetch.Arduino
         {
             Sampler = sampler;
         }
+
+        virtual public void Disconnect()
+        {
+            IsConnected = false;
+        }
     }
 }
