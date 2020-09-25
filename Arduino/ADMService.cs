@@ -168,6 +168,14 @@ namespace Chetch.Arduino
         protected Dictionary<String, ArduinoDeviceManager> ADMS { get; } = new Dictionary<String, ArduinoDeviceManager>();
         protected String SupportedBoards { get; set; }
         protected String RequiredBoards { get; set; }
+        protected int RequiredBoardsCount { //if RequiredBoards is not set then we assume only one board is required
+            get
+            {
+                if (RequiredBoards == null || RequiredBoards == String.Empty) return 1;
+                String[] ar = RequiredBoards.Split(',');
+                return ar.Length;
+            }
+        }
         
         protected List<String> AllowedPorts { get; } = new List<String>();
         protected List<String> DeniedPorts { get; } = new List<String>();
@@ -199,6 +207,13 @@ namespace Chetch.Arduino
             if (deniedPorts == null || deniedPorts == String.Empty) return;
             List<String> p2a = SerialPorts.ExpandComPortRanges(deniedPorts);
             DeniedPorts.AddRange(p2a);
+        }
+
+        protected bool IsRequiredBoard(String boardID)
+        {
+            if (RequiredBoards == null || RequiredBoards == String.Empty) return true;
+            String[] ar = RequiredBoards.Split(',');
+            return ar.Contains(boardID);
         }
 
         protected ArduinoDeviceManager GetADM(String boardID)
@@ -556,7 +571,7 @@ namespace Chetch.Arduino
                     }
 
                     //now we try and connect all the boards that we have not just disconnected but have not yet been connected
-                    if (ports.Count > 0)
+                    if (ports.Count > 0 && ADMS.Count < RequiredBoardsCount)
                     {
                         _noPortsFoundWarning = false;
                         foreach (String key in ports)
@@ -658,7 +673,7 @@ namespace Chetch.Arduino
                     break;
 
                 case MessageType.STATUS_RESPONSE:
-                    if(RequiredBoards != null && adm.BoardID != null && !RequiredBoards.Split(',').Contains(adm.BoardID))
+                    if(!IsRequiredBoard(adm.BoardID))
                     {
                         Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADM {0} is not one of the required boards ({1}).  Disconnecting from port {2}...", adm.BoardID, RequiredBoards, adm.Port);
                         adm.Disconnect();
