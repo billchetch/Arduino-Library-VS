@@ -91,6 +91,11 @@ namespace Chetch.Arduino
             {
                 Message.AddValue("Ports", ports);
             }
+
+            public void AddRequiredBoards(String requiredBoards)
+            {
+                Message.AddValue("RequiredBoards", (requiredBoards == null || requiredBoards == String.Empty) ? "[any]" : requiredBoards);
+            }
         } //end message schema class
 
         public enum ADMEvent
@@ -162,6 +167,9 @@ namespace Chetch.Arduino
         //map of port names to arduino device managers
         protected Dictionary<String, ArduinoDeviceManager> ADMS { get; } = new Dictionary<String, ArduinoDeviceManager>();
         protected String SupportedBoards { get; set; }
+        protected String RequiredBoards { get; set; }
+        private List<String> _requiredBoards = null;
+
         protected List<String> AllowedPorts { get; } = new List<String>();
         protected List<String> DeniedPorts { get; } = new List<String>();
         protected int MaxPingResponseTime { get; set; } = 20; //in seconds
@@ -375,7 +383,8 @@ namespace Chetch.Arduino
             {
                 case "status":
                     schema.AddADMS(ADMS);
-                    schema.AddPorts(ArduinoDeviceManager.GetBoardPorts(SupportedBoards, AllowedPorts));
+                    schema.AddPorts(ArduinoDeviceManager.GetBoardPorts(SupportedBoards, AllowedPorts, DeniedPorts));
+                    schema.AddRequiredBoards(RequiredBoards);
                     break;
 
                 default:
@@ -646,6 +655,14 @@ namespace Chetch.Arduino
                     break;
 
                 case MessageType.STATUS_RESPONSE:
+                    if(RequiredBoards != null && adm.BoardID != null && !RequiredBoards.Split(',').Contains(adm.BoardID))
+                    {
+                        Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADM {0} is not a required board ({1}) so adding port {2} to DeniedPorts and disconnecting...", adm.BoardID == null ? "n/a" : adm.BoardID, RequiredBoards, adm.Port);
+                        DeniedPorts.Add(adm.Port);
+                        adm.Disconnect();
+                        break;
+                    }
+
                     if (adm.State == ADMState.DEVICE_READY)
                     {
                         Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: Ready to add devices to {0} ...", adm.BoardID);
