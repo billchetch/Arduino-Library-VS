@@ -515,8 +515,7 @@ namespace Chetch.Arduino
                             }
                         }
                     }
-
-
+                    
                     //now formally disconnect boards that have not been found on any port
                     foreach (String key in disconnect)
                     {
