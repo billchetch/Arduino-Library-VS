@@ -169,43 +169,54 @@ namespace Chetch.Arduino
 
         public const string DEFAULT_BOARD_SET = ARDUINO_MEGA_2560 + "," + ARDUINO_UNO;
 
-        
-        static public List<String> GetBoardPorts(String supportedBoards, String allowedPorts = null)
+        static private List<String> expandPortRanges(String portRanges)
+        {
+            String[] parts = portRanges.Split(',');
+            List<String> expandedPorts = new List<String>();
+            foreach (String portRange in parts)
+            {
+                String[] rangeParts = portRange.Split('-');
+                if (rangeParts.Length == 2)
+                {
+                    int start = System.Convert.ToInt16(rangeParts[0].Replace("COM", ""));
+                    int end = System.Convert.ToInt16(rangeParts[1].Replace("COM", ""));
+                    for (int i = start; i <= end; i++)
+                    {
+                        expandedPorts.Add("COM" + i);
+                    }
+                }
+                else
+                {
+                    expandedPorts.Add("COM" + rangeParts[0].Replace("COM", ""));
+                }
+            }
+            return expandedPorts;
+        }
+
+        static public List<String> GetBoardPorts(String supportedBoards, String allowedPorts = null, String deniedPorts = null)
         {
             if (supportedBoards == null || supportedBoards == String.Empty)
             {
                 throw new Exception("ArduinoDeviceManager:Connect no supportedBoards provided");
             }
 
-            List<String> boardPorts = SerialPorts.Find(supportedBoards.Trim());
 
-            if (allowedPorts == null || allowedPorts == String.Empty || allowedPorts == "*")
+            //all ports that match supported boards
+            List<String> boardPorts = SerialPorts.Find(supportedBoards.Trim());
+            bool allowAllPorts = (allowedPorts == null || allowedPorts == String.Empty || allowedPorts == "*");
+            bool denySomePorts = (deniedPorts != null && deniedPorts != String.Empty);
+            if (allowAllPorts && !denySomePorts)
             {
                 return boardPorts;
-            } else
+            } else 
             {
-                String[] parts = allowedPorts.Split(',');
-                List<String> expandedAllowedPorts = new List<String>();
-                foreach (String portRange in parts)
-                {
-                    String[] rangeParts = portRange.Split('-');
-                    if (rangeParts.Length == 2)
-                    {
-                        int start = System.Convert.ToInt16(rangeParts[0].Replace("COM", ""));
-                        int end = System.Convert.ToInt16(rangeParts[1].Replace("COM", ""));
-                        for(int i = start; i <= end; i++)
-                        {
-                            expandedAllowedPorts.Add("COM" + i);
-                        }
-                    } else
-                    {
-                        expandedAllowedPorts.Add("COM" + rangeParts[0].Replace("COM", ""));
-                    }
-                }
+                List<String> expandedAllowedPorts = allowAllPorts ? null : expandPortRanges(allowedPorts);
+                List<String> expandedDeniedPorts = denySomePorts ? expandPortRanges(deniedPorts) : null; 
                 List<String> ports2return = new List<String>();
                 foreach(var p in boardPorts)
                 {
-                    if (expandedAllowedPorts.Contains(p)) ports2return.Add(p);
+                    if (expandedDeniedPorts != null && expandedDeniedPorts.Contains(p)) continue;
+                    if (expandedAllowedPorts != null && expandedAllowedPorts.Contains(p)) ports2return.Add(p);
                 }
                 return ports2return;
             }
