@@ -161,7 +161,8 @@ namespace Chetch.Arduino
         //map of port names to arduino device managers
         protected Dictionary<String, ArduinoDeviceManager> ADMS { get; } = new Dictionary<String, ArduinoDeviceManager>();
         protected String SupportedBoards { get; set; }
-        protected String AllowedPorts { get; set; }
+        protected List<String> AllowedPorts { get; } = new List<String>();
+        protected List<String> DeniedPorts { get; } = new List<String>();
         protected int MaxPingResponseTime { get; set; } = 20; //in seconds
 
         protected Timer _admtimer;
@@ -213,7 +214,7 @@ namespace Chetch.Arduino
                 base.OnStart(args);
 
                 //fire up the ADM service
-                Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Starting ADM service with supported boards {0} and allowed ports {1}", SupportedBoards, AllowedPorts == null || AllowedPorts == String.Empty ? " all " : AllowedPorts);
+                Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Starting ADM service with supported boards {0} and allowed ports {1}", SupportedBoards, AllowedPorts == null || AllowedPorts.Count == 0 ? " all " : String.Join(",", AllowedPorts));
 
                 //create timer
                 _admtimer = new System.Timers.Timer();
@@ -491,7 +492,7 @@ namespace Chetch.Arduino
                 lock (_lockMonitorADM)
                 {
                     //get all current ports that have boards connected
-                    List<String> ports = ArduinoDeviceManager.GetBoardPorts(SupportedBoards, AllowedPorts);
+                    List<String> ports = ArduinoDeviceManager.GetBoardPorts(SupportedBoards, AllowedPorts, DeniedPorts);
 
                     //build a list of any ADMs that are no longer connected to one of these ports (e.g. USB has been yanked out)
                     List<String> disconnect = new List<String>();
@@ -542,6 +543,11 @@ namespace Chetch.Arduino
                                 _devicesConnected[key] = false;
                                 Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Connected board on port {0}", key);
                                 Broadcast(ADMEvent.CONNECTED, String.Format("Connected ADM to port {0}", key));
+                            }
+                            catch (System.IO.IOException e)
+                            {
+                                Tracing?.TraceEvent(TraceEventType.Error, 100, "ADM: Connect causes IO exception {0}: {1} ... adding port {2} to DeniedPorts", e.GetType().ToString(), e.Message, key);
+                                if(!DeniedPorts.Contains(key))DeniedPorts.Add(key);
                             }
                             catch (Exception e)
                             {
