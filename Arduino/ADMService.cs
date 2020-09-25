@@ -568,7 +568,7 @@ namespace Chetch.Arduino
                                 Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Attempting to connect board on port {0}", key);
                                 ADMS[key] = ArduinoDeviceManager.Connect(key, TryHandleADMMessage);
                                 _devicesConnected[key] = false;
-                                Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Connected board on port {0}", key);
+                                Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Connected to board on port {0}", key);
                                 Broadcast(ADMEvent.CONNECTED, String.Format("Connected ADM to port {0}", key));
                             }
                             catch (System.IO.IOException e)
