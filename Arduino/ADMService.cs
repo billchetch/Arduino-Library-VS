@@ -249,6 +249,11 @@ namespace Chetch.Arduino
             base.OnStop();
         }
 
+        public override void HandleClientError(Connection cnn, Exception e)
+        {
+            //throw new NotImplementedException();
+        }
+
         protected void AddADMRequest(ArduinoDeviceManager adm, byte tag, String replyTo)
         {
             if (tag == 0) throw new ArgumentException("AddADMRequest: Tag cannot be 0");
