@@ -168,8 +168,7 @@ namespace Chetch.Arduino
         protected Dictionary<String, ArduinoDeviceManager> ADMS { get; } = new Dictionary<String, ArduinoDeviceManager>();
         protected String SupportedBoards { get; set; }
         protected String RequiredBoards { get; set; }
-        private List<String> _requiredBoards = null;
-
+        
         protected List<String> AllowedPorts { get; } = new List<String>();
         protected List<String> DeniedPorts { get; } = new List<String>();
         protected int MaxPingResponseTime { get; set; } = 20; //in seconds
@@ -237,7 +236,12 @@ namespace Chetch.Arduino
                 base.OnStart(args);
 
                 //fire up the ADM service
-                Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Starting ADM service with supported boards {0} and allowed ports {1}", SupportedBoards, AllowedPorts == null || AllowedPorts.Count == 0 ? " all " : String.Join(",", AllowedPorts));
+                Tracing?.TraceEvent(TraceEventType.Information, 100, 
+                    "ADM: Starting ADM service. Supported boards {0}, required boards {1}, allowed ports {2}, denied ports {3}", 
+                    SupportedBoards, 
+                    RequiredBoards == null ? "any" : RequiredBoards, 
+                    AllowedPorts == null || AllowedPorts.Count == 0 ? "all" : String.Join(",", AllowedPorts),
+                    DeniedPorts == null || DeniedPorts.Count == 0 ? "none" : String.Join(",", DeniedPorts));
 
                 //create timer
                 _admtimer = new System.Timers.Timer();
