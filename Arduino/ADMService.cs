@@ -663,16 +663,16 @@ namespace Chetch.Arduino
 
                     if (adm.State == ADMState.DEVICE_READY)
                     {
-                        Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: Ready to add devices to {0} ...", adm.BoardID);
+                        Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: Ready to add devices to {0} on port {1} ...", adm.BoardID, adm.Port);
                         AddADMDevices(adm, message);
-                        Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: {0} devices added to {1}. Configuring devices... ", adm.DeviceCount, adm.BoardID);
+                        Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: {0} devices added to {1} on port {2}. Configuring devices... ", adm.DeviceCount, adm.BoardID, adm.Port);
                     }
                     break;
 
                 case MessageType.CONFIGURE_RESPONSE:
                     if (adm.State == ADMState.DEVICE_CONNECTED && !_devicesConnected[adm.Port])
                     {
-                        Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: All {0} devices now configured and connected to board {1}", adm.DeviceCount, adm.BoardID);
+                        Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: All {0} devices now configured and connected to board {1} on port {2}", adm.DeviceCount, adm.BoardID, adm.Port);
                         OnADMDevicesConnected(adm, message);
                         _devicesConnected[adm.Port] = true;
                     }
