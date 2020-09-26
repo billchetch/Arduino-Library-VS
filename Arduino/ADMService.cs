@@ -15,6 +15,9 @@ namespace Chetch.Arduino
     {
         public class MessageSchema : Chetch.Messaging.MessageSchema
         {
+            public const String BOARD_ID = "BoardID";
+            public const String DEVICE_ID = "DeviceID";
+
             public MessageSchema() { }
 
             public MessageSchema(Message message) : base(message) { }
@@ -33,17 +36,17 @@ namespace Chetch.Arduino
                 {
                     dev = adm.GetDevice(message.Sender);
                 }
-                message.AddValue("DeviceID", dev != null ? dev.ID : "");
+                message.AddValue(DEVICE_ID, dev != null ? dev.ID : "");
             }
 
             public String GetDeviceID()
             {
-                return Message.HasValue("DeviceID") ? Message.GetString("DeviceID") : null;
+                return Message.HasValue(DEVICE_ID) ? Message.GetString(DEVICE_ID) : null;
             }
 
             public String GetBoardID()
             {
-                return Message.HasValue("BoardID") ? Message.GetString("BoardID") : null;
+                return Message.HasValue(BOARD_ID) ? Message.GetString(BOARD_ID) : null;
             }
 
             public void AddDevices(List<ArduinoDevice> devices, bool listPins = true)
@@ -130,38 +133,13 @@ namespace Chetch.Arduino
             }
         }
 
-        public class ADMMessageFilter : MessageFilter
+        public class ArduinoDeviceMessageFilter : MessageFilter
         {
-            public String DeviceID { get; internal set; }
             public String ClientName { get { return Sender; } } //change name to better fit with subscription ideas
-            private MessageSchema _schema = new MessageSchema();
-
-
-            public ADMMessageFilter(String deviceID, String clientName, MessageType messageType, Action<MessageFilter, Message> onMatched) : base(clientName, messageType, onMatched)
-            {
-                DeviceID = deviceID;
-            }
-
-            public ADMMessageFilter(String deviceID, String clientName, Action<MessageFilter, Message> onMatched) : base(clientName, onMatched)
-            {
-                DeviceID = deviceID;
-            }
-
-            public ADMMessageFilter(String deviceID, String clientName) : this(deviceID, clientName, null) { }
-
-            protected override bool Matches(Message message)
-            {
-                bool matched = base.Matches(message);
-
-                if (matched && DeviceID != null)
-                {
-                    _schema.Message = message;
-                    return DeviceID.Equals(_schema.GetDeviceID());
-                } else
-                {
-                    return matched;
-                }
-            }
+            
+            public ArduinoDeviceMessageFilter(String deviceID, String clientName, MessageType messageType) : base(clientName, messageType, MessageSchema.DEVICE_ID, deviceID)
+            {}
+            
         }
 
         //map of port names to arduino device managers
