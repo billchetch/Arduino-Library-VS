@@ -136,9 +136,12 @@ namespace Chetch.Arduino
         public class ArduinoDeviceMessageFilter : MessageFilter
         {
             public String ClientName { get { return Sender; } } //change name to better fit with subscription ideas
-            
+            public String DeviceID { get; internal set; }
+
             public ArduinoDeviceMessageFilter(String deviceID, String clientName, MessageType messageType) : base(clientName, messageType, MessageSchema.DEVICE_ID, deviceID)
-            {}
+            {
+                DeviceID = deviceID;
+            }
             
         }
 
