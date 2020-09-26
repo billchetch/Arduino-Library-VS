@@ -836,7 +836,14 @@ namespace Chetch.Arduino
             //System.Diagnostics.Debug.Print("Sending: " + s);
             lock (LockSendString)
             {
-                _session.SendStringData(s);
+                try
+                {
+                    _session.SendStringData(s);
+                } catch (Exception e)
+                {
+                    String msg = String.Format("Error sending string {0: {1} ", e.GetType(), e.Message);
+                    Tracing?.TraceEvent(TraceEventType.Error, 0, msg);
+                }
             }
         }
 
@@ -844,9 +851,17 @@ namespace Chetch.Arduino
         {
             lock(LockSetDigitalPin)
             {
-                _session.SetDigitalPin(pinNumber, value);
+                try
+                {
+                    _session.SetDigitalPin(pinNumber, value);
+                    _sleep(sleep);
+                }
+                catch (Exception e)
+                {
+                    String msg = String.Format("Error setting digital pin {0} to value {1}, {2}: {3} ", pinNumber, value, e.GetType(), e.Message);
+                    Tracing?.TraceEvent(TraceEventType.Error, 0, msg);
+                }
             }
-            _sleep(sleep);
         }
 
 
@@ -854,15 +869,30 @@ namespace Chetch.Arduino
         {
             lock (LockSetDigitalPinMode)
             {
-                _session.SetDigitalPinMode(pinNumber, pinMode);
+                try
+                {
+                    _session.SetDigitalPinMode(pinNumber, pinMode);
+                    _sleep(sleep);
+                } catch (Exception e)
+                {
+                    String msg = String.Format("Error setting digital pin {0} to mode {1}, {2}: {3} ", pinNumber, pinMode, e.GetType(), e.Message);
+                    Tracing?.TraceEvent(TraceEventType.Error, 0, msg);
+                }
             }
-            _sleep(sleep);
         }
 
         public void SetDigitalReportMode(int portNumber, Boolean enable, int sleep = 0)
         {
-            _session.SetDigitalReportMode(portNumber, enable);
-            _sleep(sleep);
+            try
+            {
+                _session.SetDigitalReportMode(portNumber, enable);
+                _sleep(sleep);
+            }
+            catch (Exception e)
+            {
+                String msg = String.Format("Error setting digital port {0} to report {1}, {2}: {3} ", portNumber, enable, e.GetType(), e.Message);
+                Tracing?.TraceEvent(TraceEventType.Error, 0, msg);
+            }
         }
 
         public byte IssueCommand(String deviceID, String command, List<Object> args = null)
