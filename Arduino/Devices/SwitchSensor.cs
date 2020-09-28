@@ -22,8 +22,8 @@ namespace Chetch.Arduino.Devices
         public bool IsOn { get { return State; } }
         public bool IsOff { get { return !State;  } }
 
-        public DateTime LastOn { get; internal set; }
-        public DateTime LastOff { get; internal set; }
+        public DateTime LastOn { get; set; }
+        public DateTime LastOff { get; set; }
 
         public Messaging.MessageType BroadcastStateChangeAs { get; set; } = Messaging.MessageType.DATA; //message type to broadcast
 
