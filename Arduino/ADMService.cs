@@ -17,6 +17,7 @@ namespace Chetch.Arduino
         {
             public const String BOARD_ID = "BoardID";
             public const String DEVICE_ID = "DeviceID";
+            public const String DEVICE_NAME = "DeviceName";
 
             public MessageSchema() { }
 
@@ -37,6 +38,7 @@ namespace Chetch.Arduino
                     dev = adm.GetDevice(message.Sender);
                 }
                 message.AddValue(DEVICE_ID, dev != null ? dev.ID : "");
+                message.AddValue(DEVICE_NAME, dev != null ? dev.Name : "");
             }
 
             public String GetDeviceID()
