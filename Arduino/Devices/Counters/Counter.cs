@@ -64,6 +64,7 @@ namespace Chetch.Arduino.Devices.Counters
                 Count = message.GetLong("Count");
                 Interval = message.GetLong("Interval");
                 Mgr.Sampler.ProvideSample(this, (double)Count, Interval);
+                message.CanBroadcast = false; //this was raised by the sampler so we keep it internal ... if a listener wants periodic data they can get it from the sampler delegate
             }
         }
     } //end class
