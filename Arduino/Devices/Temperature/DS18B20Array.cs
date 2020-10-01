@@ -41,8 +41,8 @@ namespace Chetch.Arduino.Devices.Temperature
         public const String COMMAND_READ_TEMP = "read-temp";
 
         private int _oneWirePin;
-        protected List<DS18B20Sensor> Sensors = new List<DS18B20Sensor>();
-        public List<String> SensorIDs = new List<String>();
+        public List<DS18B20Sensor> Sensors { get; } = new List<DS18B20Sensor>();
+        public List<String> SensorIDs { get; } = new List<String>();
         
         public DS18B20Array(int oneWirePin, String id) : base(id, "DS18B20")
         {
