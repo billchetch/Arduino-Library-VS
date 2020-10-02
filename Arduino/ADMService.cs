@@ -24,7 +24,7 @@ namespace Chetch.Arduino
             {
                 Message msg = new Message(MessageType.ALERT);
                 msg.AddValue(DEVICE_ID, deviceID);
-                msg.AddValue("AlarmState", alarmOn);
+                msg.AddValue("AlarmOn", alarmOn);
                 msg.AddValue("AlarmMessage", alarmMessage);
                 msg.AddValue("Testing", testing);
                 return msg;
@@ -60,6 +60,21 @@ namespace Chetch.Arduino
             public String GetBoardID()
             {
                 return Message.HasValue(BOARD_ID) ? Message.GetString(BOARD_ID) : null;
+            }
+
+            public String GetDeviceName()
+            {
+                return Message.HasValue(DEVICE_NAME) ? Message.GetString(DEVICE_NAME) : null;
+            }
+
+            public String GetAlarmMessage()
+            {
+                return Message.HasValue("AlarmMessage") ? Message.GetString("AlarmMessage") : null;
+            }
+
+            public bool IsAlarmOn()
+            {
+                return Message.HasValue("AlarmOn") ? Message.GetBool("AlarmOn") : false;
             }
 
             public void AddDevices(List<ArduinoDevice> devices, bool listPins = true)
@@ -112,6 +127,8 @@ namespace Chetch.Arduino
             {
                 Message.AddValue("RequiredBoards", (requiredBoards == null || requiredBoards == String.Empty) ? "[any]" : requiredBoards);
             }
+
+            
         } //end message schema class
 
         public enum ADMEvent
