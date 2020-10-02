@@ -19,6 +19,17 @@ namespace Chetch.Arduino
             public const String DEVICE_ID = "DeviceID";
             public const String DEVICE_NAME = "DeviceName";
 
+            //this is for other service to alert this service
+            static public Message RaiseAlarm(String deviceID, bool alarmOn, String alarmMessage, bool testing = false)
+            {
+                Message msg = new Message(MessageType.ALERT);
+                msg.AddValue(DEVICE_ID, deviceID);
+                msg.AddValue("AlarmState", alarmOn);
+                msg.AddValue("AlarmMessage", alarmMessage);
+                msg.AddValue("Testing", testing);
+                return msg;
+            }
+
             public MessageSchema() { }
 
             public MessageSchema(Message message) : base(message) { }
