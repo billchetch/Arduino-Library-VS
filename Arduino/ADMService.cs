@@ -13,15 +13,15 @@ namespace Chetch.Arduino
 {
     abstract public class ADMService : TCPMessagingClient
     {
-        public class ADMMessageSchema : MessageSchema
+        public class MessageSchema : Chetch.Messaging.MessageSchema
         {
             public const String BOARD_ID = "BoardID";
             public const String DEVICE_ID = "DeviceID";
             public const String DEVICE_NAME = "DeviceName";
             
-            public ADMMessageSchema() { }
+            public MessageSchema() { }
 
-            public ADMMessageSchema(Message message) : base(message) { }
+            public MessageSchema(Message message) : base(message) { }
 
             public void PrepareForBroadcast(ArduinoDeviceManager adm)
             {
@@ -147,7 +147,7 @@ namespace Chetch.Arduino
             public String ClientName { get { return Sender; } } //change name to better fit with subscription ideas
             public String DeviceID { get; internal set; }
 
-            public ArduinoDeviceMessageFilter(String deviceID, String clientName, MessageType messageType) : base(clientName, messageType, ADMMessageSchema.DEVICE_ID, deviceID)
+            public ArduinoDeviceMessageFilter(String deviceID, String clientName, MessageType messageType) : base(clientName, messageType, MessageSchema.DEVICE_ID, deviceID)
             {
                 DeviceID = deviceID;
             }
@@ -321,7 +321,7 @@ namespace Chetch.Arduino
 
             bool respond = true;
             ArduinoDevice device = null;
-            ADMMessageSchema schema = new ADMMessageSchema(response);
+            MessageSchema schema = new ADMService.MessageSchema(response);
             switch (command)
             {
                 case "list-commands":
@@ -386,7 +386,7 @@ namespace Chetch.Arduino
         override public bool HandleCommand(Connection cnn, Message message, String cmd, List<Object> args, Message response)
         {
             bool respond = true;
-            ADMMessageSchema schema = new ADMMessageSchema(response);
+            MessageSchema schema = new ADMService.MessageSchema(response);
 
             switch (cmd)
             {
@@ -708,7 +708,7 @@ namespace Chetch.Arduino
                 }
             }
 
-            var schema = new ADMMessageSchema(message);
+            var schema = new ADMService.MessageSchema(message);
             schema.PrepareForBroadcast(adm);
 
             //notify other clients listening to this client
