@@ -13,26 +13,15 @@ namespace Chetch.Arduino
 {
     abstract public class ADMService : TCPMessagingClient
     {
-        public class MessageSchema : Chetch.Messaging.MessageSchema
+        public class ADMMessageSchema : MessageSchema
         {
             public const String BOARD_ID = "BoardID";
             public const String DEVICE_ID = "DeviceID";
             public const String DEVICE_NAME = "DeviceName";
+            
+            public ADMMessageSchema() { }
 
-            //this is for other service to alert this service
-            static public Message RaiseAlarm(String deviceID, bool alarmOn, String alarmMessage, bool testing = false)
-            {
-                Message msg = new Message(MessageType.ALERT);
-                msg.AddValue(DEVICE_ID, deviceID);
-                msg.AddValue("AlarmOn", alarmOn);
-                msg.AddValue("AlarmMessage", alarmMessage);
-                msg.AddValue("Testing", testing);
-                return msg;
-            }
-
-            public MessageSchema() { }
-
-            public MessageSchema(Message message) : base(message) { }
+            public ADMMessageSchema(Message message) : base(message) { }
 
             public void PrepareForBroadcast(ArduinoDeviceManager adm)
             {
@@ -65,16 +54,6 @@ namespace Chetch.Arduino
             public String GetDeviceName()
             {
                 return Message.HasValue(DEVICE_NAME) ? Message.GetString(DEVICE_NAME) : null;
-            }
-
-            public String GetAlarmMessage()
-            {
-                return Message.HasValue("AlarmMessage") ? Message.GetString("AlarmMessage") : null;
-            }
-
-            public bool IsAlarmOn()
-            {
-                return Message.HasValue("AlarmOn") ? Message.GetBool("AlarmOn") : false;
             }
 
             public void AddDevices(List<ArduinoDevice> devices, bool listPins = true)
@@ -168,7 +147,7 @@ namespace Chetch.Arduino
             public String ClientName { get { return Sender; } } //change name to better fit with subscription ideas
             public String DeviceID { get; internal set; }
 
-            public ArduinoDeviceMessageFilter(String deviceID, String clientName, MessageType messageType) : base(clientName, messageType, MessageSchema.DEVICE_ID, deviceID)
+            public ArduinoDeviceMessageFilter(String deviceID, String clientName, MessageType messageType) : base(clientName, messageType, ADMMessageSchema.DEVICE_ID, deviceID)
             {
                 DeviceID = deviceID;
             }
@@ -342,7 +321,7 @@ namespace Chetch.Arduino
 
             bool respond = true;
             ArduinoDevice device = null;
-            MessageSchema schema = new MessageSchema(response);
+            ADMMessageSchema schema = new ADMMessageSchema(response);
             switch (command)
             {
                 case "list-commands":
@@ -407,7 +386,7 @@ namespace Chetch.Arduino
         override public bool HandleCommand(Connection cnn, Message message, String cmd, List<Object> args, Message response)
         {
             bool respond = true;
-            MessageSchema schema = new MessageSchema(response);
+            ADMMessageSchema schema = new ADMMessageSchema(response);
 
             switch (cmd)
             {
@@ -729,7 +708,7 @@ namespace Chetch.Arduino
                 }
             }
 
-            var schema = new MessageSchema(message);
+            var schema = new ADMMessageSchema(message);
             schema.PrepareForBroadcast(adm);
 
             //notify other clients listening to this client
