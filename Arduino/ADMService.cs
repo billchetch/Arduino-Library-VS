@@ -86,6 +86,7 @@ namespace Chetch.Arduino
                         vals["LastErrorOn"] = adm.LastErrorMessage == null ? "n/a" : adm.LastErrorOn.ToString("yyyy-MM-dd HH:mm:ss");
                         vals["LastStatusResponseOn"] = adm.LastStatusResponseMessage == null ? "n/a" : adm.LastStatusResponseOn.ToString("yyyy-MM-dd HH:mm:ss");
                         vals["LastPingResponseOn"] = adm.LastPingResponseMessage == null ? "n/a" : adm.LastPingResponseOn.ToString("yyyy-MM-dd HH:mm:ss");
+                        vals["LastDisconnectedOn"] = adm.LastDisconnectedOn == default(DateTime) ? "n/a" : adm.LastDisconnectedOn.ToString("yyyy-MM-dd HH:mm:ss");
                         vals["AvailableMessageTags"] = System.Convert.ToString(ADMMessage.AvailableTags());
 
                         Message.AddValue(adm.BoardID, vals);
@@ -544,6 +545,7 @@ namespace Chetch.Arduino
                             }
                             catch (Exception e)
                             {
+                                Tracing?.TraceEvent(TraceEventType.Error, 1000, "Assert connection failed: {0} -> {1}", e.GetType(), e.Message);
                                 disconnect.Add(entry.Key);
                             }
                         }

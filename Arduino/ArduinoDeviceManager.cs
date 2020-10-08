@@ -275,6 +275,7 @@ namespace Chetch.Arduino
         public DateTime LastPingResponseOn { get; internal set; }
         public ADMMessage LastStatusResponseMessage { get; internal set; }
         public DateTime LastStatusResponseOn { get; internal set; }
+        public DateTime LastDisconnectedOn { get; internal set; }
 
         public String Port { get; set; }
         private ArduinoSession _session;
@@ -338,7 +339,7 @@ namespace Chetch.Arduino
             {
                 dev.Disconnect();
             }
-
+            LastDisconnectedOn = DateTime.Now;
             _session?.Dispose();
         }
 
@@ -841,7 +842,7 @@ namespace Chetch.Arduino
                     _session.SendStringData(s);
                 } catch (Exception e)
                 {
-                    String msg = String.Format("Error sending string {0: {1} ", e.GetType(), e.Message);
+                    String msg = String.Format("Error sending string {0}: {1} ", e.GetType(), e.Message);
                     Tracing?.TraceEvent(TraceEventType.Error, 0, msg);
                 }
             }
