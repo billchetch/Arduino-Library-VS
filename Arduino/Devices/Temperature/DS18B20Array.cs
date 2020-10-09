@@ -42,7 +42,6 @@ namespace Chetch.Arduino.Devices.Temperature
 
         private int _oneWirePin;
         public List<DS18B20Sensor> Sensors { get; } = new List<DS18B20Sensor>();
-        public List<String> SensorIDs { get; } = new List<String>();
         
         public DS18B20Array(int oneWirePin, String id) : base(id, "DS18B20")
         {
@@ -62,6 +61,15 @@ namespace Chetch.Arduino.Devices.Temperature
         }
 
         public DS18B20Array(int oneWirePin) : this(oneWirePin, "ds18" + oneWirePin){}
+
+        public void AddSensor(String sensorID)
+        {
+            if(GetSensor(sensorID) == null)
+            {
+                DS18B20Sensor sensor = new DS18B20Sensor(sensorID);
+                Sensors.Add(sensor);
+            }
+        }
 
         public DS18B20Array.DS18B20Sensor GetSensor(String sensorID)
         {
@@ -85,11 +93,9 @@ namespace Chetch.Arduino.Devices.Temperature
             if (message.Type == Messaging.MessageType.CONFIGURE_RESPONSE && message.HasValue("SensorCount") && Sensors.Count == 0)
             {
                 int sc = message.GetInt("SensorCount");
-                for (int i = 0; i < sc; i++)
+                for (int i = 0; i < System.Math.Min(sc, Sensors.Count); i++)
                 {
-
-                    DS18B20Sensor sensor = new DS18B20Sensor(i < SensorIDs.Count ? SensorIDs[i] : "temp-" + i);
-                    Sensors.Add(sensor);
+                    DS18B20Array.DS18B20Sensor sensor = Sensors[i];
                     if (SampleInterval > 0 && SampleSize > 0)
                     {
                         Mgr.Sampler.Add(sensor, SampleInterval, SampleSize, SamplingOptions);
