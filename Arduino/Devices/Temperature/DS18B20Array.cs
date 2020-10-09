@@ -14,10 +14,11 @@ namespace Chetch.Arduino.Devices.Temperature
             public Sampler Sampler { get; internal set; }
             public String ID { get; set; }
             public double Temperature { get; set; }
+            public bool IsConnected { get; set; } = false;
             public double AverageTemperature {
                 get
                 {
-                    return Sampler.GetAverage(this);
+                    return !IsConnected ? 0 : Sampler.GetAverage(this);
                 }
             }
 
@@ -88,21 +89,25 @@ namespace Chetch.Arduino.Devices.Temperature
             message.AddArgument(_oneWirePin);
         }
 
-        public override void HandleMessage(ADMMessage message)
+        protected override void OnConnect(ADMMessage message)
         {
-            if (message.Type == Messaging.MessageType.CONFIGURE_RESPONSE && message.HasValue("SensorCount") && Sensors.Count == 0)
+            if (message.HasValue("SensorCount"))
             {
                 int sc = message.GetInt("SensorCount");
                 for (int i = 0; i < System.Math.Min(sc, Sensors.Count); i++)
                 {
                     DS18B20Array.DS18B20Sensor sensor = Sensors[i];
-                    if (SampleInterval > 0 && SampleSize > 0)
+                    if (SampleInterval > 0 && SampleSize > 0 && !sensor.IsConnected)
                     {
                         Mgr.Sampler.Add(sensor, SampleInterval, SampleSize, SamplingOptions);
+                        sensor.IsConnected = true;
                     }
                 }
             }
+        }
 
+        public override void HandleMessage(ADMMessage message)
+        {
             if (message.Type == Messaging.MessageType.DATA)
             {
                 for (int i = 0; i < Sensors.Count; i++)
