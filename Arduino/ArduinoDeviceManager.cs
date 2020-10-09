@@ -293,6 +293,8 @@ namespace Chetch.Arduino
         private Dictionary<int, DigitalPortState> _portStates;
         private Action<ADMMessage, ArduinoDeviceManager> _listener;
 
+        public List<ArduinoDeviceGroup> DeviceGroups { get; internal set; } = new List<ArduinoDeviceGroup>();
+
         //interval based sampler for providing averages over device values.
         public Sampler Sampler { get; internal set; } = new Sampler();
 
@@ -513,6 +515,7 @@ namespace Chetch.Arduino
             {
                 AddDevice(dev);
             }
+            if(!DeviceGroups.Contains(dg))DeviceGroups.Add(dg);
         }
 
         public void UpdateDevice(ArduinoDevice device)
