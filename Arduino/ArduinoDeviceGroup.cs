@@ -22,6 +22,8 @@ namespace Chetch.Arduino
 
         public void AddDevice(ArduinoDevice dev)
         {
+            if (dev == null) return;
+
             if (!Devices.Contains(dev))
             {
                 Devices.Add(dev);
