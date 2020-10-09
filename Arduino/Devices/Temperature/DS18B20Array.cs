@@ -63,7 +63,15 @@ namespace Chetch.Arduino.Devices.Temperature
 
         public DS18B20Array(int oneWirePin) : this(oneWirePin, "ds18" + oneWirePin){}
 
-        
+        public DS18B20Array.DS18B20Sensor GetSensor(String sensorID)
+        {
+            foreach(var sensor in Sensors)
+            {
+                if (sensor.ID.Equals(sensorID)) return sensor;
+            }
+            return null;
+        }
+
         public override void AddConfig(ADMMessage message)
         {
             base.AddConfig(message);
