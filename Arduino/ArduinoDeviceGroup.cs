@@ -12,7 +12,7 @@ namespace Chetch.Arduino
         public String ID { get; internal set; }
         public String Name { get; internal set; }
 
-        public List<ArduinoDevice> Devices { get; internal set; }
+        public List<ArduinoDevice> Devices { get; internal set; } = new List<ArduinoDevice>();
 
         public ArduinoDeviceGroup(String id, String name)
         {
