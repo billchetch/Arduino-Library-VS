@@ -394,7 +394,7 @@ namespace Chetch.Arduino
 
         public int GetPortForPin(int pinNumber)
         {
-            return (int)Math.Floor((double)pinNumber / 8.0);
+            return (int)System.Math.Floor((double)pinNumber / 8.0);
         }
 
         public int GetPinForPort(int portNumber, int pinIndex)
@@ -502,6 +502,17 @@ namespace Chetch.Arduino
             SendMessage(message, 250); //leave some time for this process to complete to avoid bombarding the board
             
             return device;
+        }
+
+        public void AddDeviceGroup(ArduinoDeviceGroup dg)
+        {
+            if (dg == null) throw new Exception("No device group to add");
+
+            dg.ADM = this;
+            foreach(var dev in dg.Devices)
+            {
+                AddDevice(dev);
+            }
         }
 
         public void UpdateDevice(ArduinoDevice device)
@@ -698,7 +709,7 @@ namespace Chetch.Arduino
 
                         for (int i = 0; i < 8; i++)
                         {
-                            int bit2check = (int)Math.Pow(2, i);
+                            int bit2check = (int)System.Math.Pow(2, i);
                             if ((bit2check & pinsChanged) == 0) continue;
 
                             bool state = portState.IsSet(i);

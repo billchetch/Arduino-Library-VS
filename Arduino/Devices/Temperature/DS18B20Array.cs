@@ -11,13 +11,13 @@ namespace Chetch.Arduino.Devices.Temperature
     {
         public class DS18B20Sensor : ISampleSubject
         {
-            Sampler _sampler;
+            public Sampler Sampler { get; internal set; }
             public String ID { get; set; }
             public double Temperature { get; set; }
             public double AverageTemperature {
                 get
                 {
-                    return _sampler.GetAverage(this);
+                    return Sampler.GetAverage(this);
                 }
             }
 
@@ -28,13 +28,13 @@ namespace Chetch.Arduino.Devices.Temperature
 
             public void RequestSample(Sampler sampler)
             {
-                _sampler = sampler;
+                Sampler = sampler;
             }
 
             public void SetTemperature(double temp)
             {
                 Temperature = temp;
-                _sampler?.ProvideSample(this, temp);
+                Sampler?.ProvideSample(this, temp);
             }
         }
 

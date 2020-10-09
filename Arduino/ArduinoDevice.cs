@@ -191,10 +191,13 @@ namespace Chetch.Arduino
         public long LastCommandSentOn { get; internal set; } = 0;
 
         public ArduinoDeviceManager Mgr { get; set; }
-        protected Sampler Sampler { get; set; }
+        public Sampler Sampler { get; internal set; }
         public int SampleInterval { get; set; } = 0; //in ms
         public int SampleSize { get; set; } = 0;
         public Sampler.SamplingOptions SamplingOptions { get; set; } = Sampler.SamplingOptions.MEAN_COUNT;
+        public int SampleIntervalDeviation { get; set; } = -1; //set to a positive to use
+
+
         public Measurement.Unit MeasurementUnit { get; set; } = Measurement.Unit.NONE;
 
         public ArduinoDevice()
@@ -538,7 +541,7 @@ namespace Chetch.Arduino
 
             if (SampleInterval > 0 && SampleSize > 0)
             {
-                Mgr.Sampler.Add(this, SampleInterval, SampleSize, SamplingOptions);
+                Mgr.Sampler.Add(this, SampleInterval, SampleSize, SamplingOptions, SampleIntervalDeviation);
 #if DEBUG
                 System.Diagnostics.Debug.Print(String.Format("Adding to sampler with interval {0} and sample size {1}", SampleInterval, SampleSize));
 #endif
