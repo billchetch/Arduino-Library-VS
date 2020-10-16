@@ -8,6 +8,7 @@ using System.Timers;
 using Chetch.Services;
 using Chetch.Messaging;
 using Chetch.Utilities;
+using Solid.Arduino;
 
 namespace Chetch.Arduino
 {
@@ -170,6 +171,7 @@ namespace Chetch.Arduino
         
         protected List<String> AllowedPorts { get; } = new List<String>();
         protected List<String> DeniedPorts { get; } = new List<String>();
+        protected SerialBaudRate BaudRate { get; set; } = SerialBaudRate.Bps_57600;
         protected int MaxPingResponseTime { get; set; } = 20; //in seconds
 
         protected Timer _admtimer;
@@ -573,7 +575,7 @@ namespace Chetch.Arduino
                             try
                             {
                                 Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Attempting to connect board on port {0}", key);
-                                ArduinoDeviceManager adm = ArduinoDeviceManager.Connect(key, TryHandleADMMessage);
+                                ArduinoDeviceManager adm = ArduinoDeviceManager.Connect(key, BaudRate, TryHandleADMMessage);
                                 adm.Tracing = Tracing;
                                 ADMS[key] = adm;
                                 _devicesConnected[key] = false;
