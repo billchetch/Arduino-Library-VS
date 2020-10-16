@@ -335,12 +335,12 @@ namespace Chetch.Arduino
 
         public void Disconnect()
         {
-            State = ADMState.NOT_CONNECTED;
             Sampler.Stop();
             foreach(ArduinoDevice dev in _devices.Values)
             {
                 dev.Disconnect();
             }
+            State = ADMState.NOT_CONNECTED;
             LastDisconnectedOn = DateTime.Now;
             _session?.Dispose();
         }

@@ -272,11 +272,11 @@ namespace Chetch.Arduino
                     _admtimer.Stop();
                     if (ADMS.Count > 0)
                     {
-                        Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Disconnecting ADMs");
                         foreach(ArduinoDeviceManager adm in ADMS.Values){
+                            Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Disconnecting ADM for board {0}", adm.BoardID);
                             adm.Disconnect();
                         }
-                        Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Disconnected ADMs");
+                        Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Disconnected all ADMs");
                     }
                 }
             }
