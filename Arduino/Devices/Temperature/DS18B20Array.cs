@@ -43,6 +43,17 @@ namespace Chetch.Arduino.Devices.Temperature
 
         private int _oneWirePin;
         public List<DS18B20Sensor> Sensors { get; } = new List<DS18B20Sensor>();
+        public List<DS18B20Sensor> ConnectedSensors { 
+            get
+            {
+                List<DS18B20Sensor> connectedSensors = new List<DS18B20Sensor>();
+                foreach (var sensor in Sensors)
+                {
+                    if (sensor.IsConnected) connectedSensors.Add(sensor);
+                }
+                return connectedSensors;
+            } 
+        }
         
         public DS18B20Array(int oneWirePin, String id) : base(id, "DS18B20")
         {
