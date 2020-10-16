@@ -858,6 +858,7 @@ namespace Chetch.Arduino
                 {
                     String msg = String.Format("Error sending string {0}: {1} ", e.GetType(), e.Message);
                     Tracing?.TraceEvent(TraceEventType.Error, 0, msg);
+                    throw e;
                 }
             }
         }
