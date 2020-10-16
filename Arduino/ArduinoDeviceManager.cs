@@ -195,9 +195,9 @@ namespace Chetch.Arduino
             }
         }
 
-        static public ArduinoDeviceManager Connect(String port, int timeOut, Action<ADMMessage, ArduinoDeviceManager> listener)
+        static public ArduinoDeviceManager Connect(String port, SerialBaudRate bps, int timeOut, Action<ADMMessage, ArduinoDeviceManager> listener)
         {
-            ISerialConnection connection = new EnhancedSerialConnection(port, SerialBaudRate.Bps_57600);
+            ISerialConnection connection = new EnhancedSerialConnection(port, bps);
             if (connection != null)
             {
                 var session = new ArduinoSession(connection, timeOut);
@@ -216,14 +216,14 @@ namespace Chetch.Arduino
             return null;
         }
 
-        static public ArduinoDeviceManager Connect(String supportedBoards, Action<ADMMessage, ArduinoDeviceManager> listener)
+        static public ArduinoDeviceManager Connect(String supportedBoards, SerialBaudRate bps, Action<ADMMessage, ArduinoDeviceManager> listener)
         {
-            return Connect(supportedBoards, CONNECT_TIMEOUT, listener);
+            return Connect(supportedBoards, bps, CONNECT_TIMEOUT, listener);
         }
 
-        static public ArduinoDeviceManager Connect(String supportedBoards)
+        static public ArduinoDeviceManager Connect(String supportedBoards, SerialBaudRate bps)
         {
-            return Connect(supportedBoards, CONNECT_TIMEOUT, null);
+            return Connect(supportedBoards, bps, CONNECT_TIMEOUT, null);
         }
 
         public TraceSource Tracing { get; set; } = null;
