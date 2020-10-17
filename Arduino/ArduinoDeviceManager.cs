@@ -288,6 +288,8 @@ namespace Chetch.Arduino
         private Dictionary<String, ArduinoDevice> _devices;
         private Dictionary<String, byte> _device2boardID;
         private Dictionary<byte, ArduinoDevice> _boardID2device;
+        private Firmware _firmware;
+        private ProtocolVersion _protocolVersion;
         private BoardCapability _boardCapability;
         private Dictionary<int, List<ArduinoDevice>> _pin2device;
         private Dictionary<int, DigitalPortState> _portStates;
@@ -318,6 +320,15 @@ namespace Chetch.Arduino
             _listener = listener;
             _session.MessageReceived += OnMessageReceived;
 
+            _firmware = _session.GetFirmware();
+#if DEBUG
+            Debug.Print(String.Format("Firmware: {0} version {1}.{2}", _firmware.Name, _firmware.MajorVersion, _firmware.MinorVersion));
+#endif
+            _protocolVersion = _session.GetProtocolVersion();
+#if DEBUG
+            Debug.Print(String.Format("Firmata protocol version {0}.{1}", _protocolVersion.Major, _protocolVersion.Minor));
+#endif
+
             _boardCapability = _session.GetBoardCapability();
             State = ADMState.CONNECTED;
 
@@ -330,7 +341,6 @@ namespace Chetch.Arduino
 
             //and request board status
             RequestStatus();
-
         }
 
         public void Disconnect()
