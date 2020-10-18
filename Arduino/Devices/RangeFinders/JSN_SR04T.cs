@@ -10,7 +10,7 @@ namespace Chetch.Arduino.Devices.RangeFinders
 {
     public class JSN_SR04T : RangeFinderBase
     {
-        public const String DEVICE_NAME = "JSN-SR04%"; //This name must be used if the ChetchFirmata code on the Arduino is to work
+        public const String DEVICE_NAME = "JSN-SR04T"; //This name must be used if the ChetchFirmata code on the Arduino is to work
 
         private int _transmitPin;
         private int _receivePin;
