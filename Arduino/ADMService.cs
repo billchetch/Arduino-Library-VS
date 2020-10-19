@@ -255,7 +255,7 @@ namespace Chetch.Arduino
                 _admtimer = new System.Timers.Timer();
                 _admtimer.Interval = 5000;
                 _admtimer.Elapsed += new System.Timers.ElapsedEventHandler(this.MonitorADM);
-                _admtimer.Start();
+                //_admtimer.Start();
                 Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Created ADM monitor timer at intervals of {0}", _admtimer.Interval);
             }
             catch (Exception e)
@@ -373,8 +373,9 @@ namespace Chetch.Arduino
 
             //general commands related to a service
             AddCommandHelp("status", "Get status info about this service and the ADMs");
+            AddCommandHelp("enable-device", "Enables device on port <port>");
             AddCommandHelp("disable-device", "Disables device on port <port>");
-            AddCommandHelp("restart-device", "Restarts device on port <port>");
+            AddCommandHelp("reset-device", "Disables then enables the device on port <port>");
 
             //adm specific commands related to a board and device
             AddCommandHelp("adm/<board>:status",  "ADM will request board status and add additional information");
@@ -418,14 +419,31 @@ namespace Chetch.Arduino
 
                 case "disable-device":
                 case "enable-device":
+                case "reset-device":
                     if (args.Count != 1 || args[0] == null || args[0] == String.Empty) throw new Exception("No port specified");
                     String devicePort = args[0].ToString();
                     devMgr = DeviceManager.GetInstance();
                     List<DeviceManager.DeviceInfo> ar = devMgr.GetDevices("(" + devicePort + ")");
                     if (ar.Count != 1) throw new Exception("Cannot find device on port " + devicePort);
                     DeviceManager.DeviceInfo di = ar[0];
-                    System.Diagnostics.Process proc = devMgr.DisableDevice(di.InstanceID);
-                    String output = proc.StandardOutput.ReadToEnd();
+                    Process proc = null;
+                    String output = "";
+                    if (cmd == "disable-device")
+                    {
+                        proc = devMgr.DisableDevice(di.InstanceID);
+                    } else if(cmd == "enable-device")
+                    {
+                        proc = devMgr.EnableDevice(di.InstanceID);
+                        output = proc.StandardOutput.ReadToEnd();
+                    }
+                    else
+                    {
+                        proc = devMgr.DisableDevice(di.InstanceID);
+                        output = proc.StandardOutput.ReadToEnd();
+                        System.Threading.Thread.Sleep(1000);
+                        proc = devMgr.EnableDevice(di.InstanceID);
+                    }
+                    output += proc.StandardOutput.ReadToEnd();
                     response.AddValue("Output", output);
                     break;
 
