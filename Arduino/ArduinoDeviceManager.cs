@@ -606,6 +606,9 @@ namespace Chetch.Arduino
             {
                 switch (fmessage.Type)
                 {
+                    case Solid.Arduino.Firmata.MessageType.FirmwareResponse:
+                        break;
+
                     case Solid.Arduino.Firmata.MessageType.StringData:
                         StringData sd = (StringData)fmessage.Value;
                         try
