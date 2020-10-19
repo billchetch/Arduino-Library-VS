@@ -373,7 +373,9 @@ namespace Chetch.Arduino
 
             //general commands related to a service
             AddCommandHelp("status", "Get status info about this service and the ADMs");
-            
+            AddCommandHelp("disable-device", "Disables device on port <port>");
+            AddCommandHelp("restart-device", "Restarts device on port <port>");
+
             //adm specific commands related to a board and device
             AddCommandHelp("adm/<board>:status",  "ADM will request board status and add additional information");
             AddCommandHelp("adm/<board>:list-devices", "List devices added to ADM");
@@ -390,13 +392,41 @@ namespace Chetch.Arduino
         {
             bool respond = true;
             MessageSchema schema = new ADMService.MessageSchema(response);
-
+            DeviceManager devMgr;
+            
             switch (cmd)
             {
                 case "status":
                     schema.AddADMS(ADMS);
-                    schema.AddPorts(ArduinoDeviceManager.GetBoardPorts(SupportedBoards, AllowedPorts, DeniedPorts));
+                    List<String> ports = ArduinoDeviceManager.GetBoardPorts(SupportedBoards, AllowedPorts, DeniedPorts);
+                    schema.AddPorts(ports);
                     schema.AddRequiredBoards(RequiredBoards);
+
+                    devMgr = DeviceManager.GetInstance();
+                    List<String> portDevices = new List<String>();
+                    foreach (String port in ports)
+                    {
+                        List<DeviceManager.DeviceInfo> devs = devMgr.GetDevices("(" + port + ")");
+                        foreach (DeviceManager.DeviceInfo devInfo in devs)
+                        {
+                            String s = String.Format("{0} ({1}): {2}", devInfo.Description, devInfo.InstanceID, devInfo.Status);
+                            portDevices.Add(s);
+                        }
+                    }
+                    response.AddValue("PortDevices", portDevices);
+                    break;
+
+                case "disable-device":
+                case "enable-device":
+                    if (args.Count != 1 || args[0] == null || args[0] == String.Empty) throw new Exception("No port specified");
+                    String devicePort = args[0].ToString();
+                    devMgr = DeviceManager.GetInstance();
+                    List<DeviceManager.DeviceInfo> ar = devMgr.GetDevices("(" + devicePort + ")");
+                    if (ar.Count != 1) throw new Exception("Cannot find device on port " + devicePort);
+                    DeviceManager.DeviceInfo di = ar[0];
+                    System.Diagnostics.Process proc = devMgr.DisableDevice(di.InstanceID);
+                    String output = proc.StandardOutput.ReadToEnd();
+                    response.AddValue("Output", output);
                     break;
 
                 default:
