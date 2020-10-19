@@ -440,7 +440,7 @@ namespace Chetch.Arduino
                     {
                         proc = devMgr.DisableDevice(di.InstanceID);
                         output = proc.StandardOutput.ReadToEnd();
-                        System.Threading.Thread.Sleep(1000);
+                        System.Threading.Thread.Sleep(500);
                         proc = devMgr.EnableDevice(di.InstanceID);
                     }
                     output += proc.StandardOutput.ReadToEnd();
