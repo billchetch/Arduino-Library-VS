@@ -173,6 +173,7 @@ namespace Chetch.Arduino
         protected List<String> DeniedPorts { get; } = new List<String>();
         protected SerialBaudRate BaudRate { get; set; } = SerialBaudRate.Bps_57600;
         protected int MaxPingResponseTime { get; set; } = 20; //in seconds
+        protected bool AutoStartADMTimer { get; set; }  = true;
 
         protected Timer _admtimer;
         private Dictionary<String, bool> _devicesConnected = new Dictionary<string, bool>();
@@ -255,7 +256,7 @@ namespace Chetch.Arduino
                 _admtimer = new System.Timers.Timer();
                 _admtimer.Interval = 5000;
                 _admtimer.Elapsed += new System.Timers.ElapsedEventHandler(this.MonitorADM);
-                //_admtimer.Start();
+                if(AutoStartADMTimer)_admtimer.Start();
                 Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Created ADM monitor timer at intervals of {0}", _admtimer.Interval);
             }
             catch (Exception e)
@@ -394,7 +395,8 @@ namespace Chetch.Arduino
             bool respond = true;
             MessageSchema schema = new ADMService.MessageSchema(response);
             DeviceManager devMgr;
-            
+            ArduinoDeviceManager adm;
+
             switch (cmd)
             {
                 case "status":
@@ -421,30 +423,40 @@ namespace Chetch.Arduino
                 case "enable-device":
                 case "reset-device":
                     if (args.Count != 1 || args[0] == null || args[0] == String.Empty) throw new Exception("No port specified");
-                    String devicePort = args[0].ToString();
+                    String devicePort = args[0].ToString().ToUpper();
                     devMgr = DeviceManager.GetInstance();
                     List<DeviceManager.DeviceInfo> ar = devMgr.GetDevices("(" + devicePort + ")");
                     if (ar.Count != 1) throw new Exception("Cannot find device on port " + devicePort);
                     DeviceManager.DeviceInfo di = ar[0];
-                    Process proc = null;
+
+                    //first we check if there is an ADM on this port
                     String output = "";
-                    if (cmd == "disable-device")
+                    lock (_lockMonitorADM)
                     {
-                        proc = devMgr.DisableDevice(di.InstanceID);
-                    } else if(cmd == "enable-device")
-                    {
-                        proc = devMgr.EnableDevice(di.InstanceID);
-                        output = proc.StandardOutput.ReadToEnd();
+                        if (ADMS.ContainsKey(devicePort))
+                        {
+                            output += String.Format("Found ADM on port {0} so disconnecting first", devicePort) + Environment.NewLine;
+                            DisconnectADM(devicePort);
+                            System.Threading.Thread.Sleep(500);
+                            if (SerialPorts.IsOpen(devicePort)) throw new Exception("Serial port is open on " + devicePort);
+                        }
+
+                        Process proc = null;
+                        if (cmd == "disable-device")
+                        {
+                            proc = devMgr.DisableDevice(di.InstanceID);
+                        }
+                        else if (cmd == "enable-device")
+                        {
+                            proc = devMgr.EnableDevice(di.InstanceID);
+                        }
+                        else
+                        {
+                            proc = devMgr.ResetDevice(di.InstanceID);
+                        }
+                        output += proc.StandardOutput.ReadToEnd();
                     }
-                    else
-                    {
-                        proc = devMgr.DisableDevice(di.InstanceID);
-                        output = proc.StandardOutput.ReadToEnd();
-                        System.Threading.Thread.Sleep(500);
-                        proc = devMgr.EnableDevice(di.InstanceID);
-                    }
-                    output += proc.StandardOutput.ReadToEnd();
-                    response.AddValue("Output", output);
+                    response.Value = output;
                     break;
 
                 default:
@@ -461,7 +473,7 @@ namespace Chetch.Arduino
                     }
 
                     //so this is an ADM command, find the board first
-                    ArduinoDeviceManager adm = GetADM(tgtcmd[0]);
+                    adm = GetADM(tgtcmd[0]);
                     
                     if (adm == null)
                     {
@@ -503,8 +515,7 @@ namespace Chetch.Arduino
                                 break;
 
                             case "disconnect":
-                                adm.Disconnect();
-                                Broadcast(ADMEvent.DISCONNECTED, String.Format("{0} disconnected from port {1}", adm.BoardID, adm.Port));
+                                DisconnectADM(adm.Port);
                                 break;
 
                             case "setdigitalpin":
@@ -562,39 +573,54 @@ namespace Chetch.Arduino
             return respond;
         }
 
-        protected void ConnectADM(String port)
+        virtual protected void ConnectADM(String port)
         {
-            Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Attempting to connect board on port {0}", port);
+            if (ADMS.ContainsKey(port)) throw new Exception("ADMService::ConnectADM: port " + port + " already has an assigned ADM");
+
+            Tracing?.TraceEvent(TraceEventType.Information, 100, "ADMService::ConnectADM: Attempting to connect board on port {0}", port);
             ArduinoDeviceManager adm = ArduinoDeviceManager.Connect(port, BaudRate, TryHandleADMMessage);
             adm.Tracing = Tracing;
             ADMS[port] = adm;
             _devicesConnected[port] = false;
-            Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Connected to board on port {0}", port);
+            Tracing?.TraceEvent(TraceEventType.Information, 100, "ADMService::ConnectADM: Connected to board on port {0}", port);
             Broadcast(ADMEvent.CONNECTED, String.Format("Connected ADM to port {0}", port));
         }
 
-        protected void DisconnectADM(String port)
+        virtual protected void DisconnectADM(String port)
         {
-            try
-            {
-                ArduinoDeviceManager adm = ADMS[port];
-                ADMS.Remove(port);
-                _devicesConnected.Remove(port);
+            if (!ADMS.ContainsKey(port)) return;
 
-                Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADM: Board {0} on port {1} disconnected", adm.BoardID, port);
-                Broadcast(ADMEvent.DISCONNECTED, String.Format("{0} disconnected from port {1}", adm.BoardID, port));
-            }
-            catch (System.IO.IOException e)
-            {
-                Tracing?.TraceEvent(TraceEventType.Error, 100, "ADM: Connect causes IO exception {0}: {1} on port {2}", e.GetType().ToString(), e.Message, port);
-            }
-            catch (Exception e)
-            {
-                Tracing?.TraceEvent(TraceEventType.Error, 100, "ADM: Failed to connect, exception {0}: {1}", e.GetType().ToString(), e.Message);
-            }
+            ArduinoDeviceManager adm = ADMS[port];
+            adm.Disconnect();
+            ADMS.Remove(port);
+            _devicesConnected.Remove(port);
+                
+            Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADMService::DisconnectADM: Board {0} on port {1} disconnected", adm.BoardID, port);
+            Broadcast(ADMEvent.DISCONNECTED, String.Format("{0} disconnected from port {1}", adm.BoardID, port));
         }
 
-
+        protected void ResetPort(String port)
+        {
+            if (ADMS.ContainsKey(port))
+            {
+                DisconnectADM(port);
+                System.Threading.Thread.Sleep(500);
+                if (SerialPorts.IsOpen(port)) throw new Exception("Serial port is open on " + port);
+            }
+            
+            DeviceManager devMgr = DeviceManager.GetInstance();
+            List<DeviceManager.DeviceInfo> ar = devMgr.GetDevices("(" + port + ")");
+            if (ar.Count != 1)
+            {
+                DeviceManager.DeviceInfo di = ar[0];
+                Process proc = devMgr.ResetDevice(di.InstanceID);
+                String output = proc.StandardOutput.ReadToEnd();
+                Tracing?.TraceEvent(TraceEventType.Information, 0, output);
+            } else
+            {
+                Tracing?.TraceEvent(TraceEventType.Warning, 0, "Could not find a unique device for port {0}", port);
+            }
+        }
 
         /// <summary>
         /// Called by a timer
@@ -631,7 +657,7 @@ namespace Chetch.Arduino
                             }
                             catch (Exception e)
                             {
-                                Tracing?.TraceEvent(TraceEventType.Error, 1000, "Assert connection failed: {0} -> {1}", e.GetType(), e.Message);
+                                Tracing?.TraceEvent(TraceEventType.Error, 1000, "ADMService::MonitorADM: Assert connection failed: {0} -> {1}", e.GetType(), e.Message);
                                 disconnect.Add(entry.Key);
                             }
                         }
@@ -640,7 +666,14 @@ namespace Chetch.Arduino
                     //now formally disconnect boards that have not been found on any port
                     foreach (String port in disconnect)
                     {
-                        DisconnectADM(port);
+                        try
+                        {
+                            DisconnectADM(port);
+                        }
+                        catch (Exception e)
+                        {
+                            Tracing?.TraceEvent(TraceEventType.Error, 100, "ADMService::MonitorADM: Disconnecting ADM from port {0} produced exception {1}: {2}", port, e.GetType().ToString(), e.Message);
+                        }
                     }
 
                     //now we try and connect all the boards that we have not just disconnected but have not yet been connected
@@ -650,15 +683,20 @@ namespace Chetch.Arduino
                         foreach (String port in ports)
                         {
                             if (disconnect.Contains(port) || ADMS.ContainsKey(port)) continue;
-
-                            ConnectADM(port);
+                            try
+                            {
+                                ConnectADM(port);
+                            } catch (Exception e)
+                            {
+                                Tracing?.TraceEvent(TraceEventType.Error, 100, "ADMService::MonitorADM: Connecting ADM to port {0} produced exception {1}: {2}", port, e.GetType().ToString(), e.Message);
+                            }
                         }
                     }
                     else if(ADMS.Count < RequiredBoardsCount)
                     {
                         if (!_noPortsFoundWarning)
                         {
-                            Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADM: No boards connected to any port");
+                            Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADMService::MonitorADM: No boards connected to any port");
                             _noPortsFoundWarning = true;
                         }
                     }
@@ -671,8 +709,15 @@ namespace Chetch.Arduino
                         if (lastPing > MaxPingResponseTime)
                         {
                             //this will get 'formally' disconnected the next timer event
-                            Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADM: Last ping for board {0} on port {1} occured {2} seconds ago so disconnecting...", adm.BoardID, adm.Port, lastPing);
-                            DisconnectADM(adm.Port);
+                            Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADMService::MonitorADM: Last ping for board {0} on port {1} occured {2} seconds ago so disconnecting...", adm.BoardID, adm.Port, lastPing);
+                            try
+                            {
+                                DisconnectADM(adm.Port);
+                            }
+                            catch (Exception e)
+                            {
+                                Tracing?.TraceEvent(TraceEventType.Error, 100, "ADMService::MonitorADM: Disconnecting ADM from port {0} produced exception {1}: {2}", adm.Port, e.GetType().ToString(), e.Message);
+                            }
                         }
                     }
 
