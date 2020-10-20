@@ -369,12 +369,10 @@ namespace Chetch.Arduino
             }
             catch (System.IO.IOException e)
             {
-                Disconnect();
                 throw e;
             }
             catch (UnauthorizedAccessException e)
             {
-                Disconnect();
                 throw e;
             }
         }
