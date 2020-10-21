@@ -422,7 +422,7 @@ namespace Chetch.Arduino
                 case "disable-device":
                 case "enable-device":
                 case "reset-device":
-                    if (args.Count != 1 || args[0] == null || args[0] == String.Empty) throw new Exception("No port specified");
+                    if (args.Count != 1 || args[0] == null || args[0].ToString() == String.Empty) throw new Exception("No port specified");
                     String devicePort = args[0].ToString().ToUpper();
                     devMgr = DeviceManager.GetInstance();
                     List<DeviceManager.DeviceInfo> ar = devMgr.GetDevices("(" + devicePort + ")");
