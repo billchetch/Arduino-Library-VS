@@ -275,8 +275,9 @@ namespace Chetch.Arduino
                     _admtimer.Stop();
                     if (ADMS.Count > 0)
                     {
-                        foreach(ArduinoDeviceManager adm in ADMS.Values){
-                            DisconnectADM(adm.Port);
+                        List<String> ports = ADMS.Keys.ToList();
+                        foreach(String port in ports){
+                            DisconnectADM(port);
                         }
                         Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Disconnected all ADMs");
                     }
