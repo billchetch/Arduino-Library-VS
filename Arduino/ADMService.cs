@@ -601,6 +601,7 @@ namespace Chetch.Arduino
 
         protected void ResetPort(String port)
         {
+            //ensure that if an ADM is connected then we disconnect it first
             if (ADMS.ContainsKey(port))
             {
                 DisconnectADM(port);
@@ -608,6 +609,7 @@ namespace Chetch.Arduino
                 if (SerialPorts.IsOpen(port)) throw new Exception("Serial port is open on " + port);
             }
             
+            //now we disable-enable the device connected to the port
             DeviceManager devMgr = DeviceManager.GetInstance();
             List<DeviceManager.DeviceInfo> ar = devMgr.GetDevices("(" + port + ")");
             if (ar.Count != 1)
@@ -639,13 +641,14 @@ namespace Chetch.Arduino
                     List<String> ports = ArduinoDeviceManager.GetBoardPorts(SupportedBoards, AllowedPorts, DeniedPorts);
 
                     //build a list of any ADMs that are no longer connected to one of these ports (e.g. USB has been yanked out)
+                    List<ArduinoDeviceManager> adms = ADMS.Values.ToList();
                     List<String> disconnect = new List<String>();
-                    foreach (KeyValuePair<String, ArduinoDeviceManager> entry in ADMS)
+                    foreach (ArduinoDeviceManager adm in adms)
                     {
-                        if (!ports.Contains(entry.Key))
+                        if (!ports.Contains(adm.Port))
                         {
                             //if for some reason (config change) the port for the ADP is not a possible board port
-                            disconnect.Add(entry.Key);
+                            DisconnectADM(adm.Port);
                         }
                         else
                         {
@@ -653,29 +656,17 @@ namespace Chetch.Arduino
                             try
                             {
                                 //Tracing?.TraceEvent(TraceEventType.Information, 0, "ADM: Asserting connection");
-                                entry.Value.AssertConnection();
+                                adm.AssertConnection();
                             }
                             catch (Exception e)
                             {
-                                Tracing?.TraceEvent(TraceEventType.Error, 1000, "ADMService::MonitorADM: Assert connection failed: {0} -> {1}", e.GetType(), e.Message);
-                                disconnect.Add(entry.Key);
+                                Tracing?.TraceEvent(TraceEventType.Error, 1000, "ADMService::MonitorADM: Assert connection failed: {0} {1} {2}", e.GetType(), e.HResult, e.Message);
+                                ResetPort(adm.Port);
+                                //disconnect.Add(entry.Key);
                             }
                         }
                     }
                     
-                    //now formally disconnect boards that have not been found on any port
-                    foreach (String port in disconnect)
-                    {
-                        try
-                        {
-                            DisconnectADM(port);
-                        }
-                        catch (Exception e)
-                        {
-                            Tracing?.TraceEvent(TraceEventType.Error, 100, "ADMService::MonitorADM: Disconnecting ADM from port {0} produced exception {1}: {2}", port, e.GetType().ToString(), e.Message);
-                        }
-                    }
-
                     //now we try and connect all the boards that we have not just disconnected but have not yet been connected
                     if (ports.Count > 0 && ADMS.Count < RequiredBoardsCount)
                     {
@@ -702,21 +693,22 @@ namespace Chetch.Arduino
                     }
 
                     //here we check how long it has been since the last 'ping' response and force a disconnect ... next time round it should reconnect
-                    foreach (ArduinoDeviceManager adm in ADMS.Values)
+                    adms = ADMS.Values.ToList();
+                    foreach (ArduinoDeviceManager adm in adms)
                     {
                         if (adm.LastPingResponseMessage == null) continue;
                         long lastPing = (DateTime.Now.Ticks - adm.LastPingResponseOn.Ticks) / TimeSpan.TicksPerSecond;
                         if (lastPing > MaxPingResponseTime)
                         {
                             //this will get 'formally' disconnected the next timer event
-                            Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADMService::MonitorADM: Last ping for board {0} on port {1} occured {2} seconds ago so disconnecting...", adm.BoardID, adm.Port, lastPing);
+                            Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADMService::MonitorADM: Last ping for board {0} on port {1} occured {2} seconds ago so attempting prot reset...", adm.BoardID, adm.Port, lastPing);
                             try
                             {
-                                DisconnectADM(adm.Port);
+                                ResetPort(adm.Port);
                             }
                             catch (Exception e)
                             {
-                                Tracing?.TraceEvent(TraceEventType.Error, 100, "ADMService::MonitorADM: Disconnecting ADM from port {0} produced exception {1}: {2}", adm.Port, e.GetType().ToString(), e.Message);
+                                Tracing?.TraceEvent(TraceEventType.Error, 100, "ADMService::MonitorADM: Resetting port {0} produced exception {1}: {2}", adm.Port, e.GetType().ToString(), e.Message);
                             }
                         }
                     }
