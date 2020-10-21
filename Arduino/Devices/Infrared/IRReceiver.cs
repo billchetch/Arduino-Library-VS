@@ -10,8 +10,9 @@ namespace Chetch.Arduino.Devices.Infrared
 {
     public abstract class IRReceiver : IRDevice
     {
-        private bool _receiving = false;
         private String _commandName;
+        private bool _receiving;
+        public bool IsReceiving { get { return _receiving;  } }
         private int _receivePin;
         private Dictionary<String, IRCode> _irCodes = new Dictionary<String, IRCode>();
         private Dictionary<long, IRCode> _unknownCodes = new Dictionary<long, IRCode>();
@@ -37,6 +38,7 @@ namespace Chetch.Arduino.Devices.Infrared
             Category = DeviceCategory.IR_RECEIVER;
 
             _receivePin = receivePin;
+            _receiving = false;
             
             ConfigurePin(_receivePin, PinMode.DigitalInput);
 

@@ -101,6 +101,11 @@ namespace Chetch.Arduino
             Arguments.Add(arg);
         }
 
+        public override int GetHashCode()
+        {
+            return base.GetHashCode(); ///to stop compiler warnings
+        }
+
         public override bool Equals(object obj)
         {
             if (obj == null) return false;
@@ -331,7 +336,6 @@ namespace Chetch.Arduino
                     break;
                 case FilterCommandsOptions.BY_TYPE:
                     throw new NotImplementedException("Not yet implemented");
-                    break;
 
             }
             return commands;
