@@ -679,7 +679,7 @@ namespace Chetch.Arduino
                                 ConnectADM(port);
                             } catch (Exception e)
                             {
-                                Tracing?.TraceEvent(TraceEventType.Error, 100, "ADMService::MonitorADM: Connecting ADM to port {0} produced exception {1}: {2}", port, e.GetType().ToString(), e.Message);
+                                Tracing?.TraceEvent(TraceEventType.Error, 100, "ADMService::MonitorADM: Connecting ADM to port {0} produced exception {1} ({2}): {3}", port, e.GetType().ToString(), e.HResult, e.Message);
                             }
                         }
                     }
