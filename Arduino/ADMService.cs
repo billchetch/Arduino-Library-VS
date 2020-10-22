@@ -608,19 +608,20 @@ namespace Chetch.Arduino
                 System.Threading.Thread.Sleep(500);
                 if (SerialPorts.IsOpen(port)) throw new Exception("Serial port is open on " + port);
             }
-            
+
             //now we disable-enable the device connected to the port
             DeviceManager devMgr = DeviceManager.GetInstance();
             List<DeviceManager.DeviceInfo> ar = devMgr.GetDevices("(" + port + ")");
-            if (ar.Count != 1)
+            if (ar.Count == 1)
             {
                 DeviceManager.DeviceInfo di = ar[0];
+                Tracing?.TraceEvent(TraceEventType.Information, 0, "Attempting reset of device {0} of status {1} on port {2}", di.Description, di.Status, port); ;
                 Process proc = devMgr.ResetDevice(di.InstanceID);
                 String output = proc.StandardOutput.ReadToEnd();
                 Tracing?.TraceEvent(TraceEventType.Information, 0, output);
             } else
             {
-                Tracing?.TraceEvent(TraceEventType.Warning, 0, "Could not find a unique device for port {0}", port);
+                Tracing?.TraceEvent(TraceEventType.Warning, 0, "ADMService::ResetPort Could not find a unique device for port {0}", port);
             }
         }
 
@@ -660,7 +661,7 @@ namespace Chetch.Arduino
                             }
                             catch (Exception e)
                             {
-                                Tracing?.TraceEvent(TraceEventType.Error, 1000, "ADMService::MonitorADM: Assert connection failed: {0} {1} {2}", e.GetType(), e.HResult, e.Message);
+                                Tracing?.TraceEvent(TraceEventType.Error, 1000, "ADMService::MonitorADM: Assert connection on {0} ({1}) failed: {2} {3} {4}", adm.BoardID, adm.Port, e.GetType(), e.HResult, e.Message);
                                 ResetPort(adm.Port);
                                 //disconnect.Add(entry.Key);
                             }
