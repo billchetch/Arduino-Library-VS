@@ -595,7 +595,7 @@ namespace Chetch.Arduino
             ADMS.Remove(port);
             _devicesConnected.Remove(port);
                 
-            Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADMService::DisconnectADM: Board {0} on port {1} disconnected", adm.BoardID, port);
+            Tracing?.TraceEvent(TraceEventType.Information, 100, "ADMService::DisconnectADM: Board {0} on port {1} disconnected", adm.BoardID, port);
             Broadcast(ADMEvent.DISCONNECTED, String.Format("{0} disconnected from port {1}", adm.BoardID, port));
         }
 
