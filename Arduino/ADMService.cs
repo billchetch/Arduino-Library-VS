@@ -157,7 +157,7 @@ namespace Chetch.Arduino
         }
 
         //some error codes upon which to try and reset the port
-        public const int ERROR_ATTACHED_DEVICE_NOT_FUNCTIONING = -2147024865;
+        //public const int ERROR_ATTACHED_DEVICE_NOT_FUNCTIONING = -2147024865;
 
         //map of port names to arduino device managers
         protected Dictionary<String, ArduinoDeviceManager> ADMS { get; } = new Dictionary<String, ArduinoDeviceManager>();
@@ -686,7 +686,7 @@ namespace Chetch.Arduino
                             {
                                 switch (e.HResult)
                                 {
-                                    case ERROR_ATTACHED_DEVICE_NOT_FUNCTIONING:
+                                    case Win32.ERROR_ATTACHED_DEVICE_NOT_FUNCTIONING:
                                         ResetPort(port);
                                         break;
                                 }
