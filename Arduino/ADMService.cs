@@ -156,6 +156,9 @@ namespace Chetch.Arduino
             
         }
 
+        //some error codes upon which to try and reset the port
+        public const int ERROR_ATTACHED_DEVICE_NOT_FUNCTIONING = -2147024865;
+
         //map of port names to arduino device managers
         protected Dictionary<String, ArduinoDeviceManager> ADMS { get; } = new Dictionary<String, ArduinoDeviceManager>();
         protected String SupportedBoards { get; set; }
@@ -678,9 +681,20 @@ namespace Chetch.Arduino
                             try
                             {
                                 ConnectADM(port);
-                            } catch (Exception e)
+                            } 
+                            catch (System.IO.IOException e)
                             {
-                                Tracing?.TraceEvent(TraceEventType.Error, 100, "ADMService::MonitorADM: Connecting ADM to port {0} produced exception {1} ({2}): {3}", port, e.GetType().ToString(), e.HResult, e.Message);
+                                switch (e.HResult)
+                                {
+                                    case ERROR_ATTACHED_DEVICE_NOT_FUNCTIONING:
+                                        ResetPort(port);
+                                        break;
+                                }
+                                Tracing?.TraceEvent(TraceEventType.Error, 100, "ADMService::MonitorADM: Connecting ADM to port {0} produced IOException {1} ({2}): {3}", port, e.GetType().ToString(), e.HResult, e.Message);
+                            }
+                            catch (Exception e)
+                            {
+                                Tracing?.TraceEvent(TraceEventType.Error, 100, "ADMService::MonitorADM: Connecting ADM to port {0} produced Exception {1} ({2}): {3}", port, e.GetType().ToString(), e.HResult, e.Message);
                             }
                         }
                     }
