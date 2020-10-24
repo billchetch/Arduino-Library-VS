@@ -602,7 +602,7 @@ namespace Chetch.Arduino
             Broadcast(ADMEvent.DISCONNECTED, String.Format("{0} disconnected from port {1}", adm.BoardID, port));
         }
 
-        virtual protected void ResetPort(String port)
+        virtual protected void ResetPort(String port, Exception e)
         {
             //ensure that if an ADM is connected then we disconnect it first
             if (ADMS.ContainsKey(port))
@@ -665,7 +665,7 @@ namespace Chetch.Arduino
                             catch (Exception e)
                             {
                                 Tracing?.TraceEvent(TraceEventType.Error, 1000, "ADMService::MonitorADM: Assert connection on {0} ({1}) failed: {2} {3} {4}", adm.BoardID, adm.Port, e.GetType(), e.HResult, e.Message);
-                                ResetPort(adm.Port);
+                                ResetPort(adm.Port, e);
                                 //disconnect.Add(entry.Key);
                             }
                         }
@@ -687,7 +687,7 @@ namespace Chetch.Arduino
                                 switch (e.HResult)
                                 {
                                     case Win32.ERROR_ATTACHED_DEVICE_NOT_FUNCTIONING:
-                                        ResetPort(port);
+                                        ResetPort(port, e);
                                         break;
                                 }
                                 Tracing?.TraceEvent(TraceEventType.Error, 100, "ADMService::MonitorADM: Connecting ADM to port {0} produced IOException {1} ({2}): {3}", port, e.GetType().ToString(), e.HResult, e.Message);
@@ -719,7 +719,7 @@ namespace Chetch.Arduino
                             Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADMService::MonitorADM: Last ping for board {0} on port {1} occured {2} seconds ago so attempting prot reset...", adm.BoardID, adm.Port, lastPing);
                             try
                             {
-                                ResetPort(adm.Port);
+                                ResetPort(adm.Port, null);
                             }
                             catch (Exception e)
                             {
