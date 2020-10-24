@@ -602,7 +602,7 @@ namespace Chetch.Arduino
             Broadcast(ADMEvent.DISCONNECTED, String.Format("{0} disconnected from port {1}", adm.BoardID, port));
         }
 
-        protected void ResetPort(String port)
+        virtual protected void ResetPort(String port)
         {
             //ensure that if an ADM is connected then we disconnect it first
             if (ADMS.ContainsKey(port))
