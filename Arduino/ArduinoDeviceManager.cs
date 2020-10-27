@@ -166,6 +166,7 @@ namespace Chetch.Arduino
 
         public const string ARDUINO_MEGA_2560 = "USB-SERIAL CH340";
         public const string ARDUINO_UNO = "Arduino Uno";
+        public const string XBEE_DIGI = "USB Serial&Digi";
 
         public const string DEFAULT_BOARD_SET = ARDUINO_MEGA_2560 + "," + ARDUINO_UNO;
 
