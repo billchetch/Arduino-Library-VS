@@ -161,7 +161,7 @@ namespace Chetch.Arduino
 
     public class ArduinoDeviceManager
     {
-        private const int CONNECT_TIMEOUT = 10000;
+        private const int RESPONSE_TIMEOUT = 10000;
         private const int MAX_SEND_STRING_LENGTH = 32; //maximum string length to send by Firmata
 
         public const string ARDUINO_MEGA_2560 = "USB-SERIAL CH340";
@@ -203,8 +203,7 @@ namespace Chetch.Arduino
                 var session = new ArduinoSession(connection, timeOut);
                 try
                 {
-                    var mgr = new ArduinoDeviceManager(session, listener);
-                    mgr.Port = port;
+                    var mgr = new ArduinoDeviceManager(session, listener, port);
                     return mgr;
                 } catch (Exception e)
                 {
@@ -215,15 +214,40 @@ namespace Chetch.Arduino
             
             return null;
         }
-
-        static public ArduinoDeviceManager Connect(String supportedBoards, SerialBaudRate bps, Action<ADMMessage, ArduinoDeviceManager> listener)
+        
+        static public ArduinoDeviceManager Connect(String port, SerialBaudRate bps, Action<ADMMessage, ArduinoDeviceManager> listener)
         {
-            return Connect(supportedBoards, bps, CONNECT_TIMEOUT, listener);
+            return Connect(port, bps, RESPONSE_TIMEOUT, listener);
         }
 
-        static public ArduinoDeviceManager Connect(String supportedBoards, SerialBaudRate bps)
+        static public ArduinoDeviceManager Connect(String port, SerialBaudRate bps)
         {
-            return Connect(supportedBoards, bps, CONNECT_TIMEOUT, null);
+            return Connect(port, bps, RESPONSE_TIMEOUT, null);
+        }
+
+        static public ArduinoDeviceManager Connect(String nodeID, String port, SerialBaudRate bps, int timeOut, Action<ADMMessage, ArduinoDeviceManager> listener)
+        {
+            ISerialConnection connection = new XBee.XBeeFirmataSerialConnection(nodeID, port, bps);
+            if (connection != null)
+            {
+                var session = new ArduinoSession(connection, timeOut);
+                try
+                {
+                    var mgr = new ArduinoDeviceManager(session, listener, port, nodeID);
+                    return mgr;
+                }
+                catch (Exception e)
+                {
+                    throw e;
+                }
+            }
+
+            return null;
+        }
+
+        static public ArduinoDeviceManager Connect(String nodeID, String port, SerialBaudRate bps, Action<ADMMessage, ArduinoDeviceManager> listener)
+        {
+            return Connect(nodeID, port, bps, RESPONSE_TIMEOUT, listener);
         }
 
         public TraceSource Tracing { get; set; } = null;
@@ -277,7 +301,9 @@ namespace Chetch.Arduino
         public DateTime LastStatusResponseOn { get; internal set; }
         public DateTime LastDisconnectedOn { get; internal set; }
 
-        public String Port { get; set; }
+        public String Port { get; internal set; }
+        public String NodeID { get; internal set; } //if using a shared port
+
         private ArduinoSession _session;
         public String BoardID { get; internal set; } //Should be set in STATUS_RESPONSE message from board
         public int LEDBIPin { get; internal set; } = -1; //Should be set in STATUS_RESPONSE message from board
@@ -305,7 +331,7 @@ namespace Chetch.Arduino
         private Object LockSetDigitalPin = new Object();
         private Object LockSetDigitalPinMode = new Object();
 
-        public ArduinoDeviceManager(ArduinoSession firmata, Action<ADMMessage, ArduinoDeviceManager> listener)
+        public ArduinoDeviceManager(ArduinoSession firmata, Action<ADMMessage, ArduinoDeviceManager> listener, String port, String nodeID = null)
         {
             State = ADMState.CONNECTING;
 
@@ -319,6 +345,9 @@ namespace Chetch.Arduino
             _session = firmata;
             _listener = listener;
             _session.MessageReceived += OnMessageReceived;
+
+            Port = port;
+            NodeID = nodeID; 
 
             _firmware = _session.GetFirmware();
 #if DEBUG
@@ -509,6 +538,7 @@ namespace Chetch.Arduino
             message.LittleEndian = LittleEndian;
             message.Type = Messaging.MessageType.CONFIGURE;
             device.AddConfig(message);
+            Console.WriteLine("Sending CONFIGURE message to device {0}", device.ID);
             SendMessage(message, 250); //leave some time for this process to complete to avoid bombarding the board
             
             return device;
@@ -840,6 +870,7 @@ namespace Chetch.Arduino
         {
             if(message != null)
             {
+                Console.WriteLine("Sending message {0}", message.Type);
                 SendString(message.Serialize());
                 _sleep(sleep);
             }
@@ -859,11 +890,12 @@ namespace Chetch.Arduino
                 return;
             }
 
-            //System.Diagnostics.Debug.Print("Sending: " + s);
+            Console.WriteLine("Waiting for lock to send string data {0}", s);
             lock (LockSendString)
             {
                 try
                 {
+                    Console.WriteLine("Sending string data {0}", s);
                     _session.SendStringData(s);
                 } catch (Exception e)
                 {
@@ -872,6 +904,7 @@ namespace Chetch.Arduino
                     throw e;
                 }
             }
+            Console.WriteLine("Released lock on string data {0}", s);
         }
 
         public void SetDigitalPin(int pinNumber, bool value, int sleep = 0)
