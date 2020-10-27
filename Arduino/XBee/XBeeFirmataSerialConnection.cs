@@ -75,8 +75,6 @@ namespace Chetch.Arduino.XBee
                 DataBuffer.Enqueue((int)data[i]);
             }
 
-            Console.WriteLine("<------- XBLocalDevice received data {0} bytes", data.Length);
-
             //if we need the serial event args then this can be retreived (with some modification) from the serial port in the XBeeSerialConnection instance
             DataReceived?.Invoke(this, null);
         }
@@ -88,7 +86,6 @@ namespace Chetch.Arduino.XBee
             XBee64BitAddress xaddr = msg.Device.XBee64BitAddr;
             byte[] received = msg.Data;
 
-            Console.WriteLine("<----------- Data Received {0} bytes from {1}", received.Length, rxb.NodeID);
             if (NodeID.Equals(rxb.NodeID))
             {
                 AddDataReceived(received);
@@ -164,10 +161,7 @@ namespace Chetch.Arduino.XBee
         {
             if (offset == 0)
             {
-                Console.WriteLine("-------> XBLocalDevice sending data {0} bytes to {1}", buffer.Length, XBRemoteDevice.NodeID);
                 XBCoordinator.SendDataAsync(XBRemoteDevice, buffer);
-
-                Console.WriteLine("-------> XBLocalDevice data sent to {0}", XBRemoteDevice.NodeID);
                 //XBLocalDevice.SendBroadcastData(buffer);
             }
             else

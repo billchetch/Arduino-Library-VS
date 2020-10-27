@@ -538,7 +538,6 @@ namespace Chetch.Arduino
             message.LittleEndian = LittleEndian;
             message.Type = Messaging.MessageType.CONFIGURE;
             device.AddConfig(message);
-            Console.WriteLine("Sending CONFIGURE message to device {0}", device.ID);
             SendMessage(message, 250); //leave some time for this process to complete to avoid bombarding the board
             
             return device;
@@ -870,7 +869,6 @@ namespace Chetch.Arduino
         {
             if(message != null)
             {
-                Console.WriteLine("Sending message {0}", message.Type);
                 SendString(message.Serialize());
                 _sleep(sleep);
             }
@@ -890,12 +888,10 @@ namespace Chetch.Arduino
                 return;
             }
 
-            Console.WriteLine("Waiting for lock to send string data {0}", s);
             lock (LockSendString)
             {
                 try
                 {
-                    Console.WriteLine("Sending string data {0}", s);
                     _session.SendStringData(s);
                 } catch (Exception e)
                 {
@@ -904,7 +900,6 @@ namespace Chetch.Arduino
                     throw e;
                 }
             }
-            Console.WriteLine("Released lock on string data {0}", s);
         }
 
         public void SetDigitalPin(int pinNumber, bool value, int sleep = 0)

@@ -821,7 +821,7 @@ namespace Chetch.Arduino
                     break;
 
                 case MessageType.STATUS_RESPONSE:
-                    if(!IsRequiredBoard(adm.BoardID))
+                    if(!PortSharing && !IsRequiredBoard(adm.BoardID))
                     {
                         Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADM {0} is not one of the required boards ({1}).  Disconnecting from port {2}...", adm.BoardID, RequiredBoards, adm.Port);
                         DisconnectADM(adm.Port);
