@@ -377,7 +377,7 @@ namespace Chetch.Arduino
         {
             base.AddCommandHelp();
 
-            //general commands related to a service
+            //general commands related to a service or hardware
             AddCommandHelp("status", "Get status info about this service and the ADMs");
             AddCommandHelp("enable-device", "Enables device on port <port>");
             AddCommandHelp("disable-device", "Disables device on port <port>");
@@ -388,7 +388,6 @@ namespace Chetch.Arduino
             AddCommandHelp("adm/<board>:list-devices", "List devices added to ADM");
             AddCommandHelp("adm/<board>:list-pins", "List used pins and the devices using them");
             AddCommandHelp("adm/<board>:capability", "List pin capabilities");
-            AddCommandHelp("adm/<board>:disconnect", "Disconnect ADM .. should reconnect shortly after");
             AddCommandHelp("adm/<board>:pingloadtest", "Send a rapid <number> of pings with <delay> between each.");
             AddCommandHelp("adm/<board>:setdigitalpin", "Set the <pin number> to <true/false>");
             AddCommandHelp("adm/<board>:<device>:wait", "Pause for a short while, useful if interspersed with other, comma-seperated, commands");
@@ -580,11 +579,9 @@ namespace Chetch.Arduino
 
         virtual protected void ConnectADM(String port)
         {
-            Tracing?.TraceEvent(TraceEventType.Information, 100, "ADMService::ConnectADM: Attempting to connect board on port {0}", port);
-
             if(PortSharing)
             {
-                if (RequiredBoards == null) throw new Exception("If using a shared port, required board node IDs must be specified");
+                if (RequiredBoards == null) throw new Exception("If using a shared port, 'Nodes' on the port must be specified as the 'RequiredBoards' property");
 
                 //when using a shared port we connect all the boards in one go
                 var ar = RequiredBoards.Split(',');
@@ -593,15 +590,20 @@ namespace Chetch.Arduino
                     String key = port + ":" + nodeID;
                     if (ADMS.ContainsKey(key)) throw new Exception("ADMService::ConnectADM: port " + port + " already has an assigned ADM with Node ID " + nodeID);
 
+                    Tracing?.TraceEvent(TraceEventType.Information, 100, "ADMService::ConnectADM: Attempting to connect board @ {0}", key);
                     ArduinoDeviceManager adm = ArduinoDeviceManager.Connect(nodeID, port, BaudRate, TryHandleADMMessage);
                     adm.Tracing = Tracing;
                     ADMS[key] = adm;
                     _devicesConnected[key] = false;
-                    Broadcast(ADMEvent.CONNECTED, String.Format("Connected ADM to port {0} with Node ID {1}", port, nodeID));
+                    Tracing?.TraceEvent(TraceEventType.Information, 100, "ADMService::ConnectADM: Connected to board @ {0}", key);
+
+                    Broadcast(ADMEvent.CONNECTED, String.Format("ADM now Connected @ {0}", key));
                 }
             } else
             {
                 if (ADMS.ContainsKey(port)) throw new Exception("ADMService::ConnectADM: port " + port + " already has an assigned ADM");
+
+                Tracing?.TraceEvent(TraceEventType.Information, 100, "ADMService::ConnectADM: Attempting to connect board on {0} port {0}", port);
 
                 ArduinoDeviceManager adm = ArduinoDeviceManager.Connect(port, BaudRate, TryHandleADMMessage);
                 adm.Tracing = Tracing;
@@ -614,22 +616,21 @@ namespace Chetch.Arduino
 
         virtual protected void DisconnectADM(String port)
         {
-
             if (PortSharing)
             {
                 //when using a shared port we connect all the boards in one go
                 var ar = RequiredBoards.Split(',');
-                foreach (String rb in ar)
+                foreach (String nodeID in ar)
                 {
-                    String[] requiredBoard = rb.Trim().Split(':');
-                    int portID = System.Convert.ToInt16(RequiredBoards[1]);
-                    String key = port + ":" + portID;
+                    String key = port + ":" + nodeID;
                     if (!ADMS.ContainsKey(key)) continue;
 
+                    Tracing?.TraceEvent(TraceEventType.Information, 100, "ADMService::DisconnectADM: Attempting to disconnect board @ {0}", key);
                     ArduinoDeviceManager adm = ADMS[key];
                     adm.Disconnect();
                     ADMS.Remove(key);
                     _devicesConnected.Remove(key);
+                    Tracing?.TraceEvent(TraceEventType.Information, 100, "ADMService::DisconnectADM: Disconnected board @ {0}", key);
                 }
             }
             else
@@ -704,7 +705,7 @@ namespace Chetch.Arduino
                             }
                             catch (Exception e)
                             {
-                                Tracing?.TraceEvent(TraceEventType.Error, 1000, "ADMService::MonitorADM: Assert connection on {0} ({1}) failed: {2} {3} {4}", adm.BoardID, adm.Port, e.GetType(), e.HResult, e.Message);
+                                Tracing?.TraceEvent(TraceEventType.Error, 1000, "ADMService::MonitorADM: Assert connection on {0} ({1}) failed: {2} {3} {4}", adm.BoardID, adm.PortAndNodeID, e.GetType(), e.HResult, e.Message);
                                 ResetPort(adm.Port, e);
                             }
                         }
@@ -754,7 +755,7 @@ namespace Chetch.Arduino
                         if (lastPing > MaxPingResponseTime)
                         {
                             //this will get 'formally' disconnected the next timer event
-                            Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADMService::MonitorADM: Last ping for board {0} on port {1} occured {2} seconds ago so attempting prot reset...", adm.BoardID, adm.Port, lastPing);
+                            Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADMService::MonitorADM: Last ping for board {0} on port {1} occured {2} seconds ago so attempting prot reset...", adm.BoardID, adm.PortAndNodeID, lastPing);
                             try
                             {
                                 ResetPort(adm.Port, null);
@@ -830,17 +831,17 @@ namespace Chetch.Arduino
 
                     if (adm.State == ADMState.DEVICE_READY)
                     {
-                        Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: Ready to add devices to {0} on port {1} ...", adm.BoardID, adm.Port);
+                        Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: Ready to add devices to {0} on port {1} ...", adm.BoardID, adm.PortAndNodeID);
                         AddADMDevices(adm, message);
-                        Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: {0} devices added to {1} on port {2}. Configuring devices... ", adm.DeviceCount, adm.BoardID, adm.Port);
+                        Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: {0} devices added to {1} on port {2}. Configuring devices... ", adm.DeviceCount, adm.BoardID, adm.PortAndNodeID);
                     }
                     break;
 
                 case MessageType.CONFIGURE_RESPONSE:
-                    String key = PortSharing ? adm.Port + ":" + adm.NodeID : adm.Port;
+                    String key = adm.PortAndNodeID;
                     if (adm.State == ADMState.DEVICE_CONNECTED && !_devicesConnected[key])
                     {
-                        Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: All {0} devices now configured and connected to board {1} on port {2}", adm.DeviceCount, adm.BoardID, adm.Port);
+                        Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: All {0} devices now configured and connected to board {1} on port {2}", adm.DeviceCount, adm.BoardID, adm.PortAndNodeID);
                         OnADMDevicesConnected(adm, message);
                         _devicesConnected[key] = true;
                     }

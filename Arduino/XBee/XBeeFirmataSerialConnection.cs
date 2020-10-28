@@ -92,7 +92,7 @@ namespace Chetch.Arduino.XBee
             }
             else
             {
-                Console.WriteLine("WTF... received data from {0} but this is node {1}", rxb.NodeID, NodeID);
+                //Console.WriteLine("WTF... received data from {0} but this is node {1}", rxb.NodeID, NodeID);
             }
         }
 
@@ -155,6 +155,7 @@ namespace Chetch.Arduino.XBee
         {
             //_serialPort.Write(text);
             Console.WriteLine("oops... write string");
+            throw new NotImplementedException("XBeeFirmataSericalConnection::Write string");
         }
 
         public void Write(byte[] buffer, int offset, int count)
@@ -173,7 +174,7 @@ namespace Chetch.Arduino.XBee
         public void Write(char[] buffer, int offset, int count)
         {
             Console.WriteLine("oops... write char buffer");
-            throw new NotImplementedException("XBeeFirmataSericalConnection::Write char[] ");
+            throw new NotImplementedException("XBeeFirmataSericalConnection::Write char[]");
         }
 
         public void WriteLine(string text)

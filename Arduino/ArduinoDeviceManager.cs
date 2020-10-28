@@ -305,6 +305,8 @@ namespace Chetch.Arduino
         public String Port { get; internal set; }
         public String NodeID { get; internal set; } //if using a shared port
 
+        public String PortAndNodeID {  get { return Port + (String.IsNullOrEmpty(NodeID) ? "" : ":" + NodeID);  } }
+
         private ArduinoSession _session;
         public String BoardID { get; internal set; } //Should be set in STATUS_RESPONSE message from board
         public int LEDBIPin { get; internal set; } = -1; //Should be set in STATUS_RESPONSE message from board
