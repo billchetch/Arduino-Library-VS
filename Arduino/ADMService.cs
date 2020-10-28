@@ -84,6 +84,7 @@ namespace Chetch.Arduino
                         vals["BoardID"] = adm.BoardID;
                         vals["Port"] = adm.Port;
                         vals["NodeID"] = adm.NodeID?.ToString();
+                        vals["State"] = adm.State.ToString();
                         vals["LastError"] = adm.LastErrorMessage == null ? "n/a" : adm.LastErrorMessage.Value;
                         vals["LastErrorOn"] = adm.LastErrorMessage == null ? "n/a" : adm.LastErrorOn.ToString("yyyy-MM-dd HH:mm:ss");
                         vals["LastStatusResponseOn"] = adm.LastStatusResponseMessage == null ? "n/a" : adm.LastStatusResponseOn.ToString("yyyy-MM-dd HH:mm:ss");
@@ -385,6 +386,7 @@ namespace Chetch.Arduino
 
             //adm specific commands related to a board and device
             AddCommandHelp("adm/<board>:status",  "ADM will request board status and add additional information");
+            AddCommandHelp("adm/<board>:ping", "ADM will ping board");
             AddCommandHelp("adm/<board>:list-devices", "List devices added to ADM");
             AddCommandHelp("adm/<board>:list-pins", "List used pins and the devices using them");
             AddCommandHelp("adm/<board>:capability", "List pin capabilities");
@@ -498,6 +500,11 @@ namespace Chetch.Arduino
                         {
                             case "status":
                                 AddADMRequest(adm, adm.RequestStatus(), response.Target);
+                                respond = false;
+                                break;
+
+                            case "ping":
+                                AddADMRequest(adm, adm.Ping(), response.Target);
                                 respond = false;
                                 break;
 
