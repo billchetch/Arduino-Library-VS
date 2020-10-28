@@ -281,7 +281,12 @@ namespace Chetch.Arduino
                     _admtimer.Stop();
                     if (ADMS.Count > 0)
                     {
-                        List<String> ports = ADMS.Keys.ToList();
+                        List<String> ports = new List<String>();
+                        foreach (ArduinoDeviceManager adm in ADMS.Values) 
+                        {
+                            if (!ports.Contains(adm.Port)) ports.Add(adm.Port);
+                        }
+
                         foreach(String port in ports){
                             DisconnectADM(port);
                         }
@@ -852,6 +857,9 @@ namespace Chetch.Arduino
                         OnADMDevicesConnected(adm, message);
                         _devicesConnected[key] = true;
                     }
+                    break;
+
+                case MessageType.PING_RESPONSE:
                     break;
 
             }
