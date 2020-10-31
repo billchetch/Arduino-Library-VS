@@ -40,6 +40,9 @@ namespace Chetch.Arduino.Devices.Temperature
         }
 
         public const String COMMAND_READ_TEMP = "read-temp";
+        public const String PARAM_SENSOR_COUNT = "SC";
+        public const String PARAM_ONE_WIRE_PIN = "OP";
+        public const String PARAM_TEMPERATURE = "TP";
 
         private int _oneWirePin;
         public List<DS18B20Sensor> Sensors { get; } = new List<DS18B20Sensor>();
@@ -102,9 +105,9 @@ namespace Chetch.Arduino.Devices.Temperature
 
         protected override void OnConnect(ADMMessage message)
         {
-            if (message.HasValue("SensorCount"))
+            if (message.HasValue(PARAM_SENSOR_COUNT))
             {
-                int sc = message.GetInt("SensorCount");
+                int sc = message.GetInt(PARAM_SENSOR_COUNT);
                 for (int i = 0; i < System.Math.Min(sc, Sensors.Count); i++)
                 {
                     DS18B20Array.DS18B20Sensor sensor = Sensors[i];
@@ -123,7 +126,7 @@ namespace Chetch.Arduino.Devices.Temperature
             {
                 for (int i = 0; i < Sensors.Count; i++)
                 {
-                    String key = "Temperature-" + i;
+                    String key = PARAM_TEMPERATURE + "-" + i;
                     if (message.HasValue(key))
                     {
                         Sensors[i].SetTemperature(message.GetDouble(key));

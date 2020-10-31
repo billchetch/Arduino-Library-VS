@@ -85,7 +85,13 @@ namespace Chetch.Arduino
                         vals["Port"] = adm.Port;
                         vals["NodeID"] = adm.NodeID?.ToString();
                         vals["State"] = adm.State.ToString();
-                        vals["LastError"] = adm.LastErrorMessage == null ? "n/a" : adm.LastErrorMessage.Value;
+                        vals["MessagesSent"] = System.Convert.ToString(adm.MessagesSent);
+                        vals["MessagesReceived"] = System.Convert.ToString(adm.MessagesReceived);
+                        vals["LastMessageSent"] = adm.LastMessageSent == null ? "n/a" : adm.LastMessageSent.Type.ToString();
+                        vals["LastMessageSentOn"] = adm.LastMessageSent == null ? "n/a" : adm.LastMessageSentOn.ToString("yyyy-MM-dd HH:mm:ss");
+                        vals["LastMessageReceived"] = adm.LastMessageReceived == null ? "n/a" : adm.LastMessageReceived.Type.ToString();
+                        vals["LastMessageReceivedOn"] = adm.LastMessageReceived == null ? "n/a" : adm.LastMessageReceivedOn.ToString("yyyy-MM-dd HH:mm:ss");
+                        //vals["LastError"] = adm.LastErrorMessage == null ? "n/a" : adm.LastErrorMessage.Value;
                         vals["LastErrorOn"] = adm.LastErrorMessage == null ? "n/a" : adm.LastErrorOn.ToString("yyyy-MM-dd HH:mm:ss");
                         vals["LastStatusResponseOn"] = adm.LastStatusResponseMessage == null ? "n/a" : adm.LastStatusResponseOn.ToString("yyyy-MM-dd HH:mm:ss");
                         vals["LastPingResponseOn"] = adm.LastPingResponseMessage == null ? "n/a" : adm.LastPingResponseOn.ToString("yyyy-MM-dd HH:mm:ss");
@@ -216,7 +222,7 @@ namespace Chetch.Arduino
             return ar.Contains(boardID);
         }
 
-        protected ArduinoDeviceManager GetADM(String boardID)
+        public ArduinoDeviceManager GetADM(String boardID)
         {
             if(ADMS.Count == 0)
             {
@@ -518,6 +524,7 @@ namespace Chetch.Arduino
                                 delay = args != null && args.Count > 1 ? System.Convert.ToInt16(args[1]) : 500;
                                 for (int i = 0; i < repeat; i++)
                                 {
+                                    Console.WriteLine("Ping {0}", i);
                                     adm.Ping();
                                     System.Threading.Thread.Sleep(delay);
                                 }
@@ -600,16 +607,26 @@ namespace Chetch.Arduino
                 foreach(String nodeID in ar)
                 {
                     String key = port + ":" + nodeID;
-                    if (ADMS.ContainsKey(key)) throw new Exception("ADMService::ConnectADM: port " + port + " already has an assigned ADM with Node ID " + nodeID);
+                    if (ADMS.ContainsKey(key)) continue ;
 
-                    Tracing?.TraceEvent(TraceEventType.Information, 100, "ADMService::ConnectADM: Attempting to connect board @ {0}", key);
-                    ArduinoDeviceManager adm = ArduinoDeviceManager.Connect(nodeID, port, BaudRate, TryHandleADMMessage);
-                    adm.Tracing = Tracing;
-                    ADMS[key] = adm;
-                    _devicesConnected[key] = false;
-                    Tracing?.TraceEvent(TraceEventType.Information, 100, "ADMService::ConnectADM: Connected to board @ {0}", key);
+                    List<Exception> exs = new List<Exception>();
+                    try
+                    {
+                        Tracing?.TraceEvent(TraceEventType.Information, 100, ">>>>>>>>>>>>>>>> ADMService::ConnectADM: Attempting to connect board @ {0}", key);
+                        ArduinoDeviceManager adm = ArduinoDeviceManager.Connect(nodeID, port, BaudRate, TryHandleADMMessage);
+                        adm.Tracing = Tracing;
+                        ADMS[key] = adm;
+                        _devicesConnected[key] = false;
+                        Tracing?.TraceEvent(TraceEventType.Information, 100, ">>>>>>>>>>>>>>>> ADMService::ConnectADM: Connected to board @ {0}", key);
 
-                    Broadcast(ADMEvent.CONNECTED, String.Format("ADM now Connected @ {0}", key));
+                        Broadcast(ADMEvent.CONNECTED, String.Format("ADM now Connected @ {0}", key));
+
+                    } catch (Exception e)
+                    {
+                        //TODO: remove the trace and create a single 'aggregate' exception and throw that after th eloop
+                        Tracing?.TraceEvent(TraceEventType.Error, 100, "ADMService::ConnectADM: Error connection to board @ {0}: {1}", key, e.Message);
+                        exs.Add(e);
+                    }
                 }
             } else
             {
@@ -709,16 +726,25 @@ namespace Chetch.Arduino
                         }
                         else
                         {
-                            //otherwise this ADM is on a valid port so we try and assert the connection
+                            //otherwise this ADM is on a valid port so we try and assert the connection....
+                            //if the asssert fails we try a 'Clear'
                             try
                             {
-                                //Tracing?.TraceEvent(TraceEventType.Information, 0, "ADM: Asserting connection");
+                                Tracing?.TraceEvent(TraceEventType.Information, 0, "ADM: Asserting connection");
                                 adm.AssertConnection();
                             }
                             catch (Exception e)
                             {
                                 Tracing?.TraceEvent(TraceEventType.Error, 1000, "ADMService::MonitorADM: Assert connection on {0} ({1}) failed: {2} {3} {4}", adm.BoardID, adm.PortAndNodeID, e.GetType(), e.HResult, e.Message);
-                                ResetPort(adm.Port, e);
+
+                                try
+                                {
+                                    Tracing?.TraceEvent(TraceEventType.Error, 1000, "ADMService::MonitorADM: Attempting clear...");
+                                    adm.Clear();
+                                } catch (Exception ex)
+                                {
+                                    Tracing?.TraceEvent(TraceEventType.Error, 1000, "ADMService::MonitorADM: Clear on {0} ({1}) failed: {2} {3} {4}", adm.BoardID, adm.PortAndNodeID, ex.GetType(), ex.HResult, ex.Message);
+                                }
                             }
                         }
                     }
@@ -767,7 +793,7 @@ namespace Chetch.Arduino
                         if (lastPing > MaxPingResponseTime)
                         {
                             //this will get 'formally' disconnected the next timer event
-                            Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADMService::MonitorADM: Last ping for board {0} on port {1} occured {2} seconds ago so attempting prot reset...", adm.BoardID, adm.PortAndNodeID, lastPing);
+                            Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADMService::MonitorADM: Last ping for board {0} on port {1} occured {2} seconds ago so attempting port reset...", adm.BoardID, adm.PortAndNodeID, lastPing);
                             try
                             {
                                 ResetPort(adm.Port, null);
@@ -845,7 +871,8 @@ namespace Chetch.Arduino
                     {
                         Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: Ready to add devices to {0} on port {1} ...", adm.BoardID, adm.PortAndNodeID);
                         AddADMDevices(adm, message);
-                        Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: {0} devices added to {1} on port {2}. Configuring devices... ", adm.DeviceCount, adm.BoardID, adm.PortAndNodeID);
+                        Tracing?.TraceEvent(TraceEventType.Verbose, 100, "ADM: {0} devices added to {1} on port {2}. Now configure board", adm.DeviceCount, adm.BoardID, adm.PortAndNodeID);
+                        adm.Configure();
                     }
                     break;
 

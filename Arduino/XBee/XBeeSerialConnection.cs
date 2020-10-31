@@ -17,7 +17,7 @@ namespace Chetch.Arduino.XBee
     {
         public bool IsOpen { get => _serialPort.IsOpen; }
 
-        public DataStream Stream { get; } = new DataStream();
+        public DataStream Stream { get; internal set;  } = new DataStream();
 
 
         private SerialPorts.SerialPort _serialPort;
@@ -38,6 +38,8 @@ namespace Chetch.Arduino.XBee
                 return;
 
             _serialPort.Close();
+            _serialPort.DataReceived -= HandleDataReceived;
+            Stream = null;
         }
 
         public ConnectionType GetConnectionType()
@@ -50,6 +52,7 @@ namespace Chetch.Arduino.XBee
             if (IsOpen)
                 return;
 
+            Stream = new DataStream();
             _serialPort.Open();
             _serialPort.DataReceived += HandleDataReceived;
         }
@@ -58,19 +61,26 @@ namespace Chetch.Arduino.XBee
         {
             if (sender is SerialPorts.SerialPort)
             {
-                int n = _serialPort.BytesToRead;
-                if (n > 0)
+                try
                 {
-                    byte[] bytes = new byte[n];
-                    _serialPort.Read(bytes, 0, n);
-                    Stream.Write(bytes, 0, n);
-
-                    lock (this)
+                    int n = _serialPort.BytesToRead;
+                    if (n > 0)
                     {
-                        Monitor.Pulse(this);
+                        byte[] bytes = new byte[n];
+                        _serialPort.Read(bytes, 0, n);
+                        Stream.Write(bytes, 0, n);
+
+                        lock (this)
+                        {
+                            Monitor.Pulse(this);
+                        }
                     }
+                } catch (Exception e)
+                {
+                    Console.WriteLine("XbeeSerialConnection::HandleDataReceived {0}, {1}", e.GetType(), e.Message);
                 }
             }
+                
         }
 
         public int ReadData(byte[] data)
@@ -80,7 +90,8 @@ namespace Chetch.Arduino.XBee
 
         public int ReadData(byte[] data, int offset, int length)
         {
-            //Read data from the underlying data stream which has been supplied data by the serial port on the DataReceived event
+            //Read data from the underlying data stream which has been supplied data by the serial port 
+            //on the DataReceived event
             int readBytes = 0;
             if (Stream != null)
                 readBytes = Stream.Read(data, offset, length);

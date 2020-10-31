@@ -24,7 +24,7 @@ namespace Chetch.Arduino
 
     public class ADMMessage : Message
     {
-        const long TTL = 5 * 60 * 1000; //how long in millis a Tag can last for 
+        const long TTL = 5 *  1000; //how long in millis a Tag can last for 
         static long[] _usedTags = new long[255];
         public static void ReleaseTag(byte tag)
         {
@@ -61,6 +61,14 @@ namespace Chetch.Arduino
             return available;
         }
 
+        public static void ResetTags()
+        {
+            for (byte i = 1; i < _usedTags.Length; i++)
+            {
+                _usedTags[i] = 0;
+            }
+        }
+
         public byte Tag { get; set; } = 0; //can be used to track messages
         public byte TargetID { get; set; } = 0; //ID number on board to determine what is beig targeted
         public byte CommandID { get; set; } = 0; //Command ID on board ... basically to identify function e.g. Send or Delete ...
@@ -68,10 +76,13 @@ namespace Chetch.Arduino
         public bool LittleEndian { get; set; } = true;
         public bool CanBroadcast { get; set; } = true;
 
-        public ADMMessage()
+        public ADMMessage(bool createTag)
         {
             DefaultEncoding = MessageEncoding.BYTES_ARRAY;
+            if(createTag)Tag = CreateNewTag();
         }
+
+        public ADMMessage() : this(false) { }
 
         public override void AddBytes(List<byte> bytes)
         {
@@ -161,8 +172,10 @@ namespace Chetch.Arduino
 
     public class ArduinoDeviceManager
     {
-        private const int RESPONSE_TIMEOUT = 10000;
+        private const int RESPONSE_TIMEOUT = 10000; //Firmata setting
         private const int MAX_SEND_STRING_LENGTH = 32; //maximum string length to send by Firmata
+        private const int MESSAGE_RECEIVED_TIMEOUT = 2000; //how long we hold up Sending if waiting for an ADMMessage to be received
+        private const int SEND_MESSAGE_THROTTLE = 50; //minimum ms between messages sent ... to hold off bombarding the board
 
         public const string ARDUINO_MEGA_2560 = "USB-SERIAL CH340";
         public const string ARDUINO_UNO = "Arduino Uno";
@@ -199,6 +212,7 @@ namespace Chetch.Arduino
         static public ArduinoDeviceManager Connect(String port, SerialBaudRate bps, int timeOut, Action<ADMMessage, ArduinoDeviceManager> listener)
         {
             ISerialConnection connection = new EnhancedSerialConnection(port, bps);
+            
             if (connection != null)
             {
                 var session = new ArduinoSession(connection, timeOut);
@@ -264,6 +278,8 @@ namespace Chetch.Arduino
                 }
             }
         }
+
+        public ArduinoSession Session { get { return _session;  } }
         public bool IsConnected
         {
             get
@@ -294,6 +310,13 @@ namespace Chetch.Arduino
                 return devicesConnected;
             }
         }
+        public long MessagesSent { get; internal set; } = 0;
+        public long MessagesReceived { get; internal set; } = 0;
+        public ADMMessage LastMessageSent { get; internal set; }
+        public DateTime LastMessageSentOn { get; internal set; }
+        public bool MessageSentSuccess { get; internal set; } = false;
+        public ADMMessage LastMessageReceived { get; internal set; }
+        public DateTime LastMessageReceivedOn { get; internal set; }
         public ADMMessage LastErrorMessage { get; internal set;  }
         public DateTime LastErrorOn { get; internal set; }
         public ADMMessage LastPingResponseMessage { get; internal set; }
@@ -330,10 +353,8 @@ namespace Chetch.Arduino
         public Sampler Sampler { get; internal set; } = new Sampler();
 
         //Thread Locks
-        private Object LockSendString = new Object();
-        private Object LockSetDigitalPin = new Object();
-        private Object LockSetDigitalPinMode = new Object();
-
+        private Object SendDataLock = new Object();
+       
         public ArduinoDeviceManager(ArduinoSession firmata, Action<ADMMessage, ArduinoDeviceManager> listener, String port, String nodeID = null)
         {
             State = ADMState.CONNECTING;
@@ -347,29 +368,26 @@ namespace Chetch.Arduino
 
             _session = firmata;
             _listener = listener;
-            _session.MessageReceived += OnMessageReceived;
+            _session.MessageReceived += HandleFirmataMessageReceived;
+            _session.ProcessMessageException += HandleFirmataProcessMessageException;
 
             Port = port;
             NodeID = nodeID; 
 
             _firmware = _session.GetFirmware();
 #if DEBUG
-            Debug.Print(String.Format("Firmware: {0} version {1}.{2}", _firmware.Name, _firmware.MajorVersion, _firmware.MinorVersion));
+            Debug.Print(String.Format("{0}: Firmware: {1} version {2}.{3}", PortAndNodeID, _firmware.Name, _firmware.MajorVersion, _firmware.MinorVersion));
 #endif
             _protocolVersion = _session.GetProtocolVersion();
 #if DEBUG
-            Debug.Print(String.Format("Firmata protocol version {0}.{1}", _protocolVersion.Major, _protocolVersion.Minor));
+            Debug.Print(String.Format("{0}: Firmata protocol version {1}.{2}", PortAndNodeID, _protocolVersion.Major, _protocolVersion.Minor));
 #endif
-
             _boardCapability = _session.GetBoardCapability();
             State = ADMState.CONNECTED;
 
             //if here and no exceptions then the connection should be good
             //so initialise the board
-            ADMMessage message = new ADMMessage();
-            message.TargetID = 0;
-            message.Type = Messaging.MessageType.INITIALISE;
-            SendMessage(message, 250);
+            Initialise();
 
             //and request board status
             RequestStatus();
@@ -406,6 +424,14 @@ namespace Chetch.Arduino
             catch (UnauthorizedAccessException e)
             {
                 throw e;
+            }
+        }
+
+        public void Clear()
+        {
+            lock (SendDataLock)
+            {
+                _session.Clear();
             }
         }
 
@@ -457,13 +483,13 @@ namespace Chetch.Arduino
 
         public ArduinoDevice AddDevice(ArduinoDevice device)
         {
-            if(State != ADMState.DEVICE_READY)
-            {
-                throw new Exception("ADM state mut be DEVICE_READY ... currently " + State);
-            }
             if(device.ID == null)
             {
                 throw new Exception("Cannot add this device as it does not have a valid ID");
+            }
+            if (State != ADMState.DEVICE_READY)
+            {
+                throw new Exception("Cannot add device " + device.ID + " as ADM state must be DEVICE_READY ... currently " + State);
             }
             if (_devices.ContainsKey(device.ID))
             {
@@ -530,19 +556,12 @@ namespace Chetch.Arduino
                         SetDigitalPinMode(dpin.PinNumber, dpin.Mode);
                         if (dpin.InitialValue != -1)
                         {
-                            SetDigitalPin(dpin.PinNumber, dpin.InitialValue > 0, 100);
+                            SetDigitalPin(dpin.PinNumber, dpin.InitialValue > 0);
                         }
                         break;
                 }
             }
 
-            //send configuration/setup data to board
-            var message = new ADMMessage();
-            message.LittleEndian = LittleEndian;
-            message.Type = Messaging.MessageType.CONFIGURE;
-            device.AddConfig(message);
-            SendMessage(message, 250); //leave some time for this process to complete to avoid bombarding the board
-            
             return device;
         }
 
@@ -628,7 +647,18 @@ namespace Chetch.Arduino
             return (d != null && d.IsConnected);
         }
 
-        public void OnMessageReceived(Object sender, FirmataMessageEventArgs eventArgs)
+        private void HandleFirmataProcessMessageException(Object sender, Exception e)
+        {
+            String msg = String.Format("Error processing firmata message {0}: {1} ", e.GetType(), e.Message);
+            Tracing?.TraceEvent(TraceEventType.Error, 0, msg);
+        }
+
+        /// <summary>
+        /// Handle messages that harve arrived from the board and successfully processed by Firmata
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="eventArgs"></param>
+        private void HandleFirmataMessageReceived(Object sender, FirmataMessageEventArgs eventArgs)
         {
             var fmessage = eventArgs.Value;
             ADMMessage message = null;
@@ -658,7 +688,14 @@ namespace Chetch.Arduino
                             }
 
                             message = ADMMessage.Deserialize<ADMMessage>(serialized, MessageEncoding.QUERY_STRING);
+                            Console.WriteLine("<-------------- {0}: Received message {1}", PortAndNodeID, message.Type);
+                            //if (message.HasValue("FM")) Console.WriteLine("Free Memory: {0}", message.GetValue("FM"));
+
                             message.TargetID = Utilities.Convert.ToByte(message.Target);
+                            LastMessageReceived = message;
+                            LastMessageReceivedOn = DateTime.Now;
+                            MessageSentSuccess = message.Tag == LastMessageSent.Tag;
+                            MessagesReceived++;
                         }
                         catch (Exception e)
                         {
@@ -870,14 +907,52 @@ namespace Chetch.Arduino
 
         public void SendMessage(ADMMessage message, int sleep = 0)
         {
-            if(message != null)
+            if (message == null) return;
+            lock(SendDataLock)
             {
+                bool ready2send;
+                long msSinceLastSent = -1; 
+
+                do
+                {
+                    msSinceLastSent = (DateTime.Now.Ticks - LastMessageSentOn.Ticks) / TimeSpan.TicksPerMillisecond;
+                    if (LastMessageSent == null || MessageSentSuccess)
+                    {
+                        ready2send = true;
+                    }
+                    else 
+                    { 
+                        ready2send = msSinceLastSent > MESSAGE_RECEIVED_TIMEOUT;
+                        if (!ready2send)
+                        {
+                             _sleep(10); //crappy idea to reduce load on cpu
+                        } else
+                        {
+                            Console.WriteLine("{0}: Timeout since last message received so proceeding with send of {1}", PortAndNodeID, message.Type);
+                        }
+                    }
+                } while (!ready2send);
+
+                //we do some 'throttling' here
+                if(msSinceLastSent > 0 && msSinceLastSent < SEND_MESSAGE_THROTTLE)
+                {
+                    long throttleBy = System.Convert.ToInt64(SEND_MESSAGE_THROTTLE);
+                    _sleep(System.Convert.ToInt32(throttleBy - msSinceLastSent));
+                }
+
+                if (message.Tag == 0) message.Tag = ADMMessage.CreateNewTag();
+                Console.WriteLine("------------> {0}: Send message {1}", PortAndNodeID, message.Type);
                 SendString(message.Serialize());
+
+                MessagesSent++;
+                LastMessageSent = message;
+                LastMessageSentOn = DateTime.Now;
+                MessageSentSuccess = false;
                 _sleep(sleep);
-            }
+            } //end lock
         }
 
-        public void SendString(String s)
+        private void SendString(String s)
         {
             if (s == null || s == String.Empty) return;
 
@@ -891,23 +966,20 @@ namespace Chetch.Arduino
                 return;
             }
 
-            lock (LockSendString)
+            try
             {
-                try
-                {
-                    _session.SendStringData(s);
-                } catch (Exception e)
-                {
-                    String msg = String.Format("Error sending string {0}: {1} ", e.GetType(), e.Message);
-                    Tracing?.TraceEvent(TraceEventType.Error, 0, msg);
-                    throw e;
-                }
+                _session.SendStringData(s);
+            } catch (Exception e)
+            {
+                String msg = String.Format("Error sending string {0}: {1} ", e.GetType(), e.Message);
+                Tracing?.TraceEvent(TraceEventType.Error, 0, msg);
+                throw e;
             }
         }
 
         public void SetDigitalPin(int pinNumber, bool value, int sleep = 0)
         {
-            lock(LockSetDigitalPin)
+            lock(SendDataLock)
             {
                 try
                 {
@@ -925,7 +997,7 @@ namespace Chetch.Arduino
 
         public void SetDigitalPinMode(int pinNumber, PinMode pinMode, int sleep = 0)
         {
-            lock (LockSetDigitalPinMode)
+            lock (SendDataLock)
             {
                 try
                 {
@@ -984,22 +1056,42 @@ namespace Chetch.Arduino
             return device.ThreadExecuteCommand(command, repeat, delay, args);
         }
 
+        public byte Initialise()
+        {
+            ADMMessage message = new ADMMessage();
+            message.TargetID = 0;
+            message.Type = Messaging.MessageType.INITIALISE;
+            SendMessage(message, 250);
+            return message.Tag;
+        }
+
         public byte RequestStatus(byte boardID = 0)
         {
-            var message = new ADMMessage();
+            var message = new ADMMessage(true);
             message.Type = Messaging.MessageType.STATUS_REQUEST;
-            message.Tag = ADMMessage.CreateNewTag();
             message.TargetID = boardID;
             SendMessage(message);
             return message.Tag;
         }
 
+        public void Configure()
+        {
+            //send configuration/setup data to board
+            foreach (ArduinoDevice device in _devices.Values)
+            {
+                var message = new ADMMessage();
+                message.LittleEndian = LittleEndian;
+                message.Type = Messaging.MessageType.CONFIGURE;
+                device.AddConfig(message);
+                SendMessage(message, 250); //leave some time for this process to complete to avoid bombarding the board
+            }
+        }
+
         public byte Ping()
         {
-            var message = new ADMMessage();
+            var message = new ADMMessage(true);
             message.Type = Messaging.MessageType.PING;
             message.TargetID = 0;
-            message.Tag = ADMMessage.CreateNewTag();
             SendMessage(message);
             return message.Tag;
         }

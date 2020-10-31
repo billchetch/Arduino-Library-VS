@@ -7,6 +7,7 @@ using System.IO.Ports;
 using XBeeLibrary.Core;
 using XBeeLibrary.Core.Models;
 using XBeeLibrary.Core.Utils;
+using Chetch.Application;
 
 namespace Chetch.Arduino.XBee
 {
@@ -24,15 +25,20 @@ namespace Chetch.Arduino.XBee
 
         public int BytesToRead { get => DataBuffer.Count; }
 
+        public int MaxRetrySendAttempts { get; set; } = 1;
+
         public XBeeSerialConnection XBSerialConnection { get; internal set; }
 
+        public event SerialDataReceivedEventHandler DataReceived;
+        
         public XBeeDevice XBCoordinator { get; internal set; }
 
         public String NodeID { get; internal set; }
-
+        
         public RemoteXBeeDevice XBRemoteDevice { get; set; }
 
-        private Object lockXBDevice = new object();
+        private Object lockXBDevice = new Object();
+        private Object lockDataBuffer = new Object();
 
         public XBeeFirmataSerialConnection(String nodeID, String port, Solid.Arduino.SerialBaudRate baudRate)
         {
@@ -44,14 +50,30 @@ namespace Chetch.Arduino.XBee
             if (_connections.ContainsKey(port) && _connections[port].Count > 0)
             {
                 //do a quick check to see if the nodeID is being used
+                XBeeFirmataSerialConnection cnn2remove = null;
                 foreach (var cnn in _connections[port])
                 {
-                    if (cnn.NodeID.Equals(nodeID)) throw new Exception(String.Format("Node ID {0} is already taken for connections on port {1}", nodeID, port));
+                    if (cnn.NodeID.Equals(nodeID))
+                    {
+                        //if the connection is open we barf
+                        if (cnn.IsOpen)
+                        {
+                            throw new Exception(String.Format("Node ID {0} is already being used for connections on port {1}", nodeID, port));
+                        }
+                        else 
+                        { 
+                            //otherwise we take this newly created connection and remove the old one
+                            cnn2remove = cnn;
+                        }
+                        break;
+                    }
                 }
 
                 //reuse the connection and coordinator
                 XBSerialConnection = _connections[port][0].XBSerialConnection;
                 XBCoordinator = _connections[port][0].XBCoordinator;
+
+                if (cnn2remove != null) _connections[port].Remove(cnn2remove);
             }
             else
             {
@@ -59,23 +81,35 @@ namespace Chetch.Arduino.XBee
                 //and a new coordinator (to coordinate XBee network)
                 XBSerialConnection = new XBeeSerialConnection(port, (int)baudRate);
                 XBCoordinator = new ZigBeeDevice(XBSerialConnection); //TODO: parameterize this
-
+                
                 _connections[port] = new List<XBeeFirmataSerialConnection>();
             }
 
             _connections[port].Add(this);
         }
 
-        public event SerialDataReceivedEventHandler DataReceived;
-
         public void AddDataReceived(byte[] data)
         {
-            for (int i = 0; i < data.Length; i++)
+            lock (lockDataBuffer)
             {
-                DataBuffer.Enqueue((int)data[i]);
+                for (int i = 0; i < data.Length; i++)
+                {
+                    DataBuffer.Enqueue((int)data[i]);
+                }
             }
 
             //if we need the serial event args then this can be retreived (with some modification) from the serial port in the XBeeSerialConnection instance
+            if(DataReceived != null)
+            {
+                var This = this;
+                Task.Run(() => {
+                    DataReceived.Invoke(This, null);
+                });
+            }
+        }
+
+        private void OnDataReceived()
+        {
             DataReceived?.Invoke(this, null);
         }
 
@@ -103,14 +137,15 @@ namespace Chetch.Arduino.XBee
                 lock (lockXBDevice)
                 {
                     XBCoordinator.Open();
-                    XBCoordinator.ReceiveTimeout = 10000; //default is 2000
                 }
             }
 
             XBCoordinator.DataReceived += HandleXBeeDataReceived;
+            
             XBRemoteDevice = XBCoordinator.GetNetwork().DiscoverDevice(NodeID);
             if (XBRemoteDevice == null)
             {
+                Close(); //this is no good to us if there is no remote device
                 throw new Exception(String.Format("Open: Cannot find XBee with NodeID {0}", NodeID));
             }
 
@@ -134,20 +169,26 @@ namespace Chetch.Arduino.XBee
 
             if (allClosed)
             {
-                XBCoordinator.Close();
-                XBSerialConnection.Close();
+                lock (lockXBDevice)
+                {
+                    XBCoordinator.Close();
+                }
             }
         }
 
+       
         public int ReadByte()
         {
-            if (DataBuffer.Count == 0)
+            lock (lockDataBuffer)
             {
-                return -1;
-            }
-            else
-            {
-                return DataBuffer.Dequeue();
+                if (DataBuffer.Count == 0)
+                {
+                    return -1;
+                }
+                else
+                {
+                    return DataBuffer.Dequeue();
+                }
             }
         }
 
@@ -162,8 +203,11 @@ namespace Chetch.Arduino.XBee
         {
             if (offset == 0)
             {
-                XBCoordinator.SendDataAsync(XBRemoteDevice, buffer);
-                //XBLocalDevice.SendBroadcastData(buffer);
+                lock (lockXBDevice)
+                {
+                    //XBCoordinator.SendDataAsync(XBRemoteDevice, buffer);
+                    XBCoordinator.SendData(XBRemoteDevice, buffer);
+                }
             }
             else
             {

@@ -12,7 +12,9 @@ namespace Chetch.Arduino.Devices.Counters
     public class Counter : ArduinoDevice
     {
         public const String COMMAND_READ_COUNT = "read-count";
-
+        public const String PARAM_COUNT = "CT"; //The Count parameter name used by the board device
+        public const String PARAM_INTERVAL = "IV"; //The Interval paramater name used by th eboard device
+            
         public long Count { get; internal set; } = 0;
         public long Interval { get; internal set; } = 0;
         
@@ -59,10 +61,10 @@ namespace Chetch.Arduino.Devices.Counters
         {
             base.HandleMessage(message);
 
-            if (message.Type == Chetch.Messaging.MessageType.COMMAND_RESPONSE && message.HasValue("Count"))
+            if (message.Type == Chetch.Messaging.MessageType.COMMAND_RESPONSE && message.HasValue(PARAM_COUNT))
             {
-                Count = message.GetLong("Count");
-                Interval = message.GetLong("Interval");
+                Count = message.GetLong(PARAM_COUNT);
+                Interval = message.GetLong(PARAM_INTERVAL);
                 Mgr.Sampler.ProvideSample(this, (double)Count, Interval);
             }
         }
