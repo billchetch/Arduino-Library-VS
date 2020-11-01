@@ -22,50 +22,66 @@ namespace Chetch.Arduino
         DEVICE_CONNECTED
     }
 
+    public enum ErrorCode
+    {
+        NO_ERROR = 0,
+        ERROR_CHECKSUM = 1,
+        ERROR_UNRECOGNISED_MESSAGE_TYPE = 2,
+        ERROR_BADLY_FORMED_MESSAGE = 3,
+        ERROR_UNKNOWN = 4
+    }
+
     public class ADMMessage : Message
     {
-        const long TTL = 5 *  1000; //how long in millis a Tag can last for 
-        static long[] _usedTags = new long[255];
-        public static void ReleaseTag(byte tag)
+        public class MessageTags
         {
-            if (tag == 0) return;
-            _usedTags[tag] = 0;
-        }
+            const long TTL = 5 * 1000; //how long in millis a Tag can last for 
+            private long[] _usedTags = new long[255];
 
-        public static byte CreateNewTag()
-        {
-            //start from 1 as we reserve 0 to mean a non-assigned tag
-            long nowInMillis = DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
-            for(byte i = 1; i < _usedTags.Length; i++)
+            public void Release(byte tag)
             {
-                if (_usedTags[i] == 0 || nowInMillis - _usedTags[i] > TTL)
+                if (tag == 0) return;
+                _usedTags[tag] = 0;
+            }
+
+            public byte CreateTag()
+            {
+                //start from 1 as we reserve 0 to mean a non-assigned tag
+                long nowInMillis = DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
+                for (byte i = 1; i < _usedTags.Length; i++)
                 {
-                    _usedTags[i] = nowInMillis;
-                    return i;
+                    if (_usedTags[i] == 0 || nowInMillis - _usedTags[i] > TTL)
+                    {
+                        _usedTags[i] = nowInMillis;
+                        return i;
+                    }
+                }
+                throw new Exception("Cannot create tag as all tags are being used");
+            }
+
+            public int Available
+            {
+                get
+                {
+                    int available = 0;
+                    long nowInMillis = DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
+                    for (byte i = 1; i < _usedTags.Length; i++)
+                    {
+                        if (_usedTags[i] == 0 || nowInMillis - _usedTags[i] > TTL)
+                        {
+                            available++;
+                        }
+                    }
+                    return available;
                 }
             }
-            throw new Exception("Cannot create tag as all tags are being used");
-        }
 
-        public static int AvailableTags()
-        {
-            int available = 0;
-            long nowInMillis = DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
-            for (byte i = 1; i < _usedTags.Length; i++)
+            public void Reset()
             {
-                if (_usedTags[i] == 0 || nowInMillis - _usedTags[i] > TTL)
+                for (byte i = 1; i < _usedTags.Length; i++)
                 {
-                    available++;
+                    _usedTags[i] = 0;
                 }
-            }
-            return available;
-        }
-
-        public static void ResetTags()
-        {
-            for (byte i = 1; i < _usedTags.Length; i++)
-            {
-                _usedTags[i] = 0;
             }
         }
 
@@ -76,19 +92,20 @@ namespace Chetch.Arduino
         public bool LittleEndian { get; set; } = true;
         public bool CanBroadcast { get; set; } = true;
 
-        public ADMMessage(bool createTag)
+        public ADMMessage(byte tag)
         {
             DefaultEncoding = MessageEncoding.BYTES_ARRAY;
-            if(createTag)Tag = CreateNewTag();
+            if(tag > 0)Tag = tag;
         }
 
-        public ADMMessage() : this(false) { }
+        public ADMMessage() : this(0) { }
 
         public override void AddBytes(List<byte> bytes)
         {
             //Scheme here is 4 bytes as a 'header' to include: Type, Tag, TargetID, CommandID
             //Followed by a non-limited (although in reality it should be determined by the board)
             //number of arguments, where each argument is preceded by the number of bytes the argument needs
+            //and then finally a checksum of all the bytes
             base.AddBytes(bytes); //will add Type
 
             bytes.Add(Tag);
@@ -100,6 +117,11 @@ namespace Chetch.Arduino
                 bytes.Add((byte)b.Length);
                 bytes.AddRange(b);
             }
+
+            byte checksum = Utilities.CheckSum.SimpleAddition(bytes.ToArray());
+            bytes.Add(checksum);
+
+            if (bytes.Count > 254) throw new Exception("Message cannot exceed 254 bytes");
 
             //we now add a byte to handle the zero byte case cos the zero byte is interpreted as string termination
             byte mask = (byte)255;
@@ -173,8 +195,8 @@ namespace Chetch.Arduino
     public class ArduinoDeviceManager
     {
         private const int RESPONSE_TIMEOUT = 10000; //Firmata setting
-        private const int MAX_SEND_STRING_LENGTH = 32; //maximum string length to send by Firmata
-        private const int MESSAGE_RECEIVED_TIMEOUT = 2000; //how long we hold up Sending if waiting for an ADMMessage to be received
+        private const int MAX_SEND_STRING_LENGTH = 31; //maximum string length to send by Firmata (was 32, reduced to 31 cos message now contains checksum byte)
+        private const int MESSAGE_RECEIVED_TIMEOUT = 1500; //how long we hold up Sending if waiting for an ADMMessage to be received
         private const int SEND_MESSAGE_THROTTLE = 50; //minimum ms between messages sent ... to hold off bombarding the board
 
         public const string ARDUINO_MEGA_2560 = "USB-SERIAL CH340";
@@ -310,20 +332,28 @@ namespace Chetch.Arduino
                 return devicesConnected;
             }
         }
+        //Thread Locks
+        private Object SendDataLock = new Object();
+        private Object MessageStatsLock = new Object();
+
+        public ADMMessage.MessageTags MessageTags { get; } = new ADMMessage.MessageTags();
+
         public long MessagesSent { get; internal set; } = 0;
         public long MessagesReceived { get; internal set; } = 0;
         public ADMMessage LastMessageSent { get; internal set; }
         public DateTime LastMessageSentOn { get; internal set; }
-        public bool MessageSentSuccess { get; internal set; } = false;
+        public bool MessageReceivedSuccess { get; internal set; } = false;
         public ADMMessage LastMessageReceived { get; internal set; }
         public DateTime LastMessageReceivedOn { get; internal set; }
         public ADMMessage LastErrorMessage { get; internal set;  }
+        public ErrorCode LastErrorCode { get; internal set; }
         public DateTime LastErrorOn { get; internal set; }
         public ADMMessage LastPingResponseMessage { get; internal set; }
         public DateTime LastPingResponseOn { get; internal set; }
         public ADMMessage LastStatusResponseMessage { get; internal set; }
         public DateTime LastStatusResponseOn { get; internal set; }
         public DateTime LastDisconnectedOn { get; internal set; }
+
 
         public String Port { get; internal set; }
         public String NodeID { get; internal set; } //if using a shared port
@@ -352,9 +382,6 @@ namespace Chetch.Arduino
         //interval based sampler for providing averages over device values.
         public Sampler Sampler { get; internal set; } = new Sampler();
 
-        //Thread Locks
-        private Object SendDataLock = new Object();
-       
         public ArduinoDeviceManager(ArduinoSession firmata, Action<ADMMessage, ArduinoDeviceManager> listener, String port, String nodeID = null)
         {
             State = ADMState.CONNECTING;
@@ -372,7 +399,8 @@ namespace Chetch.Arduino
             _session.ProcessMessageException += HandleFirmataProcessMessageException;
 
             Port = port;
-            NodeID = nodeID; 
+            NodeID = nodeID;
+            _session.ID = PortAndNodeID;
 
             _firmware = _session.GetFirmware();
 #if DEBUG
@@ -649,8 +677,10 @@ namespace Chetch.Arduino
 
         private void HandleFirmataProcessMessageException(Object sender, Exception e)
         {
-            String msg = String.Format("Error processing firmata message {0}: {1} ", e.GetType(), e.Message);
+            String msg = String.Format("{0} error processing firmata message {1}: {2} ", BoardID, e.GetType(), e.Message);
             Tracing?.TraceEvent(TraceEventType.Error, 0, msg);
+
+            Console.WriteLine(msg);
         }
 
         /// <summary>
@@ -688,14 +718,37 @@ namespace Chetch.Arduino
                             }
 
                             message = ADMMessage.Deserialize<ADMMessage>(serialized, MessageEncoding.QUERY_STRING);
-                            Console.WriteLine("<-------------- {0}: Received message {1}", PortAndNodeID, message.Type);
                             //if (message.HasValue("FM")) Console.WriteLine("Free Memory: {0}", message.GetValue("FM"));
 
+                            //do some general checking
+                            if(BoardID != null && message.HasValue("BDID"))
+                            {
+                                String bdid = message.GetString("BDID");
+                                if (!BoardID.Equals(bdid))
+                                {
+                                    Console.WriteLine("WOW WRONG FRICKEN BOARD ... this is {0} but message is for {1}", BoardID, bdid);
+                                }
+                            }
+
                             message.TargetID = Utilities.Convert.ToByte(message.Target);
-                            LastMessageReceived = message;
-                            LastMessageReceivedOn = DateTime.Now;
-                            MessageSentSuccess = message.Tag == LastMessageSent.Tag;
-                            MessagesReceived++;
+
+                            lock (MessageStatsLock)
+                            {
+                                if (MessagesReceived >= MessagesSent)
+                                {
+                                    Console.WriteLine("Big message stats error ... received = {0}, sent = {1}", MessagesReceived + 1, MessagesSent);
+                                }
+
+                                LastMessageReceived = message;
+                                LastMessageReceivedOn = DateTime.Now;
+                                MessageReceivedSuccess = message.Tag == LastMessageSent.Tag;
+                                MessagesReceived++;
+                            }
+                            
+                            
+                            
+
+                            Console.WriteLine("<<<<< {0}: Received message {1} tag {2}. Success = {3}, Msgs Sent = {4}, Msgs Recv. = {5}", PortAndNodeID, message.Type, message.Tag, MessageReceivedSuccess, MessagesSent, MessagesReceived);
                         }
                         catch (Exception e)
                         {
@@ -742,6 +795,7 @@ namespace Chetch.Arduino
                                 break;
 
                             case Messaging.MessageType.ERROR:
+                                Console.WriteLine("ArduinoDeviceManager::HandleFirmataMessageReceived !!!ERROR!!!: {0} produced error {1}", BoardID, message.HasValue("EC") ? ((ErrorCode)message.GetInt("EC")).ToString() : ErrorCode.ERROR_UNKNOWN.ToString());
                                 break;
                         }
 
@@ -831,6 +885,10 @@ namespace Chetch.Arduino
             {
                 //record last error message
                 LastErrorMessage = message;
+                if (message.HasValue("EC")) {
+                    LastErrorCode = (ErrorCode)message.GetInt("EC");
+                    message.AddValue("ErrorCode", LastErrorCode);
+                }
                 LastErrorOn = DateTime.Now;
             }
             Broadcast(message);
@@ -840,7 +898,7 @@ namespace Chetch.Arduino
         {
             if (message == null) return;
 
-            ADMMessage.ReleaseTag(message.Tag);
+            MessageTags.Release(message.Tag);
             message.Target = null; //clear the target as it may have been used internally but now this is a broadcast so it's not intended for any specific target
 
             if (_listener != null && message.CanBroadcast)
@@ -861,13 +919,13 @@ namespace Chetch.Arduino
             }
         }
 
-        public void SendCommand(byte targetID, ArduinoCommand command, List<Object> extraArgs = null, byte tag = 0)
+        public byte SendCommand(byte targetID, ArduinoCommand command, List<Object> extraArgs = null, byte tag = 0)
         {
             var message = new ADMMessage();
             message.LittleEndian = LittleEndian;
             message.Type = Messaging.MessageType.COMMAND;
             message.TargetID = targetID;
-            message.Tag = tag;
+            message.Tag = tag == 0 ? MessageTags.CreateTag() : tag;
             message.CommandID = (byte)command.Type;
             
             List<Object> allArgs = command.Arguments;
@@ -894,7 +952,7 @@ namespace Chetch.Arduino
                 message.AddArgument(b);
             }
 
-            SendMessage(message);
+            return SendMessage(message);
         }
 
         private void _sleep(int sleep)
@@ -905,9 +963,9 @@ namespace Chetch.Arduino
             }
         }
 
-        public void SendMessage(ADMMessage message, int sleep = 0)
+        public byte SendMessage(ADMMessage message, int sleep = 0)
         {
-            if (message == null) return;
+            if (message == null) return 0;
             lock(SendDataLock)
             {
                 bool ready2send;
@@ -916,7 +974,7 @@ namespace Chetch.Arduino
                 do
                 {
                     msSinceLastSent = (DateTime.Now.Ticks - LastMessageSentOn.Ticks) / TimeSpan.TicksPerMillisecond;
-                    if (LastMessageSent == null || MessageSentSuccess)
+                    if (LastMessageSent == null || MessageReceivedSuccess)
                     {
                         ready2send = true;
                     }
@@ -928,7 +986,7 @@ namespace Chetch.Arduino
                              _sleep(10); //crappy idea to reduce load on cpu
                         } else
                         {
-                            Console.WriteLine("{0}: Timeout since last message received so proceeding with send of {1}", PortAndNodeID, message.Type);
+                            Console.WriteLine("{0}: Expecting to receive message tag {1} but timeout occurred so proceeding with send of {2} tag {3}", PortAndNodeID, LastMessageSent.Tag, message.Type, message.Tag);
                         }
                     }
                 } while (!ready2send);
@@ -940,16 +998,27 @@ namespace Chetch.Arduino
                     _sleep(System.Convert.ToInt32(throttleBy - msSinceLastSent));
                 }
 
-                if (message.Tag == 0) message.Tag = ADMMessage.CreateNewTag();
-                Console.WriteLine("------------> {0}: Send message {1}", PortAndNodeID, message.Type);
-                SendString(message.Serialize());
-
-                MessagesSent++;
-                LastMessageSent = message;
-                LastMessageSentOn = DateTime.Now;
-                MessageSentSuccess = false;
+                try
+                {
+                    lock (MessageStatsLock)
+                    {
+                        MessagesSent++;
+                        LastMessageSent = message;
+                        LastMessageSentOn = DateTime.Now;
+                        MessageReceivedSuccess = false;
+                    }
+                    Console.WriteLine(">>>>>>>>>> {0}: Sending message {1} tag {2}. Success = {3}, Msgs Sent = {4}, Msgs Recv. = {5}", PortAndNodeID, message.Type, message.Tag, MessageReceivedSuccess, MessagesSent, MessagesReceived);
+                    if (message.Tag == 0) message.Tag = MessageTags.CreateTag();
+                    SendString(message.Serialize());
+                } catch (Exception e)
+                {
+                    throw e;
+                }
+                
                 _sleep(sleep);
             } //end lock
+
+            return message.Tag;
         }
 
         private void SendString(String s)
@@ -1058,7 +1127,7 @@ namespace Chetch.Arduino
 
         public byte Initialise()
         {
-            ADMMessage message = new ADMMessage();
+            ADMMessage message = new ADMMessage(MessageTags.CreateTag());
             message.TargetID = 0;
             message.Type = Messaging.MessageType.INITIALISE;
             SendMessage(message, 250);
@@ -1067,13 +1136,13 @@ namespace Chetch.Arduino
 
         public byte RequestStatus(byte boardID = 0)
         {
-            var message = new ADMMessage(true);
+            var message = new ADMMessage(MessageTags.CreateTag());
             message.Type = Messaging.MessageType.STATUS_REQUEST;
             message.TargetID = boardID;
             SendMessage(message);
             return message.Tag;
         }
-
+        
         public void Configure()
         {
             //send configuration/setup data to board
@@ -1089,7 +1158,7 @@ namespace Chetch.Arduino
 
         public byte Ping()
         {
-            var message = new ADMMessage(true);
+            var message = new ADMMessage(MessageTags.CreateTag());
             message.Type = Messaging.MessageType.PING;
             message.TargetID = 0;
             SendMessage(message);

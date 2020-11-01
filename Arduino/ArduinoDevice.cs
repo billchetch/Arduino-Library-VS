@@ -434,7 +434,7 @@ namespace Chetch.Arduino
                 args = new List<Object>();
             }
 
-            byte tag = acmd.ExpectsResponse ? ADMMessage.CreateNewTag() : (byte)0;
+            byte tag = acmd.ExpectsResponse ? Mgr.MessageTags.CreateTag() : (byte)0;
             ExecutionArguments xargs = new ExecutionArguments(args, tag);
 
             //Use ThreadExecutionManager to allow for multi-threading by device 
@@ -444,7 +444,7 @@ namespace Chetch.Arduino
             ThreadExecutionManager.MaxQueueSize = prevSize;
             if(xs == null)
             {
-                ADMMessage.ReleaseTag(tag);
+                Mgr.MessageTags.Release(tag);
                 tag = 0;
             }
             

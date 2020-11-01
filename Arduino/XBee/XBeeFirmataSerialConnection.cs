@@ -8,6 +8,8 @@ using XBeeLibrary.Core;
 using XBeeLibrary.Core.Models;
 using XBeeLibrary.Core.Utils;
 using Chetch.Application;
+using XBeeLibrary.Core.Packet;
+using XBeeLibrary.Core.Packet.Common;
 
 namespace Chetch.Arduino.XBee
 {
@@ -21,9 +23,25 @@ namespace Chetch.Arduino.XBee
         public string PortName { get => XBSerialConnection.PortName; set => XBSerialConnection.PortName = value; }
         public string NewLine { get => XBSerialConnection.NewLine; set => XBSerialConnection.NewLine = value; }
 
-        public Queue<int> DataBuffer { get; internal set; } = new Queue<int>();
+        private int _bufferReadPosition = 0;
+        private int _bufferWritePosition = 0;
 
-        public int BytesToRead { get => DataBuffer.Count; }
+        private const int BUFFER_SIZE = 1024 * 32;
+        public byte[] DataBuffer { get; internal set; } = new byte[BUFFER_SIZE]; //
+
+        public int BytesToRead
+        {
+            get
+            {
+                if (_bufferWritePosition >= _bufferReadPosition)
+                {
+                    return _bufferWritePosition - _bufferReadPosition;
+                } else
+                {
+                    return BUFFER_SIZE - _bufferReadPosition + _bufferWritePosition;
+                }
+            }
+        }
 
         public int MaxRetrySendAttempts { get; set; } = 1;
 
@@ -38,7 +56,8 @@ namespace Chetch.Arduino.XBee
         public RemoteXBeeDevice XBRemoteDevice { get; set; }
 
         private Object lockXBDevice = new Object();
-        private Object lockDataBuffer = new Object();
+        private Object bufferPositionLock = new Object();
+        private Task _deliverDataTask;
 
         public XBeeFirmataSerialConnection(String nodeID, String port, Solid.Arduino.SerialBaudRate baudRate)
         {
@@ -90,27 +109,34 @@ namespace Chetch.Arduino.XBee
 
         public void AddDataReceived(byte[] data)
         {
-            lock (lockDataBuffer)
-            {
-                for (int i = 0; i < data.Length; i++)
-                {
-                    DataBuffer.Enqueue((int)data[i]);
-                }
-            }
+            if (data.Length > DataBuffer.Length) throw new Exception("Too many bytes!");
 
-            //if we need the serial event args then this can be retreived (with some modification) from the serial port in the XBeeSerialConnection instance
-            if(DataReceived != null)
+            int idx = _bufferWritePosition;
+            for (int i = 0; i < data.Length; i++)
             {
-                var This = this;
-                Task.Run(() => {
-                    DataReceived.Invoke(This, null);
-                });
+                DataBuffer[idx] = data[i];
+                idx = (idx + 1) % BUFFER_SIZE;
             }
+            lock (bufferPositionLock)
+            {
+                _bufferWritePosition = idx;
+            }
+            
+            //byte checksum = Chetch.Utilities.CheckSum.SimpleAddition(data);
+            //Console.WriteLine("XBee: {0} added {1} bytes to buffer, checksum = {2}, rp = {3}, wp = {4}, available = {5}", NodeID, data.Length, checksum, _bufferReadPosition, _bufferWritePosition, BytesToRead);
+            //Console.WriteLine("XBee: {0}", HexUtils.ByteArrayToHexString(data));
         }
 
-        private void OnDataReceived()
+        private void DeliverData()
         {
-            DataReceived?.Invoke(this, null);
+            while (IsOpen)
+            {
+                if (DataReceived != null && BytesToRead > 0)
+                {
+                    DataReceived.Invoke(this, null);
+                }
+                System.Threading.Thread.Sleep(10);
+            }
         }
 
         private void HandleXBeeDataReceived(Object sender, XBeeLibrary.Core.Events.DataReceivedEventArgs args)
@@ -130,6 +156,18 @@ namespace Chetch.Arduino.XBee
             }
         }
 
+        private void HandleXBeePacketReceived(Object sender, XBeeLibrary.Core.Events.PacketReceivedEventArgs args)
+        {
+            if (args.ReceivedPacket is TransmitStatusPacket)
+            {
+                TransmitStatusPacket receivedPacket = (TransmitStatusPacket)args.ReceivedPacket;
+                if(receivedPacket.TransmitStatus != XBeeTransmitStatus.SUCCESS)
+                {
+                    Console.WriteLine("!!!!!!! Transmit issues: {0}", NodeID);
+                }
+            }
+        }
+
         public void Open()
         {
             if (!XBCoordinator.IsOpen)
@@ -141,6 +179,7 @@ namespace Chetch.Arduino.XBee
             }
 
             XBCoordinator.DataReceived += HandleXBeeDataReceived;
+            XBCoordinator.PacketReceived += HandleXBeePacketReceived;
             
             XBRemoteDevice = XBCoordinator.GetNetwork().DiscoverDevice(NodeID);
             if (XBRemoteDevice == null)
@@ -150,11 +189,14 @@ namespace Chetch.Arduino.XBee
             }
 
             IsOpen = true;
+
+            _deliverDataTask = Task.Run(() => DeliverData());
         }
 
         public void Close()
         {
             XBCoordinator.DataReceived -= HandleXBeeDataReceived;
+            XBCoordinator.PacketReceived -= HandleXBeePacketReceived;
             IsOpen = false;
 
             bool allClosed = true;
@@ -179,16 +221,18 @@ namespace Chetch.Arduino.XBee
        
         public int ReadByte()
         {
-            lock (lockDataBuffer)
+            if (BytesToRead > 0)
             {
-                if (DataBuffer.Count == 0)
+                int b = (int)DataBuffer[_bufferReadPosition];
+                lock (bufferPositionLock)
                 {
-                    return -1;
+                    _bufferReadPosition = (_bufferReadPosition + 1) % BUFFER_SIZE;
                 }
-                else
-                {
-                    return DataBuffer.Dequeue();
-                }
+                return b;
+            }
+            else
+            {
+                return -1;
             }
         }
 

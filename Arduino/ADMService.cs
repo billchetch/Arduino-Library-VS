@@ -96,7 +96,7 @@ namespace Chetch.Arduino
                         vals["LastStatusResponseOn"] = adm.LastStatusResponseMessage == null ? "n/a" : adm.LastStatusResponseOn.ToString("yyyy-MM-dd HH:mm:ss");
                         vals["LastPingResponseOn"] = adm.LastPingResponseMessage == null ? "n/a" : adm.LastPingResponseOn.ToString("yyyy-MM-dd HH:mm:ss");
                         vals["LastDisconnectedOn"] = adm.LastDisconnectedOn == default(DateTime) ? "n/a" : adm.LastDisconnectedOn.ToString("yyyy-MM-dd HH:mm:ss");
-                        vals["AvailableMessageTags"] = System.Convert.ToString(ADMMessage.AvailableTags());
+                        vals["AvailableMessageTags"] = System.Convert.ToString(adm.MessageTags.Available);
 
                         Message.AddValue(adm.BoardID, vals);
                     }
@@ -730,8 +730,8 @@ namespace Chetch.Arduino
                             //if the asssert fails we try a 'Clear'
                             try
                             {
-                                Tracing?.TraceEvent(TraceEventType.Information, 0, "ADM: Asserting connection");
-                                adm.AssertConnection();
+                                //Tracing?.TraceEvent(TraceEventType.Information, 0, "ADM: Asserting connection");
+                                //adm.AssertConnection();
                             }
                             catch (Exception e)
                             {
@@ -852,7 +852,8 @@ namespace Chetch.Arduino
             switch (message.Type)
             {
                 case MessageType.ERROR:
-                    Tracing?.TraceEvent(TraceEventType.Error, 100, "ADM {0} produced error: {1}", adm.BoardID == null ? "n/a" : adm.BoardID, message.Value);
+                    Tracing?.TraceEvent(TraceEventType.Error, 100, "ADM {0} produced error: {1}", adm.BoardID == null ? "n/a" : adm.BoardID,  message.HasValue("ErrorCode") ? message.GetValue("ErrorCode") : ErrorCode.ERROR_UNKNOWN);
+
                     break;
 
                 case MessageType.WARNING:
