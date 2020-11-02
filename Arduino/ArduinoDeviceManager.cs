@@ -10,6 +10,8 @@ using Chetch.Services;
 using Chetch.Utilities;
 using Chetch.Application;
 using Chetch.Messaging;
+using Chetch.Arduino.XBee;
+using Chetch.Arduino.Exceptions;
 
 namespace Chetch.Arduino
 {
@@ -459,7 +461,45 @@ namespace Chetch.Arduino
         {
             lock (SendDataLock)
             {
-                _session.Clear();
+                String errMsg = null;
+                Exception innerException = null;
+                try
+                {
+                    _session.Clear();
+                } catch (BoardNotFoundException e)
+                {
+                    if(_session.Connection is XBeeFirmataSerialConnection)
+                    {
+                        try
+                        {
+                            Console.WriteLine("ArduinoDeviceManager::Clear for {0} produced XBee BoardNotFoundException ({1}) so trying a clear on the port.. ", PortAndNodeID, e.Message);
+                            XBeeFirmataSerialConnection.Clear(Port);
+                            Console.WriteLine("ArduinoDeviceManager::Clear successfully cleared port {0}", Port);
+                        } catch (Exception ex)
+                        {
+                            errMsg = String.Format("ArduinoDeviceManager::Clear for {0} Attempting to clear XBee port produced exception {1} {2}", PortAndNodeID, ex.GetType(), ex.Message);
+                            innerException = ex;
+                        }
+                    } else
+                    {
+                        errMsg = String.Format("ArduinoDeviceManager::Clear for {0} produced exception {1} {2}", PortAndNodeID, e.GetType(), e.Message);
+                        innerException = e;
+                    }
+                } catch (Exception e)
+                {
+                    //TODO: Handle in some way
+                    errMsg = String.Format("ArduinoDeviceManager::Clear for {0} produced exception {1} {2}", PortAndNodeID, e.GetType(), e.Message);
+                    innerException = e;
+                }
+                finally
+                {
+                    if(errMsg != null)
+                    {
+                        Tracing?.TraceEvent(TraceEventType.Error, 0, errMsg);
+                        Console.WriteLine(errMsg);
+                        throw new ArduinoException(errMsg, innerException);
+                    }
+                }
             }
         }
 

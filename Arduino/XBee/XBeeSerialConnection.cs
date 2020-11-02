@@ -31,17 +31,7 @@ namespace Chetch.Arduino.XBee
             _serialPort = new SerialPorts.SerialPort(port, baud);
         }
 
-        public void Close()
-        {
-            // Do nothing if the device is not open.
-            if (!IsOpen)
-                return;
-
-            _serialPort.Close();
-            _serialPort.DataReceived -= HandleDataReceived;
-            Stream = null;
-        }
-
+        
         public ConnectionType GetConnectionType()
         {
             return ConnectionType.SERIAL;
@@ -52,9 +42,18 @@ namespace Chetch.Arduino.XBee
             if (IsOpen)
                 return;
 
-            Stream = new DataStream();
             _serialPort.Open();
             _serialPort.DataReceived += HandleDataReceived;
+        }
+
+        public void Close()
+        {
+            // Do nothing if the device is not open.
+            if (!IsOpen)
+                return;
+
+            _serialPort.Close();
+            _serialPort.DataReceived -= HandleDataReceived;
         }
 
         private void HandleDataReceived(Object sender, SerialDataReceivedEventArgs eargs)

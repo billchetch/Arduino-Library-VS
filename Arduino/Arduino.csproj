@@ -92,6 +92,8 @@
     <Compile Include="Devices\SwitchSensor.cs" />
     <Compile Include="Devices\Temperature\DS18B20Array.cs" />
     <Compile Include="Devices\Temperature\TemperatureSensorBase.cs" />
+    <Compile Include="Exceptions\ArduinoException.cs" />
+    <Compile Include="Exceptions\BoardNotFoundException.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SharedSerialConnection.cs" />
     <Compile Include="XBee\XBeeFirmataSerialConnection.cs" />

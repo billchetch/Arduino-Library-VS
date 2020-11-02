@@ -7,7 +7,7 @@ using System.IO.Ports;
 using XBeeLibrary.Core;
 using XBeeLibrary.Core.Models;
 using XBeeLibrary.Core.Utils;
-using Chetch.Application;
+using Chetch.Arduino.Exceptions;
 using XBeeLibrary.Core.Packet;
 using XBeeLibrary.Core.Packet.Common;
 
@@ -16,6 +16,28 @@ namespace Chetch.Arduino.XBee
     public class XBeeFirmataSerialConnection : Solid.Arduino.ISerialConnection
     {
         static private Dictionary<String, List<XBeeFirmataSerialConnection>> _connections = new Dictionary<String, List<XBeeFirmataSerialConnection>>();
+
+        static public int Clear(String port)
+        {
+            if (!_connections.ContainsKey(port)) return 0;
+
+            int cleared = 0;
+            ///close all connections first
+            foreach(XBeeFirmataSerialConnection cnn in _connections[port])
+            {
+                cnn.Close();
+                System.Threading.Thread.Sleep(100);
+            }
+
+            //now open
+            foreach (XBeeFirmataSerialConnection cnn in _connections[port])
+            {
+                cnn.Open();
+                System.Threading.Thread.Sleep(100);
+                cleared++;
+            }
+            return cleared;
+        }
 
         public bool IsOpen { get; internal set; } = false;
 
@@ -57,7 +79,7 @@ namespace Chetch.Arduino.XBee
 
         private Object lockXBDevice = new Object();
         private Object bufferPositionLock = new Object();
-        private Task _deliverDataTask;
+        private Task _deliverDataTask = null;
 
         public XBeeFirmataSerialConnection(String nodeID, String port, Solid.Arduino.SerialBaudRate baudRate)
         {
@@ -107,6 +129,12 @@ namespace Chetch.Arduino.XBee
             _connections[port].Add(this);
         }
 
+        private void FlushBuffer(bool resetBytes2zero = false)
+        {
+            _bufferReadPosition = 0;
+            _bufferWritePosition = 0;
+        }
+
         public void AddDataReceived(byte[] data)
         {
             if (data.Length > DataBuffer.Length) throw new Exception("Too many bytes!");
@@ -121,10 +149,10 @@ namespace Chetch.Arduino.XBee
             {
                 _bufferWritePosition = idx;
             }
-            
+
             //byte checksum = Chetch.Utilities.CheckSum.SimpleAddition(data);
             //Console.WriteLine("XBee: {0} added {1} bytes to buffer, checksum = {2}, rp = {3}, wp = {4}, available = {5}", NodeID, data.Length, checksum, _bufferReadPosition, _bufferWritePosition, BytesToRead);
-            //Console.WriteLine("XBee: {0}", HexUtils.ByteArrayToHexString(data));
+            Console.WriteLine("{0} XBee: {1}: {2} bytes: {3}", System.Threading.Thread.CurrentThread.ManagedThreadId, NodeID,data.Length, HexUtils.ByteArrayToHexString(data));
         }
 
         private void DeliverData()
@@ -170,6 +198,8 @@ namespace Chetch.Arduino.XBee
 
         public void Open()
         {
+            if (IsOpen) return;
+
             if (!XBCoordinator.IsOpen)
             {
                 lock (lockXBDevice)
@@ -178,26 +208,32 @@ namespace Chetch.Arduino.XBee
                 }
             }
 
-            XBCoordinator.DataReceived += HandleXBeeDataReceived;
-            XBCoordinator.PacketReceived += HandleXBeePacketReceived;
-            
             XBRemoteDevice = XBCoordinator.GetNetwork().DiscoverDevice(NodeID);
             if (XBRemoteDevice == null)
             {
-                Close(); //this is no good to us if there is no remote device
-                throw new Exception(String.Format("Open: Cannot find XBee with NodeID {0}", NodeID));
+                throw new BoardNotFoundException(String.Format("Open: Cannot find XBee with NodeID {0}", NodeID));
             }
 
+            XBCoordinator.DataReceived += HandleXBeeDataReceived;
+            XBCoordinator.PacketReceived += HandleXBeePacketReceived;
             IsOpen = true;
 
+            //start up the thread that waits for received data and forwards it to subscribers
             _deliverDataTask = Task.Run(() => DeliverData());
         }
 
         public void Close()
         {
+            if (!IsOpen) return;
+
+            IsOpen = false;
+            if (!_deliverDataTask.IsCompleted)
+            {
+                _deliverDataTask.Wait();
+            }
+            FlushBuffer();
             XBCoordinator.DataReceived -= HandleXBeeDataReceived;
             XBCoordinator.PacketReceived -= HandleXBeePacketReceived;
-            IsOpen = false;
 
             bool allClosed = true;
             foreach (var cnn in _connections[PortName])
@@ -214,11 +250,13 @@ namespace Chetch.Arduino.XBee
                 lock (lockXBDevice)
                 {
                     XBCoordinator.Close();
+                    Console.WriteLine("{0} closing coordinator", NodeID);
                 }
             }
+            
         }
 
-       
+
         public int ReadByte()
         {
             if (BytesToRead > 0)
