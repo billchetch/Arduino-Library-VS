@@ -17,28 +17,6 @@ namespace Chetch.Arduino.XBee
     {
         static private Dictionary<String, List<XBeeFirmataSerialConnection>> _connections = new Dictionary<String, List<XBeeFirmataSerialConnection>>();
 
-        static public int Clear(String port)
-        {
-            if (!_connections.ContainsKey(port)) return 0;
-
-            int cleared = 0;
-            ///close all connections first
-            foreach(XBeeFirmataSerialConnection cnn in _connections[port])
-            {
-                cnn.Close();
-                System.Threading.Thread.Sleep(100);
-            }
-
-            //now open
-            foreach (XBeeFirmataSerialConnection cnn in _connections[port])
-            {
-                cnn.Open();
-                System.Threading.Thread.Sleep(100);
-                cleared++;
-            }
-            return cleared;
-        }
-
         public bool IsOpen { get; internal set; } = false;
 
         public int BaudRate { get => XBSerialConnection.BaudRate; set => XBSerialConnection.BaudRate = value; }
@@ -152,7 +130,7 @@ namespace Chetch.Arduino.XBee
 
             //byte checksum = Chetch.Utilities.CheckSum.SimpleAddition(data);
             //Console.WriteLine("XBee: {0} added {1} bytes to buffer, checksum = {2}, rp = {3}, wp = {4}, available = {5}", NodeID, data.Length, checksum, _bufferReadPosition, _bufferWritePosition, BytesToRead);
-            Console.WriteLine("{0} XBee: {1}: {2} bytes: {3}", System.Threading.Thread.CurrentThread.ManagedThreadId, NodeID,data.Length, HexUtils.ByteArrayToHexString(data));
+            //Console.WriteLine("{0} XBee: {1}: {2} bytes: {3}", System.Threading.Thread.CurrentThread.ManagedThreadId, NodeID,data.Length, HexUtils.ByteArrayToHexString(data));
         }
 
         private void DeliverData()
@@ -205,6 +183,7 @@ namespace Chetch.Arduino.XBee
                 lock (lockXBDevice)
                 {
                     XBCoordinator.Open();
+                    Console.WriteLine("Opening coordinator");
                 }
             }
 
@@ -234,6 +213,7 @@ namespace Chetch.Arduino.XBee
             FlushBuffer();
             XBCoordinator.DataReceived -= HandleXBeeDataReceived;
             XBCoordinator.PacketReceived -= HandleXBeePacketReceived;
+            XBRemoteDevice = null;
 
             bool allClosed = true;
             foreach (var cnn in _connections[PortName])

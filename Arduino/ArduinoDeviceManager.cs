@@ -12,6 +12,8 @@ using Chetch.Application;
 using Chetch.Messaging;
 using Chetch.Arduino.XBee;
 using Chetch.Arduino.Exceptions;
+using System.Threading.Tasks;
+using System.Linq.Expressions;
 
 namespace Chetch.Arduino
 {
@@ -198,7 +200,7 @@ namespace Chetch.Arduino
     {
         private const int RESPONSE_TIMEOUT = 10000; //Firmata setting
         private const int MAX_SEND_STRING_LENGTH = 31; //maximum string length to send by Firmata (was 32, reduced to 31 cos message now contains checksum byte)
-        private const int MESSAGE_RECEIVED_TIMEOUT = 1500; //how long we hold up Sending if waiting for an ADMMessage to be received
+        private const int MESSAGE_RECEIVED_TIMEOUT = 2000; //how long we hold up Sending if waiting for an ADMMessage to be received
         private const int SEND_MESSAGE_THROTTLE = 50; //minimum ms between messages sent ... to hold off bombarding the board
 
         public const string ARDUINO_MEGA_2560 = "USB-SERIAL CH340";
@@ -457,50 +459,44 @@ namespace Chetch.Arduino
             }
         }
 
-        public void Clear()
+        public void Clear(int attempts = 1, int waitBetweenAttempts = 0)
         {
             lock (SendDataLock)
             {
                 String errMsg = null;
                 Exception innerException = null;
-                try
+                for (int i = 0; i < attempts; i++)
                 {
-                    _session.Clear();
-                } catch (BoardNotFoundException e)
-                {
-                    if(_session.Connection is XBeeFirmataSerialConnection)
+                    errMsg = null;
+                    try
                     {
-                        try
-                        {
-                            Console.WriteLine("ArduinoDeviceManager::Clear for {0} produced XBee BoardNotFoundException ({1}) so trying a clear on the port.. ", PortAndNodeID, e.Message);
-                            XBeeFirmataSerialConnection.Clear(Port);
-                            Console.WriteLine("ArduinoDeviceManager::Clear successfully cleared port {0}", Port);
-                        } catch (Exception ex)
-                        {
-                            errMsg = String.Format("ArduinoDeviceManager::Clear for {0} Attempting to clear XBee port produced exception {1} {2}", PortAndNodeID, ex.GetType(), ex.Message);
-                            innerException = ex;
-                        }
-                    } else
+                        Tracing?.TraceEvent(TraceEventType.Information, 0, "Attempt ({0} of {1}) to clear session @ {2}", i + 1, attempts, PortAndNodeID);
+                        _session.Clear();
+                        Tracing?.TraceEvent(TraceEventType.Information, 0, "Session @ {0} cleared", PortAndNodeID);
+                        break;
+                    }
+                    catch (Exception e)
                     {
-                        errMsg = String.Format("ArduinoDeviceManager::Clear for {0} produced exception {1} {2}", PortAndNodeID, e.GetType(), e.Message);
+                        errMsg = String.Format("ArduinoDeviceManager::Clear Session @ {0} produced exception {1} {2}", PortAndNodeID, e.GetType(), e.Message);
                         innerException = e;
-                    }
-                } catch (Exception e)
-                {
-                    //TODO: Handle in some way
-                    errMsg = String.Format("ArduinoDeviceManager::Clear for {0} produced exception {1} {2}", PortAndNodeID, e.GetType(), e.Message);
-                    innerException = e;
-                }
-                finally
-                {
-                    if(errMsg != null)
-                    {
-                        Tracing?.TraceEvent(TraceEventType.Error, 0, errMsg);
-                        Console.WriteLine(errMsg);
-                        throw new ArduinoException(errMsg, innerException);
+                        Tracing?.TraceEvent(TraceEventType.Information, 0, errMsg);
+
+                        if (waitBetweenAttempts > 0 && attempts > 1)
+                        {
+                            System.Threading.Thread.Sleep(waitBetweenAttempts);
+                        }
                     }
                 }
-            }
+
+                if(errMsg != null)
+                {
+                    throw new ArduinoException(errMsg, innerException);
+                } else
+                {
+                    //Do some resetting
+                    MessageReceivedSuccess = true; //to avoid message timeout exceptions upon the first message sent after this clear
+                }
+            }           
         }
 
         public bool IsPinCapable(int pinNumber, PinMode mode)
@@ -723,6 +719,7 @@ namespace Chetch.Arduino
             Console.WriteLine(msg);
         }
 
+
         /// <summary>
         /// Handle messages that harve arrived from the board and successfully processed by Firmata
         /// </summary>
@@ -759,112 +756,11 @@ namespace Chetch.Arduino
 
                             message = ADMMessage.Deserialize<ADMMessage>(serialized, MessageEncoding.QUERY_STRING);
                             //if (message.HasValue("FM")) Console.WriteLine("Free Memory: {0}", message.GetValue("FM"));
-
-                            //do some general checking
-                            if(BoardID != null && message.HasValue("BDID"))
-                            {
-                                String bdid = message.GetString("BDID");
-                                if (!BoardID.Equals(bdid))
-                                {
-                                    Console.WriteLine("WOW WRONG FRICKEN BOARD ... this is {0} but message is for {1}", BoardID, bdid);
-                                }
-                            }
-
-                            message.TargetID = Utilities.Convert.ToByte(message.Target);
-
-                            lock (MessageStatsLock)
-                            {
-                                if (MessagesReceived >= MessagesSent)
-                                {
-                                    Console.WriteLine("Big message stats error ... received = {0}, sent = {1}", MessagesReceived + 1, MessagesSent);
-                                }
-
-                                LastMessageReceived = message;
-                                LastMessageReceivedOn = DateTime.Now;
-                                MessageReceivedSuccess = message.Tag == LastMessageSent.Tag;
-                                MessagesReceived++;
-                            }
-                            
-                            
-                            
-
-                            Console.WriteLine("<<<<< {0}: Received message {1} tag {2}. Success = {3}, Msgs Sent = {4}, Msgs Recv. = {5}", PortAndNodeID, message.Type, message.Tag, MessageReceivedSuccess, MessagesSent, MessagesReceived);
                         }
                         catch (Exception e)
                         {
                             Tracing?.TraceEvent(TraceEventType.Error, 4000, "Deserializing {0} produced exception {1}: {2}", sd.Text, e.GetType(), e.Message);
                             throw e;
-                        }
-                        switch (message.Type)
-                        {
-                            case Messaging.MessageType.STATUS_RESPONSE:
-                                try
-                                {
-                                    LittleEndian = Chetch.Utilities.Convert.ToBoolean(message.GetValue("LE"));
-                                    _boardType = message.GetString("BD");
-                                    BoardID = message.HasValue("BDID") ? message.GetString("BDID") : null;
-                                    MaxDevices = message.HasValue("MD") ? message.GetInt("MD") : 0;
-                                    if (State == ADMState.CONNECTED)
-                                    {
-                                        State = ADMState.DEVICE_READY;
-                                    }
-
-                                    if (message.HasValue("LEDBI"))
-                                    {
-                                        LEDBIPin = message.GetInt("LEDBI");
-                                    }
-                                }
-                                catch (Exception e)
-                                {
-                                    Tracing?.TraceEvent(TraceEventType.Error, 4000, "STATUS_RESPONSE error: {0}, {1}", e.GetType(), e.Message);
-                                    throw e;
-                                }
-
-                                //record this
-                                LastStatusResponseMessage = message;
-                                LastStatusResponseOn = DateTime.Now;
-                                break;
-
-                            case Messaging.MessageType.PING_RESPONSE:
-                                //record this
-                                LastPingResponseMessage = message;
-                                LastPingResponseOn = DateTime.Now;
-                                break;
-
-                            case Messaging.MessageType.CONFIGURE_RESPONSE:
-                                break;
-
-                            case Messaging.MessageType.ERROR:
-                                Console.WriteLine("ArduinoDeviceManager::HandleFirmataMessageReceived !!!ERROR!!!: {0} produced error {1}", BoardID, message.HasValue("EC") ? ((ErrorCode)message.GetInt("EC")).ToString() : ErrorCode.ERROR_UNKNOWN.ToString());
-                                break;
-                        }
-
-                        if (State == ADMState.DEVICE_READY || State == ADMState.DEVICE_CONNECTED)
-                        {
-                            //direct messages to devices
-                            var dev = GetTargetedDevice(message);
-                            if (dev != null)
-                            {
-#if DEBUG
-                                Debug.Print(String.Format("Handling message {0} for device {1} ... connected: {2}, memory: {3}", message.Type, dev.ID, dev.IsConnected, message.HasValue("FM") ? message.GetValue("FM") : "N/A"));
-#endif
-                                try
-                                {
-                                    dev.HandleMessage(message);
-                                } catch (Exception e)
-                                {
-                                    Tracing?.TraceEvent(TraceEventType.Error, 4000, "Handling message for device {0} produced exception {1}: {2}", dev.ID, e.GetType(), e.Message);
-                                    throw e;
-                                }
-                                
-                            }
-
-                            //we do this test after handling message because the message maybe a CONFIGURE_RESPONSE message which will then set the 'connected' status of the device
-                            if (message.Type == Messaging.MessageType.CONFIGURE_RESPONSE && DevicesConnected)
-                            {
-                                State = ADMState.DEVICE_CONNECTED;
-                                Sampler.Start();
-                            }
                         }
                         break;
 
@@ -921,16 +817,131 @@ namespace Chetch.Arduino
                 message.Tag = tag;
             }
 
-            if(message != null && message.Type == Messaging.MessageType.ERROR)
+            if(message != null)
             {
-                //record last error message
-                LastErrorMessage = message;
-                if (message.HasValue("EC")) {
-                    LastErrorCode = (ErrorCode)message.GetInt("EC");
-                    message.AddValue("ErrorCode", LastErrorCode);
-                }
-                LastErrorOn = DateTime.Now;
+                Task.Run(() => { HandleReceivedADMMessage(message); });
             }
+        }
+
+        private void HandleReceivedADMMessage(ADMMessage message)
+        {
+            try
+            {
+                //do some general checking
+                if (BoardID != null && message.HasValue("BDID"))
+                {
+                    String bdid = message.GetString("BDID");
+                    if (!BoardID.Equals(bdid))
+                    {
+                        Console.WriteLine("WOW WRONG FRICKEN BOARD ... this is {0} but message is for {1}", BoardID, bdid);
+                    }
+                }
+
+                message.TargetID = Utilities.Convert.ToByte(message.Target);
+
+                lock (MessageStatsLock)
+                {
+                    if (MessagesReceived >= MessagesSent)
+                    {
+                        Console.WriteLine("Big message stats error ... received = {0}, sent = {1}", MessagesReceived + 1, MessagesSent);
+                    }
+
+                    LastMessageReceived = message;
+                    LastMessageReceivedOn = DateTime.Now;
+                    MessageReceivedSuccess = message.Tag == LastMessageSent.Tag;
+                    MessagesReceived++;
+                }
+                Console.WriteLine("<<<<< {0}: Received message {1} tag {2}. Success = {3}, Msgs Sent = {4}, Msgs Recv. = {5}", PortAndNodeID, message.Type, message.Tag, MessageReceivedSuccess, MessagesSent, MessagesReceived);
+
+                switch (message.Type)
+                {
+                    case Messaging.MessageType.STATUS_RESPONSE:
+                        try
+                        {
+                            LittleEndian = Chetch.Utilities.Convert.ToBoolean(message.GetValue("LE"));
+                            _boardType = message.GetString("BD");
+                            BoardID = message.HasValue("BDID") ? message.GetString("BDID") : null;
+                            MaxDevices = message.HasValue("MD") ? message.GetInt("MD") : 0;
+                            if (State == ADMState.CONNECTED)
+                            {
+                                State = ADMState.DEVICE_READY;
+                            }
+
+                            if (message.HasValue("LEDBI"))
+                            {
+                                LEDBIPin = message.GetInt("LEDBI");
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            Tracing?.TraceEvent(TraceEventType.Error, 4000, "STATUS_RESPONSE error: {0}, {1}", e.GetType(), e.Message);
+                            throw e;
+                        }
+
+                        //record this
+                        LastStatusResponseMessage = message;
+                        LastStatusResponseOn = DateTime.Now;
+                        break;
+
+                    case Messaging.MessageType.PING_RESPONSE:
+                        //record this
+                        LastPingResponseMessage = message;
+                        LastPingResponseOn = DateTime.Now;
+                        break;
+
+                    case Messaging.MessageType.CONFIGURE_RESPONSE:
+                        break;
+
+                    case Messaging.MessageType.ERROR:
+                        Console.WriteLine("ArduinoDeviceManager::HandleFirmataMessageReceived !!!ERROR!!!: {0} produced error {1}", BoardID, message.HasValue("EC") ? ((ErrorCode)message.GetInt("EC")).ToString() : ErrorCode.ERROR_UNKNOWN.ToString());
+                        //record last error message
+                        LastErrorMessage = message;
+                        if (message.HasValue("EC"))
+                        {
+                            LastErrorCode = (ErrorCode)message.GetInt("EC");
+                            message.AddValue("ErrorCode", LastErrorCode);
+                        }
+                        LastErrorOn = DateTime.Now;
+                        break;
+                }
+
+                if (State == ADMState.DEVICE_READY || State == ADMState.DEVICE_CONNECTED)
+                {
+                    //direct messages to devices
+                    var dev = GetTargetedDevice(message);
+                    if (dev != null)
+                    {
+#if DEBUG
+                        Debug.Print(String.Format("Handling message {0} for device {1} ... connected: {2}, memory: {3}", message.Type, dev.ID, dev.IsConnected, message.HasValue("FM") ? message.GetValue("FM") : "N/A"));
+#endif
+                        try
+                        {
+                            dev.HandleMessage(message);
+                        }
+                        catch (Exception e)
+                        {
+                            Tracing?.TraceEvent(TraceEventType.Error, 4000, "Handling message for device {0} produced exception {1}: {2}", dev.ID, e.GetType(), e.Message);
+                            throw e;
+                        }
+
+                    }
+
+                    //we do this test after handling message because the message maybe a CONFIGURE_RESPONSE message which will then set the 'connected' status of the device
+                    if (message.Type == Messaging.MessageType.CONFIGURE_RESPONSE && DevicesConnected)
+                    {
+                        State = ADMState.DEVICE_CONNECTED;
+                        Sampler.Start();
+                    }
+                }
+            } catch (Exception e)
+            {
+                byte tag = message != null ? message.Tag : (byte)0;
+                message = new ADMMessage();
+                message.Type = Messaging.MessageType.ERROR;
+                message.Value = e.Message;
+                message.Tag = tag;
+            }
+
             Broadcast(message);
         }
 
@@ -1026,7 +1037,8 @@ namespace Chetch.Arduino
                              _sleep(10); //crappy idea to reduce load on cpu
                         } else
                         {
-                            Console.WriteLine("{0}: Expecting to receive message tag {1} but timeout occurred so proceeding with send of {2} tag {3}", PortAndNodeID, LastMessageSent.Tag, message.Type, message.Tag);
+                            String msg = String.Format("SendMessage {0}: Expecting to receive message tag {1} but timeout occurred ", PortAndNodeID, LastMessageSent.Tag, message.Type, message.Tag);
+                            throw new TimeoutException(msg);
                         }
                     }
                 } while (!ready2send);
@@ -1047,8 +1059,8 @@ namespace Chetch.Arduino
                         LastMessageSentOn = DateTime.Now;
                         MessageReceivedSuccess = false;
                     }
-                    Console.WriteLine(">>>>>>>>>> {0}: Sending message {1} tag {2}. Success = {3}, Msgs Sent = {4}, Msgs Recv. = {5}", PortAndNodeID, message.Type, message.Tag, MessageReceivedSuccess, MessagesSent, MessagesReceived);
                     if (message.Tag == 0) message.Tag = MessageTags.CreateTag();
+                    Console.WriteLine(">>>>>>>>>> {0}: Sending message {1} tag {2}. Success = {3}, Msgs Sent = {4}, Msgs Recv. = {5}", PortAndNodeID, message.Type, message.Tag, MessageReceivedSuccess, MessagesSent, MessagesReceived);
                     SendString(message.Serialize());
                 } catch (Exception e)
                 {
