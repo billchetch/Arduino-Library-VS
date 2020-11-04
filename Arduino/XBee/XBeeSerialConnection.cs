@@ -22,11 +22,13 @@ namespace Chetch.Arduino.XBee
 
         private SerialPorts.SerialPort _serialPort;
 
+        private Object _serialPortLock = new object();
+
         public int BaudRate { get => _serialPort.BaudRate; set => throw new Exception("XBeeSerialConnection: cannot assign baud rate"); }
         public string PortName { get => _serialPort.PortName; set => throw new Exception("XBeeSerialConnection: cannot assign portname"); }
         public string NewLine { get => _serialPort.NewLine; set => _serialPort.NewLine = value; }
 
-        public XBeeSerialConnection(String port, int baud)
+public XBeeSerialConnection(String port, int baud)
         {
             _serialPort = new SerialPorts.SerialPort(port, baud);
         }
@@ -39,21 +41,27 @@ namespace Chetch.Arduino.XBee
 
         public void Open()
         {
-            if (IsOpen)
-                return;
+            lock (_serialPortLock)
+            {
+                if (IsOpen)
+                    return;
 
-            _serialPort.Open();
-            _serialPort.DataReceived += HandleDataReceived;
+                _serialPort.DataReceived += HandleDataReceived;
+                _serialPort.Open();
+            }
         }
 
         public void Close()
         {
             // Do nothing if the device is not open.
-            if (!IsOpen)
-                return;
+            lock (_serialPortLock)
+            {
+                if (!IsOpen)
+                    return;
 
-            _serialPort.Close();
-            _serialPort.DataReceived -= HandleDataReceived;
+                _serialPort.Close();
+                _serialPort.DataReceived -= HandleDataReceived;
+            }
         }
 
         private void HandleDataReceived(Object sender, SerialDataReceivedEventArgs eargs)

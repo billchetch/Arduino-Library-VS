@@ -16,7 +16,7 @@ namespace Chetch.Arduino.XBee
     public class XBeeFirmataSerialConnection : Solid.Arduino.ISerialConnection
     {
         static private Dictionary<String, List<XBeeFirmataSerialConnection>> _connections = new Dictionary<String, List<XBeeFirmataSerialConnection>>();
-
+        
         public bool IsOpen { get; internal set; } = false;
 
         public int BaudRate { get => XBSerialConnection.BaudRate; set => XBSerialConnection.BaudRate = value; }
@@ -50,12 +50,12 @@ namespace Chetch.Arduino.XBee
         public event SerialDataReceivedEventHandler DataReceived;
         
         public XBeeDevice XBCoordinator { get; internal set; }
+        public Object XBCoordinatorLock;
 
         public String NodeID { get; internal set; }
         
         public RemoteXBeeDevice XBRemoteDevice { get; set; }
 
-        private Object lockXBDevice = new Object();
         private Object bufferPositionLock = new Object();
         private Task _deliverDataTask = null;
 
@@ -88,9 +88,10 @@ namespace Chetch.Arduino.XBee
                     }
                 }
 
-                //reuse the connection and coordinator
+                //reuse the connection and coordinator and lock
                 XBSerialConnection = _connections[port][0].XBSerialConnection;
                 XBCoordinator = _connections[port][0].XBCoordinator;
+                XBCoordinatorLock = _connections[port][0].XBCoordinatorLock;
 
                 if (cnn2remove != null) _connections[port].Remove(cnn2remove);
             }
@@ -100,7 +101,8 @@ namespace Chetch.Arduino.XBee
                 //and a new coordinator (to coordinate XBee network)
                 XBSerialConnection = new XBeeSerialConnection(port, (int)baudRate);
                 XBCoordinator = new ZigBeeDevice(XBSerialConnection); //TODO: parameterize this
-                
+                XBCoordinatorLock = new Object();
+
                 _connections[port] = new List<XBeeFirmataSerialConnection>();
             }
 
@@ -178,23 +180,28 @@ namespace Chetch.Arduino.XBee
         {
             if (IsOpen) return;
 
-            if (!XBCoordinator.IsOpen)
-            {
-                lock (lockXBDevice)
+            lock (XBCoordinatorLock)
+            { 
+                if (!XBCoordinator.IsOpen)
                 {
+                    Console.WriteLine("Opening coordinator while opening connection to {0}", NodeID);
                     XBCoordinator.Open();
-                    Console.WriteLine("Opening coordinator");
                 }
-            }
+            
+                XBeeNetwork network = XBCoordinator.GetNetwork();
+                if(network == null)
+                {
+                    throw new NetworkNotFoundException(String.Format("Open: Cannot find coordinator network when looking for NodeID {0}", NodeID));
+                }
+                XBRemoteDevice = network.DiscoverDevice(NodeID);
+                if (XBRemoteDevice == null)
+                {
+                    throw new BoardNotFoundException(String.Format("Open: Cannot find XBee with NodeID {0}", NodeID));
+                }
 
-            XBRemoteDevice = XBCoordinator.GetNetwork().DiscoverDevice(NodeID);
-            if (XBRemoteDevice == null)
-            {
-                throw new BoardNotFoundException(String.Format("Open: Cannot find XBee with NodeID {0}", NodeID));
+                XBCoordinator.DataReceived += HandleXBeeDataReceived;
+                XBCoordinator.PacketReceived += HandleXBeePacketReceived;
             }
-
-            XBCoordinator.DataReceived += HandleXBeeDataReceived;
-            XBCoordinator.PacketReceived += HandleXBeePacketReceived;
             IsOpen = true;
 
             //start up the thread that waits for received data and forwards it to subscribers
@@ -211,9 +218,13 @@ namespace Chetch.Arduino.XBee
                 _deliverDataTask.Wait();
             }
             FlushBuffer();
-            XBCoordinator.DataReceived -= HandleXBeeDataReceived;
-            XBCoordinator.PacketReceived -= HandleXBeePacketReceived;
-            XBRemoteDevice = null;
+
+            lock (XBCoordinatorLock)
+            {
+                XBCoordinator.DataReceived -= HandleXBeeDataReceived;
+                XBCoordinator.PacketReceived -= HandleXBeePacketReceived;
+                XBRemoteDevice = null;
+            }
 
             bool allClosed = true;
             foreach (var cnn in _connections[PortName])
@@ -225,15 +236,14 @@ namespace Chetch.Arduino.XBee
                 }
             }
 
-            if (allClosed)
+            if (allClosed && XBCoordinator.IsOpen)
             {
-                lock (lockXBDevice)
+                lock (XBCoordinatorLock)
                 {
                     XBCoordinator.Close();
                     Console.WriteLine("{0} closing coordinator", NodeID);
                 }
-            }
-            
+            }       
         }
 
 
@@ -265,7 +275,7 @@ namespace Chetch.Arduino.XBee
         {
             if (offset == 0)
             {
-                lock (lockXBDevice)
+                lock (XBCoordinatorLock)
                 {
                     //XBCoordinator.SendDataAsync(XBRemoteDevice, buffer);
                     XBCoordinator.SendData(XBRemoteDevice, buffer);
