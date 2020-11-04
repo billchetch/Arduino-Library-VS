@@ -43,6 +43,12 @@ namespace Chetch.Arduino.Devices
         {
             base.OnConnect(message);
 
+            RequestState();
+        }
+
+        public void RequestState()
+        {
+            //this will trigger firmata to return the digital state of the pin
             Mgr.SetDigitalReportMode(Mgr.GetPortForPin(_sensorPin), true);
         }
 
