@@ -772,6 +772,7 @@ namespace Chetch.Arduino
                     case Solid.Arduino.Firmata.MessageType.DigitalPortState:
                         DigitalPortState portState = (DigitalPortState)fmessage.Value;
                         int pinsChanged;
+                        Console.WriteLine("Port state change {0}", portState.Port);
                         if (_portStates.ContainsKey(portState.Port))
                         {
                             pinsChanged = portState.Pins ^ _portStates[portState.Port].Pins;
@@ -845,7 +846,7 @@ namespace Chetch.Arduino
                 {
                     if (MessagesReceived >= MessagesSent)
                     {
-                        Console.WriteLine("{0} Big message stats error ... received = {1}, sent = {2}", PortAndNodeID, MessagesReceived + 1, MessagesSent);
+                        //Console.WriteLine("{0} Big message stats error ... received = {1}, sent = {2}", PortAndNodeID, MessagesReceived + 1, MessagesSent);
                     }
 
                     LastMessageReceived = message;
@@ -853,7 +854,7 @@ namespace Chetch.Arduino
                     MessageReceivedSuccess = message.Tag == LastMessageSent.Tag;
                     MessagesReceived++;
                 }
-                Console.WriteLine("<--------- {0}: Received message {1} tag {2}. Success = {3}, Msgs Sent = {4}, Msgs Recv. = {5}", PortAndNodeID, message.Type, message.Tag, MessageReceivedSuccess, MessagesSent, MessagesReceived);
+                //Console.WriteLine("<--------- {0}: Received message {1} tag {2}. Success = {3}, Msgs Sent = {4}, Msgs Recv. = {5}", PortAndNodeID, message.Type, message.Tag, MessageReceivedSuccess, MessagesSent, MessagesReceived);
 
                 switch (message.Type)
                 {
@@ -1082,7 +1083,7 @@ namespace Chetch.Arduino
                                 MessageReceivedSuccess = false;
                             }
                             if (message.Tag == 0) message.Tag = MessageTags.CreateTag();
-                            Console.WriteLine("-------------> {0}: Sending message {1} tag {2}. Success = {3}, Msgs Sent = {4}, Msgs Recv. = {5}", PortAndNodeID, message.Type, message.Tag, MessageReceivedSuccess, MessagesSent, MessagesReceived);
+                            //Console.WriteLine("-------------> {0}: Sending message {1} tag {2}. Success = {3}, Msgs Sent = {4}, Msgs Recv. = {5}", PortAndNodeID, message.Type, message.Tag, MessageReceivedSuccess, MessagesSent, MessagesReceived);
                             SendString(message.Serialize());
                             break;
                         }
@@ -1182,6 +1183,28 @@ namespace Chetch.Arduino
         {
             try
             {
+                //when setting a port to be reported by Firmata on the arduino it's important that there aren't
+                //other devices on pins on that port that may result in an inrush of reports and hence cause too
+                //much traffic from the board to the host (which can result in buffers filling up and ulitmately a board reset)
+                for(int i = 0; i < 8; i++)
+                {
+                    int pin = GetPinForPort(portNumber, i);
+                    List<ArduinoDevice> devs = GetDevicesByPin(pin);
+                    if (devs == null) continue;
+
+                    foreach(ArduinoDevice dev in devs)
+                    {
+                        bool portAvailable = dev is Devices.SwitchSensor;
+                        if (!portAvailable) 
+                        {
+                            String msg = String.Format("ArduinoDeviceManager::SetDigitalReportMode Cannot set digital port {0} as the device {1} on pin {2} is on that port", portNumber, dev.ID, pin);
+                            throw new Exception(msg);
+                        }
+                    }
+                }
+
+                //remove any record of the port state so we ensure we get a fresh one
+                if(_portStates.ContainsKey(portNumber))_portStates.Remove(portNumber);
                 _session.SetDigitalReportMode(portNumber, enable);
                 _sleep(sleep);
             }

@@ -18,7 +18,7 @@ namespace Chetch.Arduino.Devices.Temperature
             public double AverageTemperature {
                 get
                 {
-                    return !IsConnected ? 0 : Sampler.GetAverage(this);
+                    return !IsConnected || Sampler == null ? 0 : Sampler.GetAverage(this);
                 }
             }
 

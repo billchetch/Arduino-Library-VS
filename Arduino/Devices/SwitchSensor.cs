@@ -55,7 +55,7 @@ namespace Chetch.Arduino.Devices
         public override void HandleDigitalPinStateChange(int pinNumber, bool newState)
         {
             if (pinNumber != _sensorPin) throw new Exception(String.Format("State changed on pin {0} but sensor is attached to pin {1}", pinNumber, _sensorPin));
-
+            
             //we keep a record of the raw data so if we re-enable then we can re-create a state change event
             _rawState = newState;
             if (!Enabled) return;
@@ -108,6 +108,7 @@ namespace Chetch.Arduino.Devices
                 LastOff = DateTime.Now;
             }
 
+            
             ADMMessage message  = new ADMMessage();
             message.Type = BroadcastStateChangeAs;
             message.AddValue("State", newState);
