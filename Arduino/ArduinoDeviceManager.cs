@@ -200,9 +200,10 @@ namespace Chetch.Arduino
     {
         private const int RESPONSE_TIMEOUT = 10000; //Firmata setting
         private const int MAX_SEND_STRING_LENGTH = 31; //maximum string length to send by Firmata (was 32, reduced to 31 cos message now contains checksum byte)
-        private const int MESSAGE_RECEIVED_TIMEOUT = 2000; //how long we hold up Sending if waiting for an ADMMessage to be received
+        private const int MESSAGE_RECEIVED_TIMEOUT = 3000; //how long we hold up Sending if waiting for an ADMMessage to be received
         private const int SEND_MESSAGE_THROTTLE = 25; //minimum ms between messages sent ... to hold off bombarding the board
         private const int DEFAULT_SEND_ATTEMPTS = 3; //number of attempts to send a message before barfing
+        private const int SEND_MESSAGE_LOCK_TIMEOUT = 2000; //number of ms we wait to send a message before allowing thread to continue
 
         public const string ARDUINO_MEGA_2560 = "USB-SERIAL CH340";
         public const string ARDUINO_UNO = "Arduino Uno";
@@ -280,6 +281,7 @@ namespace Chetch.Arduino
                 }
                 catch (Exception e)
                 {
+                    if (connection.IsOpen) connection.Close();
                     throw e;
                 }
             }
@@ -338,7 +340,7 @@ namespace Chetch.Arduino
             }
         }
         //Thread Locks
-        private Object SendDataLock = new Object();
+        private Object SendMessageLock = new Object();
         private Object MessageStatsLock = new Object();
 
         public ADMMessage.MessageTags MessageTags { get; } = new ADMMessage.MessageTags();
@@ -463,7 +465,7 @@ namespace Chetch.Arduino
 
         public void Clear(int attempts = 1, int waitBetweenAttempts = 0)
         {
-            lock (SendDataLock)
+            lock (SendMessageLock)
             {
                 String errMsg = null;
                 Exception innerException = null;
@@ -770,9 +772,9 @@ namespace Chetch.Arduino
                         break;
 
                     case Solid.Arduino.Firmata.MessageType.DigitalPortState:
+                        Console.WriteLine("!!!!!Message arrived: {0}!!!!", fmessage.Type);
                         DigitalPortState portState = (DigitalPortState)fmessage.Value;
                         int pinsChanged;
-                        Console.WriteLine("Port state change {0}", portState.Port);
                         if (_portStates.ContainsKey(portState.Port))
                         {
                             pinsChanged = portState.Pins ^ _portStates[portState.Port].Pins;
@@ -844,11 +846,6 @@ namespace Chetch.Arduino
 
                 lock (MessageStatsLock)
                 {
-                    if (MessagesReceived >= MessagesSent)
-                    {
-                        //Console.WriteLine("{0} Big message stats error ... received = {1}, sent = {2}", PortAndNodeID, MessagesReceived + 1, MessagesSent);
-                    }
-
                     LastMessageReceived = message;
                     LastMessageReceivedOn = DateTime.Now;
                     MessageReceivedSuccess = message.Tag == LastMessageSent.Tag;
@@ -1026,97 +1023,112 @@ namespace Chetch.Arduino
         {
             if (message == null) return 0;
 
-            lock(SendDataLock)
+            if (Monitor.TryEnter(SendMessageLock, SEND_MESSAGE_LOCK_TIMEOUT))
             {
-                String errMsg = null;
-                Exception innerException = null;
-
-                for (int i = 0; i < sendAttempts; i++)
+                try
                 {
-                    errMsg = null;
-                    innerException = null;
-                    bool ready2send;
-                    long msSinceLastSent = -1;
+                    String errMsg = null;
+                    Exception innerException = null;
 
-                    try
+                    for (int i = 0; i < sendAttempts; i++)
                     {
-                        do
+                        errMsg = null;
+                        innerException = null;
+                        bool ready2send;
+                        long msSinceLastSent = -1;
+
+                        try
                         {
-                            msSinceLastSent = (DateTime.Now.Ticks - LastMessageSentOn.Ticks) / TimeSpan.TicksPerMillisecond;
-                            if (LastMessageSent == null || MessageReceivedSuccess)
+                            //loop waiting for a confirmation message
+                            do
                             {
-                                ready2send = true;
-                            }
-                            else
-                            {
-                                ready2send = msSinceLastSent > MESSAGE_RECEIVED_TIMEOUT;
-                                if (!ready2send)
+                                msSinceLastSent = (DateTime.Now.Ticks - LastMessageSentOn.Ticks) / TimeSpan.TicksPerMillisecond;
+                                if (LastMessageSent == null || MessageReceivedSuccess)
                                 {
-                                    _sleep(10); //crappy idea to reduce load on cpu
+                                    ready2send = true;
                                 }
                                 else
                                 {
-                                    String msg = String.Format("SendMessage {0}: Expecting to receive message tag {1} but timeout occurred ", PortAndNodeID, LastMessageSent.Tag, message.Type, message.Tag);
-                                    throw new TimeoutException(msg);
+                                    ready2send = msSinceLastSent > MESSAGE_RECEIVED_TIMEOUT;
+                                    if (!ready2send)
+                                    {
+                                        _sleep(10); //crappy idea to reduce load on cpu
+                                    }
+                                    else
+                                    {
+                                        String msg = String.Format("SendMessage {0}: Expecting to receive message tag {1} but timeout occurred ", PortAndNodeID, LastMessageSent.Tag, message.Type, message.Tag);
+                                        throw new TimeoutException(msg);
+                                    }
                                 }
-                            }
-                        } while (!ready2send);
+                            } while (!ready2send);
 
-                        //we do some 'throttling' here
-                        if (msSinceLastSent > 0 && msSinceLastSent < SEND_MESSAGE_THROTTLE)
-                        {
-                            long throttleBy = System.Convert.ToInt64(SEND_MESSAGE_THROTTLE);
-                            _sleep(System.Convert.ToInt32(throttleBy - msSinceLastSent));
-                        }
-
-                        //store old values before sending (rollback if exception thrown)
-                        //This unusual approach is because it appeared like messages were being received before the SendString could exit
-                        ADMMessage lastMessageSent = LastMessageSent;
-                        DateTime lastMessageSentOn = LastMessageSentOn;
-                        try
-                        {
-                            lock (MessageStatsLock)
+                            //we do some 'throttling' here
+                            if (msSinceLastSent > 0 && msSinceLastSent < SEND_MESSAGE_THROTTLE)
                             {
-                                MessagesSent++;
-                                LastMessageSent = message;
-                                LastMessageSentOn = DateTime.Now;
-                                MessageReceivedSuccess = false;
+                                long throttleBy = System.Convert.ToInt64(SEND_MESSAGE_THROTTLE);
+                                _sleep(System.Convert.ToInt32(throttleBy - msSinceLastSent));
                             }
-                            if (message.Tag == 0) message.Tag = MessageTags.CreateTag();
-                            //Console.WriteLine("-------------> {0}: Sending message {1} tag {2}. Success = {3}, Msgs Sent = {4}, Msgs Recv. = {5}", PortAndNodeID, message.Type, message.Tag, MessageReceivedSuccess, MessagesSent, MessagesReceived);
-                            SendString(message.Serialize());
-                            break;
+
+                            //store old values before sending (rollback if exception thrown)
+                            //This unusual approach is because it appeared like messages were being received before the SendString could exit
+                            ADMMessage lastMessageSent = LastMessageSent;
+                            DateTime lastMessageSentOn = LastMessageSentOn;
+                            try
+                            {
+                                lock (MessageStatsLock)
+                                {
+                                    MessagesSent++;
+                                    LastMessageSent = message;
+                                    LastMessageSentOn = DateTime.Now;
+                                    MessageReceivedSuccess = false;
+                                }
+                                if (message.Tag == 0) message.Tag = MessageTags.CreateTag();
+                                //Console.WriteLine("-------------> {0}: Sending message {1} tag {2}. Success = {3}, Msgs Sent = {4}, Msgs Recv. = {5}", PortAndNodeID, message.Type, message.Tag, MessageReceivedSuccess, MessagesSent, MessagesReceived);
+                                SendString(message.Serialize());
+                                break;
+                            }
+                            catch (Exception e)
+                            {
+                                lock (MessageStatsLock) //rollback
+                                {
+                                    MessagesSent--;
+                                    LastMessageSent = lastMessageSent;
+                                    LastMessageSentOn = lastMessageSentOn;
+                                }
+                                throw e;
+                            }
                         }
                         catch (Exception e)
                         {
-                            lock (MessageStatsLock) //rollback
-                            {
-                                MessagesSent--;
-                                LastMessageSent = lastMessageSent;
-                                LastMessageSentOn = lastMessageSentOn;
-                            }
-                            throw e;
+                            MessageReceivedSuccess = true; ///So the next send doesn't encounter a timeout
+                            innerException = e;
+                            errMsg = e.Message;
+                            Tracing?.TraceEvent(TraceEventType.Error, 0, "{0} SendMessage: Attempt {1} produced exception {2} {3}", PortAndNodeID, i + 1, e.GetType(), e.Message);
+                            _session.Clear();
+                            _sleep(50); //give a bit of breathing space
                         }
-                    } catch (Exception e)
+                    } // end attempt loop
+
+
+                    //by here if there is an innerException then it means all send attempts have failed so we barf
+                    if (innerException != null)
                     {
-                        innerException = e;
-                        errMsg = e.Message;
-                        Tracing?.TraceEvent(TraceEventType.Error, 0, "{0} SendMessage: Attempt {1} produced exception {2} {3}", PortAndNodeID, i + 1, e.GetType(), e.Message);
-                        _session.Clear();
-                        MessageReceivedSuccess = true; ///So the next send doesn't encounter a timeout
-                        _sleep(50); //give a bit of breathing space
+                        Tracing?.TraceEvent(TraceEventType.Error, 0, "{0} SendMessage: Failed after {1} attempts", PortAndNodeID, sendAttempts);
+                        throw new SendFailedException(errMsg, innerException);
                     }
-                } // end attempt loop
-                
-
-                //by here if there is an innerException then it means all send attempts have failed so we barf
-                if(innerException != null)
-                {
-                    Tracing?.TraceEvent(TraceEventType.Error, 0, "{0} SendMessage: Failed after {1} attempts", PortAndNodeID, sendAttempts);
-                    throw new SendFailedException(errMsg, innerException);
                 }
-            } //end lock
+                finally
+                {
+                    Monitor.Exit(SendMessageLock);
+                }
 
+            } //end attempt to try get lock
+            else
+            {
+                //we waited too long to get the lock...
+                Console.WriteLine("ArduinoDeviceManager::SendMessage ... waited to long to obtain lock");
+                throw new SendFailedException("ArduinoDeviceManager::SendMessage ... waited to long to obtain lock");
+            }
             return message.Tag;
         }
 
@@ -1147,35 +1159,29 @@ namespace Chetch.Arduino
 
         public void SetDigitalPin(int pinNumber, bool value, int sleep = 0)
         {
-            lock(SendDataLock)
+            try
             {
-                try
-                {
-                    _session.SetDigitalPin(pinNumber, value);
-                    _sleep(sleep);
-                }
-                catch (Exception e)
-                {
-                    String msg = String.Format("Error setting digital pin {0} to value {1}, {2}: {3} ", pinNumber, value, e.GetType(), e.Message);
-                    Tracing?.TraceEvent(TraceEventType.Error, 0, msg);
-                }
+                _session.SetDigitalPin(pinNumber, value);
+                _sleep(sleep);
             }
+            catch (Exception e)
+            {
+                String msg = String.Format("Error setting digital pin {0} to value {1}, {2}: {3} ", pinNumber, value, e.GetType(), e.Message);
+                Tracing?.TraceEvent(TraceEventType.Error, 0, msg);
+            }    
         }
 
 
         public void SetDigitalPinMode(int pinNumber, PinMode pinMode, int sleep = 0)
         {
-            lock (SendDataLock)
+            try
             {
-                try
-                {
-                    _session.SetDigitalPinMode(pinNumber, pinMode);
-                    _sleep(sleep);
-                } catch (Exception e)
-                {
-                    String msg = String.Format("Error setting digital pin {0} to mode {1}, {2}: {3} ", pinNumber, pinMode, e.GetType(), e.Message);
-                    Tracing?.TraceEvent(TraceEventType.Error, 0, msg);
-                }
+                _session.SetDigitalPinMode(pinNumber, pinMode);
+                _sleep(sleep);
+            } catch (Exception e)
+            {
+                String msg = String.Format("Error setting digital pin {0} to mode {1}, {2}: {3} ", pinNumber, pinMode, e.GetType(), e.Message);
+                Tracing?.TraceEvent(TraceEventType.Error, 0, msg);
             }
         }
 
@@ -1186,16 +1192,16 @@ namespace Chetch.Arduino
                 //when setting a port to be reported by Firmata on the arduino it's important that there aren't
                 //other devices on pins on that port that may result in an inrush of reports and hence cause too
                 //much traffic from the board to the host (which can result in buffers filling up and ulitmately a board reset)
-                for(int i = 0; i < 8; i++)
+                for (int i = 0; i < 8; i++)
                 {
                     int pin = GetPinForPort(portNumber, i);
                     List<ArduinoDevice> devs = GetDevicesByPin(pin);
                     if (devs == null) continue;
 
-                    foreach(ArduinoDevice dev in devs)
+                    foreach (ArduinoDevice dev in devs)
                     {
                         bool portAvailable = dev is Devices.SwitchSensor;
-                        if (!portAvailable) 
+                        if (!portAvailable)
                         {
                             String msg = String.Format("ArduinoDeviceManager::SetDigitalReportMode Cannot set digital port {0} as the device {1} on pin {2} is on that port", portNumber, dev.ID, pin);
                             throw new Exception(msg);
@@ -1204,7 +1210,7 @@ namespace Chetch.Arduino
                 }
 
                 //remove any record of the port state so we ensure we get a fresh one
-                if(_portStates.ContainsKey(portNumber))_portStates.Remove(portNumber);
+                if (_portStates.ContainsKey(portNumber)) _portStates.Remove(portNumber);
                 _session.SetDigitalReportMode(portNumber, enable);
                 _sleep(sleep);
             }

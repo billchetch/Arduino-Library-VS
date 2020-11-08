@@ -183,7 +183,7 @@ namespace Chetch.Arduino
         
         protected List<String> AllowedPorts { get; } = new List<String>();
         protected List<String> DeniedPorts { get; } = new List<String>();
-        protected SerialBaudRate BaudRate { get; set; } = SerialBaudRate.Bps_57600;
+        protected SerialBaudRate BaudRate { get; set; } = SerialBaudRate.Bps_38400; //SerialBaudRate.Bps_57600;
         protected int MaxPingResponseTime { get; set; } = 20; //in seconds
         protected bool AutoStartADMTimer { get; set; }  = true;
 

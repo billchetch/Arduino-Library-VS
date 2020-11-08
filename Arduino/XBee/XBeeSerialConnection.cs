@@ -15,6 +15,8 @@ namespace Chetch.Arduino.XBee
     /// </summary>
     public class XBeeSerialConnection : IConnectionInterface, IDisposable
     {
+        private const int SERIAL_PORT_LOCK_TIMEOUT = 2000;
+
         public bool IsOpen { get => _serialPort.IsOpen; }
 
         public DataStream Stream { get; internal set;  } = new DataStream();
@@ -28,7 +30,7 @@ namespace Chetch.Arduino.XBee
         public string PortName { get => _serialPort.PortName; set => throw new Exception("XBeeSerialConnection: cannot assign portname"); }
         public string NewLine { get => _serialPort.NewLine; set => _serialPort.NewLine = value; }
 
-public XBeeSerialConnection(String port, int baud)
+        public XBeeSerialConnection(String port, int baud)
         {
             _serialPort = new SerialPorts.SerialPort(port, baud);
         }
@@ -41,24 +43,34 @@ public XBeeSerialConnection(String port, int baud)
 
         public void Open()
         {
-            lock (_serialPortLock)
-            {
-                if (IsOpen)
-                    return;
+            if (IsOpen)
+                return;
 
-                _serialPort.DataReceived += HandleDataReceived;
-                _serialPort.Open();
+            if (Monitor.TryEnter(_serialPortLock, SERIAL_PORT_LOCK_TIMEOUT))
+            {
+                try
+                {
+                    _serialPort.DataReceived += HandleDataReceived;
+                    _serialPort.Open();
+                }
+                finally
+                {
+                    Monitor.Exit(_serialPortLock);
+                }
+            } else
+            {
+                throw new TimeoutException("XBeeSerialConnection::Open ... Cannot obtain lock");
             }
         }
 
         public void Close()
         {
+            if (!IsOpen)
+                return;
+
             // Do nothing if the device is not open.
             lock (_serialPortLock)
             {
-                if (!IsOpen)
-                    return;
-
                 _serialPort.Close();
                 _serialPort.DataReceived -= HandleDataReceived;
             }

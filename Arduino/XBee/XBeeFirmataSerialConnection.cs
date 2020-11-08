@@ -10,11 +10,15 @@ using XBeeLibrary.Core.Utils;
 using Chetch.Arduino.Exceptions;
 using XBeeLibrary.Core.Packet;
 using XBeeLibrary.Core.Packet.Common;
+using System.Threading;
 
 namespace Chetch.Arduino.XBee
 {
     public class XBeeFirmataSerialConnection : Solid.Arduino.ISerialConnection
     {
+        private const int DELAY_AFTER_CONNECT = 2000; //how many ms to wait after a connection ... there can be reconnect issues if attempting to reconnect too soon
+        private const int COORDINATOR_LOCK_TIMEOUT = 2000; //how long we wait to obatin a lock on the coordinator (e.g. for writing data)
+        
         static private Dictionary<String, List<XBeeFirmataSerialConnection>> _connections = new Dictionary<String, List<XBeeFirmataSerialConnection>>();
         
         public bool IsOpen { get; internal set; } = false;
@@ -26,7 +30,7 @@ namespace Chetch.Arduino.XBee
         private int _bufferReadPosition = 0;
         private int _bufferWritePosition = 0;
 
-        private const int BUFFER_SIZE = 1024 * 32;
+        private const int BUFFER_SIZE = 1024 * 1;
         public byte[] DataBuffer { get; internal set; } = new byte[BUFFER_SIZE]; //
 
         public int BytesToRead
@@ -180,27 +184,40 @@ namespace Chetch.Arduino.XBee
         {
             if (IsOpen) return;
 
-            lock (XBCoordinatorLock)
-            { 
-                if (!XBCoordinator.IsOpen)
+            if (Monitor.TryEnter(XBCoordinatorLock, COORDINATOR_LOCK_TIMEOUT))
+            {
+                try
                 {
-                    Console.WriteLine("Opening coordinator while opening connection to {0}", NodeID);
-                    XBCoordinator.Open();
-                }
-            
-                XBeeNetwork network = XBCoordinator.GetNetwork();
-                if(network == null)
+                    if (!XBCoordinator.IsOpen)
+                    {
+                        Console.WriteLine("Opening coordinator while opening connection to {0}", NodeID);
+                        XBCoordinator.Open();
+                    }
+
+                    XBeeNetwork network = XBCoordinator.GetNetwork();
+                    if (network == null)
+                    {
+                        throw new NetworkNotFoundException(String.Format("Open: Cannot find coordinator network when looking for NodeID {0}", NodeID));
+                    }
+                    XBRemoteDevice = network.DiscoverDevice(NodeID);
+                    if (XBRemoteDevice == null)
+                    {
+                        throw new BoardNotFoundException(String.Format("Open: Cannot find XBee with NodeID {0}", NodeID));
+                    }
+
+                    //delay for a while ...
+                    System.Threading.Thread.Sleep(DELAY_AFTER_CONNECT);
+
+                    XBCoordinator.DataReceived += HandleXBeeDataReceived;
+                    XBCoordinator.PacketReceived += HandleXBeePacketReceived;
+                } finally
                 {
-                    throw new NetworkNotFoundException(String.Format("Open: Cannot find coordinator network when looking for NodeID {0}", NodeID));
-                }
-                XBRemoteDevice = network.DiscoverDevice(NodeID);
-                if (XBRemoteDevice == null)
-                {
-                    throw new BoardNotFoundException(String.Format("Open: Cannot find XBee with NodeID {0}", NodeID));
+                    Monitor.Exit(XBCoordinatorLock);
                 }
 
-                XBCoordinator.DataReceived += HandleXBeeDataReceived;
-                XBCoordinator.PacketReceived += HandleXBeePacketReceived;
+            } else
+            {
+                throw new TimeoutException(String.Format("Open: could not obatin lock when trying to open NodeID {0}", NodeID));
             }
             IsOpen = true;
 
@@ -219,31 +236,39 @@ namespace Chetch.Arduino.XBee
             }
             FlushBuffer();
 
-            lock (XBCoordinatorLock)
+            if (Monitor.TryEnter(XBCoordinatorLock, COORDINATOR_LOCK_TIMEOUT))
             {
-                XBCoordinator.DataReceived -= HandleXBeeDataReceived;
-                XBCoordinator.PacketReceived -= HandleXBeePacketReceived;
-                XBRemoteDevice = null;
-            }
-
-            bool allClosed = true;
-            foreach (var cnn in _connections[PortName])
-            {
-                if (cnn.IsOpen)
+                try
                 {
-                    allClosed = false;
-                    break;
-                }
-            }
+                    XBCoordinator.DataReceived -= HandleXBeeDataReceived;
+                    XBCoordinator.PacketReceived -= HandleXBeePacketReceived;
+                    XBRemoteDevice = null;
 
-            if (allClosed && XBCoordinator.IsOpen)
-            {
-                lock (XBCoordinatorLock)
-                {
-                    XBCoordinator.Close();
-                    Console.WriteLine("{0} closing coordinator", NodeID);
+                    bool allClosed = true;
+                    foreach (var cnn in _connections[PortName])
+                    {
+                        if (cnn.IsOpen)
+                        {
+                            allClosed = false;
+                            break;
+                        }
+                    }
+
+                    if (allClosed && XBCoordinator.IsOpen)
+                    {
+                        XBCoordinator.Close();
+                        Console.WriteLine("{0} closing coordinator", NodeID);
+
+                    }
                 }
-            }       
+                finally
+                {
+                    Monitor.Exit(XBCoordinatorLock);
+                }
+            } else
+            {
+                throw new TimeoutException(String.Format("Close: could not obatin lock when trying to close NodeID {0}", NodeID));
+            }
         }
 
 
@@ -268,22 +293,37 @@ namespace Chetch.Arduino.XBee
         {
             //_serialPort.Write(text);
             Console.WriteLine("oops... write string");
-            throw new NotImplementedException("XBeeFirmataSericalConnection::Write string");
+            throw new NotImplementedException("XBeeFirmataSerialConnection::Write string");
         }
 
         public void Write(byte[] buffer, int offset, int count)
         {
             if (offset == 0)
             {
-                lock (XBCoordinatorLock)
+                if (XBRemoteDevice == null)
                 {
-                    //XBCoordinator.SendDataAsync(XBRemoteDevice, buffer);
-                    XBCoordinator.SendData(XBRemoteDevice, buffer);
+                    throw new BoardNotFoundException("XBeeFirmataSerialConnection::Write ... cannot send data as no remote XBee device available");
+                }
+
+                if (Monitor.TryEnter(XBCoordinatorLock, COORDINATOR_LOCK_TIMEOUT))
+                {
+                    try
+                    {
+                        //XBCoordinator.SendDataAsync(XBRemoteDevice, buffer);
+                        XBCoordinator.SendData(XBRemoteDevice, buffer);
+                    }
+                    finally
+                    {
+                        Monitor.Exit(XBCoordinatorLock);
+                    }
+                } else
+                {
+                    //TODO: couldn't obain a lock.. for now we just let it pass
                 }
             }
             else
             {
-                throw new Exception("XBeeFirmataSerialConnection::Write .. cannot have a non-zero offset");
+                throw new NotImplementedException("XBeeFirmataSerialConnection::Write .. cannot have a non-zero offset");
             }
         }
 
