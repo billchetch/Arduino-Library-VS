@@ -130,27 +130,27 @@ namespace Chetch.Arduino
             if (bytes.Count > 254) throw new Exception("Message cannot exceed 254 bytes");
 
             //we now add a byte to handle the zero byte case cos the zero byte is interpreted as string termination
-            byte mask = (byte)255;
-            while(mask >= 1) {
+            byte zeroByte = (byte)1;
+            while(zeroByte <= 255) {
                 bool useable = true;
                 foreach(var b in bytes)
                 {
-                    if(b == mask)
+                    if(b == zeroByte)
                     {
                         useable = false;
                         break;
                     }
                 }
                 if (useable) break;
-                mask--;
+                zeroByte++;
             }
 
-            if(mask >= 1)
+            if(zeroByte >= 1)
             {
-                bytes.Insert(0, mask); //use the 'mask' as the encoded zero byte
+                bytes.Insert(0, zeroByte); //use the 'mask' as the encoded zero byte
                 for(int i = 1; i < bytes.Count; i++)
                 {
-                    if (bytes[i] == 0) bytes[i] = mask;
+                    if (bytes[i] == 0) bytes[i] = zeroByte;
                 }
 
             } else
@@ -180,14 +180,85 @@ namespace Chetch.Arduino
             AddArgument(bytes);
         }
 
+        public byte[] Argument(int argIdx)
+        {
+            return Arguments[argIdx];
+        }
+
+        public byte ArgumentAsByte(int argIdx)
+        {
+            return Argument(argIdx)[0];
+        }
+
+        public bool ArgumentAsBool(int argIdx)
+        {
+            return ArgumentAsByte(argIdx) > 0;
+        }
+
+        public int ArgumentAsInt(int argIdx)
+        {
+            return Chetch.Utilities.Convert.ToInt(Argument(argIdx));
+        }
+
+        public long ArgumentAsLong(int argIdx)
+        {
+            return Chetch.Utilities.Convert.ToLong(Argument(argIdx));
+        }
+
+        public float ArgumentAsFloat(int argIdx)
+        {
+            return Chetch.Utilities.Convert.ToFloat(Argument(argIdx));
+        }
+
+        public String ArgumentAsString(int argIdx)
+        {
+            return Chetch.Utilities.Convert.ToString(Argument(argIdx));
+        }
+
         public override void OnDeserialize(string s, MessageEncoding encoding)
         {
             base.OnDeserialize(s, encoding);
 
-            if (HasValue("Tag"))
+            switch (encoding)
             {
-                Tag = GetByte("Tag");
-            }
+                case MessageEncoding.BYTES_ARRAY:
+                    byte[] bytes = Chetch.Utilities.Convert.ToBytes(s);
+                    if (bytes.Length < 7) throw new Exception("ADMMessage::onDeserialize message  only has " + bytes.Length + " bytes ... must have 7 or more");
+                    byte zeroByte = bytes[0];
+                    byte checkbyte = bytes[bytes.Length - 1];
+                    byte checksum = 0;
+                    
+                    //replace zerobyte with 0 and calculate checksum
+                    for(int i = 1; i < bytes.Length - 1; i++)
+                    {
+                        if (bytes[i] == zeroByte) bytes[i] = 0;
+                        checksum += bytes[i];
+                    }
+
+                    if (checksum != checksum) throw new Exception("ADMMessage::onDeserialize checksum does not match checkbyte");
+
+                    //add propoerties
+                    Type = (Chetch.Messaging.MessageType)bytes[1];
+                    Tag = bytes[2];
+                    TargetID = bytes[3];
+                    CommandID = bytes[4];
+                    SenderID = bytes[5];
+
+                    //convert arguments
+                    int argumentIndex = 6; // 1 more than Type, Tag, Target, Command, Sender because first byte is zero byte
+                    while(argumentIndex < bytes.Length - 1)
+                    {
+                        int length = bytes[argumentIndex];
+                        byte[] arg = new byte[length];
+                        for(int i = 0; i < length; i++)
+                        {
+                            arg[i] = bytes[argumentIndex + i + 1];
+                        }
+                        AddArgument(arg);
+                        argumentIndex += length + 1;
+                    }
+                    break;
+            } //end encoding switch
         }
     }
 
@@ -746,21 +817,7 @@ namespace Chetch.Arduino
                         try
                         {
                             String serialized = sd.Text;
-                            try
-                            {
-                                var sanitised = serialized.Replace("&", String.Empty).Replace("=", String.Empty);
-                                if (!Utilities.Convert.IsUrlEncoded(sanitised))
-                                {
-                                    throw new Exception(String.Format("{0} is not URL encoded", sanitised));
-                                }
-                            }
-                            catch (Exception e)
-                            {
-                                Tracing?.TraceEvent(TraceEventType.Error, 4000, e.Message);
-                            }
-
-                            message = ADMMessage.Deserialize<ADMMessage>(serialized, MessageEncoding.QUERY_STRING);
-                            //if (message.HasValue("FM")) Console.WriteLine("Free Memory: {0}", message.GetValue("FM"));
+                            message = ADMMessage.Deserialize<ADMMessage>(serialized, MessageEncoding.BYTES_ARRAY);
                         }
                         catch (Exception e)
                         {
@@ -835,9 +892,6 @@ namespace Chetch.Arduino
             {
                 //do some general checking
                 //TODO: check BoardID matches to SenderID
-
-                message.TargetID = Utilities.Convert.ToByte(message.Target);
-
                 lock (MessageStatsLock)
                 {
                     LastMessageReceived = message;
@@ -850,11 +904,16 @@ namespace Chetch.Arduino
 
                 switch (message.Type)
                 {
+                    case Messaging.MessageType.INITIALISE_RESPONSE:
+                        message.AddValue("LittleEndian", message.ArgumentAsBool(0));
+                        LittleEndian = message.GetBool("LittleEndian");
+                        message.AddValue("FreeMemory", message.ArgumentAsInt(1));
+                        BoardID = message.SenderID;
+                        break;
+
                     case Messaging.MessageType.STATUS_RESPONSE:
                         try
                         {
-                            LittleEndian = Chetch.Utilities.Convert.ToBoolean(message.GetValue("LE"));
-                            BoardID = message.HasValue("BDID") ? message.GetByte("BDID") : (byte)0;
                             MaxDevices = message.HasValue("MD") ? message.GetInt("MD") : 0;
                             if (State == ADMState.CONNECTED)
                             {

@@ -48,7 +48,7 @@
     <Reference Include="netstandard, Version=2.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51" />
     <Reference Include="Solid.Arduino, Version=1.0.2.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\SolidSoils\Arduino\Solid.Arduino\bin\Release\Solid.Arduino.dll</HintPath>
+      <HintPath>..\..\SolidSoils\Arduino\Solid.Arduino\bin\Debug\Solid.Arduino.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
