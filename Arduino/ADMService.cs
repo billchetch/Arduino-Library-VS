@@ -81,7 +81,7 @@ namespace Chetch.Arduino
                     foreach (ArduinoDeviceManager adm in adms.Values)
                     {
                         Dictionary<String, String> vals = new Dictionary<string, string>();
-                        vals["BoardID"] = adm.BoardID;
+                        vals["BoardID"] = adm.BoardID.ToString();
                         vals["Port"] = adm.Port;
                         vals["NodeID"] = adm.NodeID?.ToString();
                         vals["State"] = adm.State.ToString();
@@ -98,7 +98,7 @@ namespace Chetch.Arduino
                         vals["LastDisconnectedOn"] = adm.LastDisconnectedOn == default(DateTime) ? "n/a" : adm.LastDisconnectedOn.ToString("yyyy-MM-dd HH:mm:ss");
                         vals["AvailableMessageTags"] = System.Convert.ToString(adm.MessageTags.Available);
 
-                        Message.AddValue(adm.BoardID, vals);
+                        Message.AddValue("Board:" + adm.BoardID, vals);
                     }
                 }
                 else
@@ -215,11 +215,15 @@ namespace Chetch.Arduino
             DeniedPorts.AddRange(p2a);
         }
 
-        protected bool IsRequiredBoard(String boardID)
+        protected bool IsRequiredBoard(byte boardID)
         {
             if (RequiredBoards == null || RequiredBoards == String.Empty) return true;
             String[] ar = RequiredBoards.Split(',');
-            return ar.Contains(boardID);
+            for (int i = 0; i < ar.Length; i++)
+            {
+                if (ar[i] == boardID.ToString()) return true;
+            }
+            return false;
         }
 
         public ArduinoDeviceManager GetADM(String boardID)
@@ -236,7 +240,7 @@ namespace Chetch.Arduino
 
             foreach(ArduinoDeviceManager adm in ADMS.Values)
             {
-                if (adm != null && adm.BoardID != null && adm.BoardID.Equals(boardID, StringComparison.OrdinalIgnoreCase)) return adm;
+                if (adm != null && adm.BoardID != 0 && adm.BoardID.ToString().Equals(boardID, StringComparison.OrdinalIgnoreCase)) return adm;
             }
 
             return null;
@@ -522,12 +526,15 @@ namespace Chetch.Arduino
                             case "pingloadtest":
                                 repeat = args != null && args.Count > 0 ? System.Convert.ToInt16(args[0]) : 10;
                                 delay = args != null && args.Count > 1 ? System.Convert.ToInt16(args[1]) : 500;
-                                for (int i = 0; i < repeat; i++)
+                                Task.Run(() =>
                                 {
-                                    Console.WriteLine("Ping {0}", i);
-                                    adm.Ping();
-                                    System.Threading.Thread.Sleep(delay);
-                                }
+                                    for (int i = 0; i < repeat; i++)
+                                    {
+                                        Console.WriteLine("Ping {0}", i);
+                                        adm.Ping();
+                                        System.Threading.Thread.Sleep(delay);
+                                    }
+                                });
                                 respond = false;
                                 break;
 
@@ -807,12 +814,12 @@ namespace Chetch.Arduino
             switch (message.Type)
             {
                 case MessageType.ERROR:
-                    Tracing?.TraceEvent(TraceEventType.Error, 100, "ADM {0} produced error: {1}", adm.BoardID == null ? "n/a" : adm.BoardID,  message.HasValue("ErrorCode") ? message.GetValue("ErrorCode") : ErrorCode.ERROR_UNKNOWN);
+                    Tracing?.TraceEvent(TraceEventType.Error, 100, "ADM {0} produced error: {1}", adm.BoardID,  message.HasValue("ErrorCode") ? message.GetValue("ErrorCode") : ErrorCode.ERROR_UNKNOWN);
 
                     break;
 
                 case MessageType.WARNING:
-                    Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADM {0} produced warning: {1}", adm.BoardID == null ? "n/a" : adm.BoardID, message.Value);
+                    Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADM {0} produced warning: {1}", adm.BoardID, message.Value);
                     break;
 
                 case MessageType.STATUS_RESPONSE:
