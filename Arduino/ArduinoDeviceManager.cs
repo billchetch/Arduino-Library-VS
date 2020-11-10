@@ -847,6 +847,7 @@ namespace Chetch.Arduino
                 }
                 //Console.WriteLine("<--------- {0}: Received message {1} tag {2}. Success = {3}, Msgs Sent = {4}, Msgs Recv. = {5}", PortAndNodeID, message.Type, message.Tag, MessageReceivedSuccess, MessagesSent, MessagesReceived);
 
+
                 switch (message.Type)
                 {
                     case Messaging.MessageType.STATUS_RESPONSE:
