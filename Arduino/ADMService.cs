@@ -767,6 +767,14 @@ namespace Chetch.Arduino
                             _noPortsFoundWarning = true;
                         }
                     }
+
+
+                    //Finally we look to see if there has been suspicioius lack of activity
+                    foreach (ArduinoDeviceManager adm in adms)
+                    {
+
+                    }
+
                 } //end of monitor lock
             } catch (Exception e)
             {

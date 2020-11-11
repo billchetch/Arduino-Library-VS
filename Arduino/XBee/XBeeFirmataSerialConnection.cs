@@ -21,6 +21,7 @@ namespace Chetch.Arduino.XBee
         {
             private const int DELAY_AFTER_CONNECT = 2000; //how many ms to wait after a connection ... there can be reconnect issues if attempting to reconnect too soon
             private const int COORDINATOR_LOCK_TIMEOUT = 2000; //how long we wait to obatin a lock on the coordinator (e.g. for writing data)
+            private const int SEND_DATA_THROTTLE = 100; //ensure this many ms between data sends
 
             public XBeeDevice Coordinator;
             public DateTime DataLastSent;
@@ -103,7 +104,13 @@ namespace Chetch.Arduino.XBee
                     try
                     {
                         //XBCoordinator.SendDataAsync(XBRemoteDevice, buffer);
+                        long msSinceLastSent = (DateTime.Now.Ticks - DataLastSent.Ticks) / TimeSpan.TicksPerMillisecond;
+                        if(msSinceLastSent < SEND_DATA_THROTTLE)
+                        {
+                            System.Threading.Thread.Sleep((int)(SEND_DATA_THROTTLE - msSinceLastSent));
+                        }
                         Coordinator.SendData(rxb, data);
+                        DataLastSent = DateTime.Now;
                     }
                     finally
                     {
