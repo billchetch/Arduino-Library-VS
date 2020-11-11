@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 using Solid.Arduino.Firmata;
 using Chetch.Utilities;
 using Chetch.Application;
+using System.Security.Cryptography;
+using System.Data;
 
 namespace Chetch.Arduino
 {
@@ -40,6 +42,9 @@ namespace Chetch.Arduino
 
     public class ArduinoCommand
     {
+        /*
+         * Important: there cannot be more than 16 command types due to how command type and a count is used with messaging
+         */
         public enum CommandType
         {
             NOT_SET,
@@ -58,7 +63,10 @@ namespace Chetch.Arduino
         }
 
         public String CommandAlias { get; set; }
-        public CommandType Type { get; set; } = CommandType.NOT_SET; //request to perform a certain command e.g. Send or Delete or Reset etc. etc.
+        public CommandType Type { get; internal set; } = CommandType.NOT_SET; //request to perform a certain command e.g. Send or Delete or Reset etc. etc.
+
+        public byte ID { get; internal set; } = 0; //contains the type and count value (used in messaging with the board)
+        
         public List<Object> Arguments { get; set; } = new List<Object>();
         public List<ArduinoCommand> Commands { get; set; } = new List<ArduinoCommand>();
         public int Delay { get; set; } = 0; //delay in milliseconds between 'child' commands
@@ -94,6 +102,12 @@ namespace Chetch.Arduino
         {
             CommandAlias = commandAlias;
             Type = commandType;
+        }
+
+        public byte AssignID(byte idx)
+        {
+            ID = ADMMessage.CreateCommandID((byte)Type, idx);
+            return ID;
         }
 
         public void AddArgument(Object arg)
@@ -348,6 +362,13 @@ namespace Chetch.Arduino
             {
                 throw new Exception("Already contains a command with alias " + command.CommandAlias);
             }
+
+            //we auto generate a byte ID which uses the lower 4 bits for the type and the upper 5 bits for a count
+            byte count = 0;
+            foreach(ArduinoCommand cmd in _commands.Values){
+                if (command.Type == cmd.Type) count++;
+            }
+            command.AssignID(count);
             _commands[key] = command;
             return command;
         }
@@ -357,11 +378,12 @@ namespace Chetch.Arduino
             return AddCommand(new ArduinoCommand(commandAlias, commandType));
         }
 
-        public ArduinoCommand AddCommand(String commandAlias, String[] commandAliases, int delay = 1, int repeat = 1)
+        public ArduinoCommand AddCommand(String commandAlias, String[] commandAliases, int delay = 1, int repeat = 1, ArduinoCommand.CommandType commandType = ArduinoCommand.CommandType.NOT_SET, bool expectsResponse = false)
         {
-            var command = new ArduinoCommand(commandAlias);
+            var command = new ArduinoCommand(commandAlias, commandType);
             command.Delay = delay;
             command.Repeat = repeat;
+            command.ExpectsResponse = expectsResponse;
             if(commandAliases != null)
             { 
                 for(int i = 0; i < commandAliases.Length; i++)
@@ -374,13 +396,12 @@ namespace Chetch.Arduino
             return AddCommand(command);
         }
 
-        public ArduinoCommand TryAddCommand(String commandAlias, String commandAliases, int delay = 1, int repeat = 1, ArduinoCommand.CommandType commandType = ArduinoCommand.CommandType.NOT_SET, bool expectsResponse = false)
+
+        public ArduinoCommand TryAddCommand(String commandAlias, String[] commandAliases, int delay = 1, int repeat = 1, ArduinoCommand.CommandType commandType = ArduinoCommand.CommandType.NOT_SET, bool expectsResponse = false)
         {
             try
             {
-                ArduinoCommand cmd = AddCommand(commandAlias, commandAliases != null ? commandAliases.Split(',') : null, delay, repeat);
-                cmd.Type = commandType;
-                cmd.ExpectsResponse = expectsResponse;
+                ArduinoCommand cmd = AddCommand(commandAlias, commandAliases, delay, repeat, commandType, expectsResponse);
                 return cmd;
             } catch (Exception)
             {
@@ -388,12 +409,15 @@ namespace Chetch.Arduino
             }
         }
 
-        public ArduinoCommand TryAddCommand(String commandAlias, ArduinoCommand.CommandType commandType = ArduinoCommand.CommandType.NOT_SET, bool expectsResponse = false)
+        public ArduinoCommand TryAddCommand(String commandAlias, String commandAliases = null, int delay = 1, int repeat = 1, ArduinoCommand.CommandType commandType = ArduinoCommand.CommandType.NOT_SET, bool expectsResponse = false)
         {
-            ArduinoCommand cmd = TryAddCommand(commandAlias, null);
-            if(cmd != null)cmd.Type = commandType;
-            cmd.ExpectsResponse = expectsResponse;
-            return cmd;
+            String[] aliases = commandAliases == null || commandAliases == String.Empty ? null : commandAliases.Split(',');
+            return TryAddCommand(commandAlias, aliases, delay, repeat, commandType, expectsResponse);
+        }
+
+        public ArduinoCommand TryAddCommand(String commandAlias, ArduinoCommand.CommandType commandType, bool expectsResponse = false)
+        {
+            return TryAddCommand(commandAlias, String.Empty, 1, 1, commandType, expectsResponse);
         }
 
         virtual public void AddCommands(List<ArduinoCommand> commands)
@@ -486,6 +510,7 @@ namespace Chetch.Arduino
             }
         }
 
+        //messaging
         virtual protected void SendCommand(ArduinoCommand command, ExecutionArguments xargs = null)
         {
             if (Mgr == null) throw new Exception(String.Format("Device {0} has not yet been added to a device manager", ToString()));
@@ -501,7 +526,6 @@ namespace Chetch.Arduino
             LastCommandSentOn = DateTime.Now.Ticks;
         }
 
-        //messaging
         virtual protected void Broadcast(ADMMessage message)
         {
             message.Sender = ID;

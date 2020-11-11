@@ -14,10 +14,7 @@ namespace Chetch.Arduino.Devices.Counters
         {
             get
             {
-                long durationTotal = Mgr.Sampler.GetDurationTotal(this);
-                if (durationTotal <= 0) return 0;
-
-                double averageRPM = Mgr.Sampler.GetSampleTotal(this) * 60000 / (double)durationTotal;
+                double averageRPM = AverageRate * 60;
                 return Calibration * averageRPM;
             }
         }
@@ -26,7 +23,9 @@ namespace Chetch.Arduino.Devices.Counters
         {
             SampleInterval = 1000; //in ms
             SampleSize = 5;
-            SamplingOptions = Sampler.SamplingOptions.MEAN_INTERVAL;
+            SamplingOptions = Sampler.SamplingOptions.MEAN_COUNT;
+
+            CountMode = Mode.RATE;
         }
 
         public RPMCounter(int pin) : this(pin, "rpm" + pin, "RPM"){}

@@ -89,6 +89,27 @@ namespace Chetch.Arduino
             }
         }
 
+        public static byte CreateCommandID(byte ctype, byte idx)
+        {
+            byte cid = (byte)((int)ctype + (idx << 4));
+            return cid;
+        }
+
+        public static bool IsCommandType(byte commandID, byte ctype)
+        {
+            return GetCommandType(commandID) ==  ctype;
+        }
+
+        public static byte GetCommandType(byte commandID)
+        {
+            return (byte)(commandID & 0xF);
+        }
+
+        public static byte GetCommandIndex(byte commandID)
+        {
+            return (byte)(commandID >> 4);
+        }
+
         public byte Tag { get; set; } = 0; //can be used to track messages
         public byte TargetID { get; set; } = 0; //ID number on board to determine what is beig targeted
         public byte CommandID { get; set; } = 0; //Command ID on board ... basically to identify function e.g. Send or Delete ...
@@ -222,40 +243,47 @@ namespace Chetch.Arduino
             switch (encoding)
             {
                 case MessageEncoding.BYTES_ARRAY:
-                    byte[] bytes = Chetch.Utilities.Convert.ToBytes(s);
-                    if (bytes.Length < 7) throw new Exception("ADMMessage::onDeserialize message  only has " + bytes.Length + " bytes ... must have 7 or more");
-                    byte zeroByte = bytes[0];
-                    byte checkbyte = bytes[bytes.Length - 1];
-                    byte checksum = 0;
-                    
-                    //replace zerobyte with 0 and calculate checksum
-                    for(int i = 1; i < bytes.Length - 1; i++)
+                    byte[] bytes;
+                    try
                     {
-                        if (bytes[i] == zeroByte) bytes[i] = 0;
-                        checksum += bytes[i];
-                    }
+                        bytes = Chetch.Utilities.Convert.ToBytes(s);
+                        if (bytes.Length < 7) throw new Exception("ADMMessage::onDeserialize message  only has " + bytes.Length + " bytes ... must have 7 or more");
+                        byte zeroByte = bytes[0];
+                        byte checkbyte = bytes[bytes.Length - 1];
+                        byte checksum = 0;
 
-                    if (checksum != checksum) throw new Exception("ADMMessage::onDeserialize checksum does not match checkbyte");
-
-                    //add propoerties
-                    Type = (Chetch.Messaging.MessageType)bytes[1];
-                    Tag = bytes[2];
-                    TargetID = bytes[3];
-                    CommandID = bytes[4];
-                    SenderID = bytes[5];
-
-                    //convert arguments
-                    int argumentIndex = 6; // 1 more than Type, Tag, Target, Command, Sender because first byte is zero byte
-                    while(argumentIndex < bytes.Length - 1)
-                    {
-                        int length = bytes[argumentIndex];
-                        byte[] arg = new byte[length];
-                        for(int i = 0; i < length; i++)
+                        //replace zerobyte with 0 and calculate checksum
+                        for (int i = 1; i < bytes.Length - 1; i++)
                         {
-                            arg[i] = bytes[argumentIndex + i + 1];
+                            if (bytes[i] == zeroByte) bytes[i] = 0;
+                            checksum += bytes[i];
                         }
-                        AddArgument(arg);
-                        argumentIndex += length + 1;
+
+                        if (checksum != checksum) throw new Exception("ADMMessage::onDeserialize checksum does not match checkbyte");
+
+                        //add propoerties
+                        Type = (Chetch.Messaging.MessageType)bytes[1];
+                        Tag = bytes[2];
+                        TargetID = bytes[3];
+                        CommandID = bytes[4];
+                        SenderID = bytes[5];
+
+                        //convert arguments
+                        int argumentIndex = 6; // 1 more than Type, Tag, Target, Command, Sender because first byte is zero byte
+                        while (argumentIndex < bytes.Length - 1)
+                        {
+                            int length = bytes[argumentIndex];
+                            byte[] arg = new byte[length];
+                            for (int i = 0; i < length; i++)
+                            {
+                                arg[i] = bytes[argumentIndex + i + 1];
+                            }
+                            AddArgument(arg);
+                            argumentIndex += length + 1;
+                        }
+                    } catch (Exception e)
+                    {
+                        throw e;
                     }
                     break;
             } //end encoding switch
@@ -777,7 +805,7 @@ namespace Chetch.Arduino
 
         public ArduinoDevice GetTargetedDevice(ADMMessage message)
         {
-            var boardID = Chetch.Utilities.Convert.ToByte(message.Target);
+            var boardID = message.TargetID;
             return GetDeviceByBoardID(boardID);
         }
 
@@ -899,7 +927,7 @@ namespace Chetch.Arduino
                     MessageReceivedSuccess = message.Tag == LastMessageSent.Tag;
                     MessagesReceived++;
                 }
-                //Console.WriteLine("<--------- {0}: Received message {1} tag {2}. Success = {3}, Msgs Sent = {4}, Msgs Recv. = {5}", PortAndNodeID, message.Type, message.Tag, MessageReceivedSuccess, MessagesSent, MessagesReceived);
+                Console.WriteLine("<--------- {0}: Received message {1} tag {2} target {3} from sender {4}", PortAndNodeID, message.Type, message.Tag, message.TargetID, message.SenderID);
 
 
                 switch (message.Type)
@@ -909,20 +937,28 @@ namespace Chetch.Arduino
                         LittleEndian = message.GetBool("LittleEndian");
                         message.AddValue("FreeMemory", message.ArgumentAsInt(1));
                         BoardID = message.SenderID;
+                        message.AddValue("MaxDevices", message.ArgumentAsInt(2));
+                        MaxDevices = message.GetInt("MaxDevices");
+                        message.AddValue("LEDBI", message.ArgumentAsInt(3));
+                        LEDBIPin = message.GetInt("LEDBI");
+
+                        Console.WriteLine("{0}: Board {1} intialise response .... FM={2}", PortAndNodeID, BoardID, message.GetInt("FreeMemory"));
                         break;
 
                     case Messaging.MessageType.STATUS_RESPONSE:
                         try
                         {
-                            MaxDevices = message.HasValue("MD") ? message.GetInt("MD") : 0;
+                            if (message.TargetID == 0)
+                            {
+                                message.AddValue("FreeMemory", message.ArgumentAsInt(0));
+                                message.AddValue("BoardType", message.ArgumentAsString(1));
+                                message.AddValue("Initialised", message.ArgumentAsBool(2));
+                                message.AddValue("DeviceCount", message.ArgumentAsInt(3));
+                                Console.WriteLine("{0}: Board {1} status response .... FM={2}", PortAndNodeID, BoardID, message.GetInt("FreeMemory"));
+                            }
                             if (State == ADMState.CONNECTED)
                             {
                                 State = ADMState.DEVICE_READY;
-                            }
-
-                            if (message.HasValue("LEDBI"))
-                            {
-                                LEDBIPin = message.GetInt("LEDBI");
                             }
                         }
                         catch (Exception e)
@@ -946,15 +982,11 @@ namespace Chetch.Arduino
                         break;
 
                     case Messaging.MessageType.ERROR:
-                        Console.WriteLine("ArduinoDeviceManager::HandleFirmataMessageReceived !!!ERROR!!!: {0} produced error {1}", BoardID, message.HasValue("EC") ? ((ErrorCode)message.GetInt("EC")).ToString() : ErrorCode.ERROR_UNKNOWN.ToString());
                         //record last error message
+                        message.AddValue("ErrorCode", (ErrorCode)message.ArgumentAsByte(0));
                         LastErrorMessage = message;
-                        if (message.HasValue("EC"))
-                        {
-                            LastErrorCode = (ErrorCode)message.GetInt("EC");
-                            message.AddValue("ErrorCode", LastErrorCode);
-                        }
                         LastErrorOn = DateTime.Now;
+                        Console.WriteLine("ArduinoDeviceManager::HandleReceivedADMMessage !!!ERROR!!!: {0} produced error {1}", BoardID, message.GetValue("ErrorCode"));
                         break;
                 }
 
@@ -1035,7 +1067,7 @@ namespace Chetch.Arduino
             message.Type = Messaging.MessageType.COMMAND;
             message.TargetID = targetID;
             message.Tag = tag == 0 ? MessageTags.CreateTag() : tag;
-            message.CommandID = (byte)command.Type;
+            message.CommandID = command.ID;
             
             List<Object> allArgs = command.Arguments;
             if(extraArgs != null && extraArgs.Count > 0)
@@ -1136,7 +1168,7 @@ namespace Chetch.Arduino
                             }
                             if (message.Tag == 0) message.Tag = MessageTags.CreateTag();
                             message.SenderID = BoardID;
-                            //Console.WriteLine("-------------> {0}: Sending message {1} tag {2}. Success = {3}, Msgs Sent = {4}, Msgs Recv. = {5}", PortAndNodeID, message.Type, message.Tag, MessageReceivedSuccess, MessagesSent, MessagesReceived);
+                            Console.WriteLine("-------------> {0}: Sending message {1} tag {2} target {3}." , PortAndNodeID, message.Type, message.Tag, message.TargetID);
                             SendString(message.Serialize());
                             break;
                         }

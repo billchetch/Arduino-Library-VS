@@ -815,7 +815,6 @@ namespace Chetch.Arduino
             {
                 case MessageType.ERROR:
                     Tracing?.TraceEvent(TraceEventType.Error, 100, "ADM {0} produced error: {1}", adm.BoardID,  message.HasValue("ErrorCode") ? message.GetValue("ErrorCode") : ErrorCode.ERROR_UNKNOWN);
-
                     break;
 
                 case MessageType.WARNING:
