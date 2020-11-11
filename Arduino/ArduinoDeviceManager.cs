@@ -259,7 +259,7 @@ namespace Chetch.Arduino
                             checksum += bytes[i];
                         }
 
-                        if (checksum != checksum) throw new Exception("ADMMessage::onDeserialize checksum does not match checkbyte");
+                        if (checksum != checkbyte) throw new Exception("ADMMessage::onDeserialize checksum does not match checkbyte");
 
                         //add propoerties
                         Type = (Chetch.Messaging.MessageType)bytes[1];
@@ -301,9 +301,7 @@ namespace Chetch.Arduino
     {
         private const int RESPONSE_TIMEOUT = 10000; //Firmata setting
         private const int MAX_SEND_STRING_LENGTH = 31; //maximum string length to send by Firmata (was 32, reduced to 31 cos message now contains checksum byte)
-        private const int MESSAGE_RECEIVED_TIMEOUT = 3000; //how long we hold up Sending if waiting for an ADMMessage to be received
-        private const int SEND_MESSAGE_THROTTLE = 50; //minimum ms between messages sent ... to hold off bombarding the board
-        private const int DEFAULT_SEND_ATTEMPTS = 3; //number of attempts to send a message before barfing
+        private const int MESSAGE_RECEIVED_TIMEOUT = 3000; //how long we hold up Sending the current message while waiting for the previous ADMMessage to be received
         private const int SEND_MESSAGE_LOCK_TIMEOUT = 2000; //number of ms we wait to send a message before allowing thread to continue
 
         public const string ARDUINO_MEGA_2560 = "USB-SERIAL CH340";
@@ -1104,7 +1102,7 @@ namespace Chetch.Arduino
             }
         }
 
-        public byte SendMessage(ADMMessage message, int sendAttempts = DEFAULT_SEND_ATTEMPTS)
+        public byte SendMessage(ADMMessage message)
         {
             if (message == null) return 0;
 
@@ -1112,86 +1110,62 @@ namespace Chetch.Arduino
             {
                 try
                 {
-                    String errMsg = null;
-                    Exception innerException = null;
+                    bool ready2send;
+                    long msSinceLastSent = -1;
 
-                    for (int i = 0; i < sendAttempts; i++)
+                    //loop waiting for a message response
+                    do
                     {
-                        errMsg = null;
-                        innerException = null;
-                        bool ready2send;
-                        long msSinceLastSent = -1;
-
-                        //loop waiting for a confirmation message
-                        do
+                        msSinceLastSent = (DateTime.Now.Ticks - LastMessageSentOn.Ticks) / TimeSpan.TicksPerMillisecond;
+                        if (LastMessageSent == null || MessageReceivedSuccess)
                         {
-                            msSinceLastSent = (DateTime.Now.Ticks - LastMessageSentOn.Ticks) / TimeSpan.TicksPerMillisecond;
-                            if (LastMessageSent == null || MessageReceivedSuccess)
+                            ready2send = true;
+                        }
+                        else
+                        {
+                            ready2send = msSinceLastSent > MESSAGE_RECEIVED_TIMEOUT;
+                            if (!ready2send)
                             {
-                                ready2send = true;
+                                _sleep(10); //crappy idea to reduce load on cpu
                             }
                             else
                             {
-                                ready2send = msSinceLastSent > MESSAGE_RECEIVED_TIMEOUT;
-                                if (!ready2send)
-                                {
-                                    _sleep(10); //crappy idea to reduce load on cpu
-                                }
-                                else
-                                {
-                                    //so here we have waited long enough for the previous sent message which has failed to arrive
-                                    //so we proceed with sending anyway
-                                    Tracing?.TraceEvent(TraceEventType.Warning, 0, "SendMessage {0}: Timed out waiting to receive message tag {1}", PortAndNodeID, LastMessageSent.Tag, message.Type, message.Tag);
-                                }
+                                //so here we have waited long enough for the previous sent message which has failed to arrive
+                                //so we proceed with sending anyway
+                                Tracing?.TraceEvent(TraceEventType.Warning, 0, "SendMessage {0}: Timed out waiting to receive message tag {1}", PortAndNodeID, LastMessageSent.Tag, message.Type, message.Tag);
                             }
-                        } while (!ready2send);
-
-                        //we do some 'throttling' here
-                        if (msSinceLastSent > 0 && msSinceLastSent < SEND_MESSAGE_THROTTLE)
-                        {
-                            long throttleBy = System.Convert.ToInt64(SEND_MESSAGE_THROTTLE);
-                            _sleep(System.Convert.ToInt32(throttleBy - msSinceLastSent));
                         }
+                    } while (!ready2send);
 
-                        //store old values before sending (rollback if exception thrown)
-                        //This unusual approach is because it appeared like messages were being received before the SendString could exit
-                        ADMMessage lastMessageSent = LastMessageSent;
-                        DateTime lastMessageSentOn = LastMessageSentOn;
-                        try
-                        {
-                            lock (MessageStatsLock)
-                            {
-                                MessagesSent++;
-                                LastMessageSent = message;
-                                LastMessageSentOn = DateTime.Now;
-                                MessageReceivedSuccess = false;
-                            }
-                            if (message.Tag == 0) message.Tag = MessageTags.CreateTag();
-                            message.SenderID = BoardID;
-                            Console.WriteLine("-------------> {0}: Sending message {1} tag {2} target {3}." , PortAndNodeID, message.Type, message.Tag, message.TargetID);
-                            SendString(message.Serialize());
-                            break;
-                        }
-                        catch (Exception e)
-                        {
-                            lock (MessageStatsLock) //rollback
-                            {
-                                MessagesSent--;
-                                LastMessageSent = lastMessageSent;
-                                LastMessageSentOn = lastMessageSentOn;
-                            }
-                            MessageReceivedSuccess = true; ///So the next attempt doesn't encounter a timeout
-                            innerException = e;
-                            errMsg = String.Format("{0} SendMessage: Attempt {1} sending {2} (Tag={3}) produced exception {4} {5}", PortAndNodeID, i + 1, message.Type, message.Tag, e.GetType(), e.Message);
-                            Tracing?.TraceEvent(TraceEventType.Error, 0, errMsg);
-                        }
-                    } // end attempt loop
-
-
-                    if (innerException != null)
+                    //store old values before sending (rollback if exception thrown)
+                    //This unusual approach is because it appeared like messages were being received before the SendString could exit
+                    ADMMessage lastMessageSent = LastMessageSent;
+                    DateTime lastMessageSentOn = LastMessageSentOn;
+                    try
                     {
-                        Tracing?.TraceEvent(TraceEventType.Error, 0, "{0} SendMessage: Failed after {1} attempts", PortAndNodeID, sendAttempts);
-                        throw new SendFailedException(errMsg, innerException);
+                        lock (MessageStatsLock)
+                        {
+                            MessagesSent++;
+                            LastMessageSent = message;
+                            LastMessageSentOn = DateTime.Now;
+                            MessageReceivedSuccess = false;
+                        }
+                        if (message.Tag == 0) message.Tag = MessageTags.CreateTag();
+                        message.SenderID = BoardID;
+                        Console.WriteLine("-------------> {0}: Sending message {1} tag {2} target {3}." , PortAndNodeID, message.Type, message.Tag, message.TargetID);
+                        SendString(message.Serialize());
+                    }
+                    catch (Exception e)
+                    {
+                        lock (MessageStatsLock) //rollback
+                        {
+                            MessagesSent--;
+                            LastMessageSent = lastMessageSent;
+                            LastMessageSentOn = lastMessageSentOn;
+                        }
+                        String errMsg = String.Format("{0} SendMessage: sending {1} (Tag={2}) produced exception {3} {4}", PortAndNodeID, message.Type, message.Tag, e.GetType(), e.Message);
+                        Tracing?.TraceEvent(TraceEventType.Error, 0, errMsg);
+                        throw e;
                     }
                 }
                 finally

@@ -11,13 +11,112 @@ using Chetch.Arduino.Exceptions;
 using XBeeLibrary.Core.Packet;
 using XBeeLibrary.Core.Packet.Common;
 using System.Threading;
+using XBeeLibrary.Core.Connection;
 
 namespace Chetch.Arduino.XBee
 {
     public class XBeeFirmataSerialConnection : Solid.Arduino.ISerialConnection
     {
-        private const int DELAY_AFTER_CONNECT = 2000; //how many ms to wait after a connection ... there can be reconnect issues if attempting to reconnect too soon
-        private const int COORDINATOR_LOCK_TIMEOUT = 2000; //how long we wait to obatin a lock on the coordinator (e.g. for writing data)
+        public class XBGateway
+        {
+            private const int DELAY_AFTER_CONNECT = 2000; //how many ms to wait after a connection ... there can be reconnect issues if attempting to reconnect too soon
+            private const int COORDINATOR_LOCK_TIMEOUT = 2000; //how long we wait to obatin a lock on the coordinator (e.g. for writing data)
+
+            public XBeeDevice Coordinator;
+            public DateTime DataLastSent;
+
+            public XBGateway(XBeeDevice coordinator)
+            {
+                Coordinator = coordinator;
+            }
+
+            public bool IsConnected { get { return Coordinator.IsOpen;  } }
+
+            public RemoteXBeeDevice Connect(String remoteNodeID)
+            {
+                if (Monitor.TryEnter(Coordinator, COORDINATOR_LOCK_TIMEOUT))
+                {
+                    RemoteXBeeDevice rxb = null;
+                    try
+                    {
+                        if (!Coordinator.IsOpen)
+                        {
+                            Console.WriteLine("Opening coordinator while opening connection to {0}", remoteNodeID);
+                            Coordinator.Open();
+                        }
+
+                        //always perform a network discovery
+                        XBeeNetwork network = Coordinator.GetNetwork();
+                        if (network == null)
+                        {
+                            throw new NetworkNotFoundException(String.Format("Open: Cannot find coordinator network when looking for NodeID {0}", remoteNodeID));
+                        }
+                        rxb = network.DiscoverDevice(remoteNodeID);
+                        if (rxb == null)
+                        {
+                            throw new BoardNotFoundException(String.Format("Open: Cannot find XBee with NodeID {0}", remoteNodeID));
+                        }
+
+                        //delay for a while ...
+                        System.Threading.Thread.Sleep(DELAY_AFTER_CONNECT);
+
+                        //return the remote xb device to be used for calls to send data
+                        return rxb;
+                    }
+                    finally
+                    {
+                        Monitor.Exit(Coordinator);
+                    }
+                }
+                else
+                {
+                    throw new TimeoutException(String.Format("TryConnect: could not obtain lock when trying to connect to NodeID {0}", remoteNodeID));
+                }
+            }
+
+            public void Disconnect()
+            {
+                if (Monitor.TryEnter(Coordinator, COORDINATOR_LOCK_TIMEOUT))
+                {
+                    try 
+                    { 
+                        if (Coordinator.IsOpen)
+                        {
+                            Coordinator.Close();
+                        }
+                    }
+                    finally
+                    {
+                        Monitor.Exit(Coordinator);
+                    }
+                }
+                else
+                {
+                    throw new TimeoutException(String.Format("Disconnect: could not obtain lock when trying to disconnect gateway"));
+                }
+            }
+
+            public void SendData(RemoteXBeeDevice rxb, byte[] data)
+            {
+                if (Monitor.TryEnter(Coordinator, COORDINATOR_LOCK_TIMEOUT))
+                {
+                    try
+                    {
+                        //XBCoordinator.SendDataAsync(XBRemoteDevice, buffer);
+                        Coordinator.SendData(rxb, data);
+                    }
+                    finally
+                    {
+                        Monitor.Exit(Coordinator);
+                    }
+                }
+                else
+                {
+                    //TODO: couldn't obain a lock.. for now we just let it pass
+                }
+            }
+        }
+
         
         static private Dictionary<String, List<XBeeFirmataSerialConnection>> _connections = new Dictionary<String, List<XBeeFirmataSerialConnection>>();
         
@@ -53,9 +152,8 @@ namespace Chetch.Arduino.XBee
 
         public event SerialDataReceivedEventHandler DataReceived;
         
-        public XBeeDevice XBCoordinator { get; internal set; }
-        public Object XBCoordinatorLock;
-
+        public XBGateway Gateway { get; internal set; }
+        
         public String NodeID { get; internal set; }
         
         public RemoteXBeeDevice XBRemoteDevice { get; set; }
@@ -94,9 +192,8 @@ namespace Chetch.Arduino.XBee
 
                 //reuse the connection and coordinator and lock
                 XBSerialConnection = _connections[port][0].XBSerialConnection;
-                XBCoordinator = _connections[port][0].XBCoordinator;
-                XBCoordinatorLock = _connections[port][0].XBCoordinatorLock;
-
+                Gateway = _connections[port][0].Gateway;
+                
                 if (cnn2remove != null) _connections[port].Remove(cnn2remove);
             }
             else
@@ -104,9 +201,8 @@ namespace Chetch.Arduino.XBee
                 //nothing on this port yet ... so we create a new serial coneection (for the port)
                 //and a new coordinator (to coordinate XBee network)
                 XBSerialConnection = new XBeeSerialConnection(port, (int)baudRate);
-                XBCoordinator = new ZigBeeDevice(XBSerialConnection); //TODO: parameterize this
-                XBCoordinatorLock = new Object();
-
+                Gateway = new XBGateway(new ZigBeeDevice(XBSerialConnection)); //TODO: parameterize this
+                
                 _connections[port] = new List<XBeeFirmataSerialConnection>();
             }
 
@@ -184,41 +280,12 @@ namespace Chetch.Arduino.XBee
         {
             if (IsOpen) return;
 
-            if (Monitor.TryEnter(XBCoordinatorLock, COORDINATOR_LOCK_TIMEOUT))
-            {
-                try
-                {
-                    if (!XBCoordinator.IsOpen)
-                    {
-                        Console.WriteLine("Opening coordinator while opening connection to {0}", NodeID);
-                        XBCoordinator.Open();
-                    }
+            //this will barf if not possible to connect
+            XBRemoteDevice = Gateway.Connect(NodeID);
 
-                    XBeeNetwork network = XBCoordinator.GetNetwork();
-                    if (network == null)
-                    {
-                        throw new NetworkNotFoundException(String.Format("Open: Cannot find coordinator network when looking for NodeID {0}", NodeID));
-                    }
-                    XBRemoteDevice = network.DiscoverDevice(NodeID);
-                    if (XBRemoteDevice == null)
-                    {
-                        throw new BoardNotFoundException(String.Format("Open: Cannot find XBee with NodeID {0}", NodeID));
-                    }
+            Gateway.Coordinator.DataReceived += HandleXBeeDataReceived;
+            Gateway.Coordinator.PacketReceived += HandleXBeePacketReceived;
 
-                    //delay for a while ...
-                    System.Threading.Thread.Sleep(DELAY_AFTER_CONNECT);
-
-                    XBCoordinator.DataReceived += HandleXBeeDataReceived;
-                    XBCoordinator.PacketReceived += HandleXBeePacketReceived;
-                } finally
-                {
-                    Monitor.Exit(XBCoordinatorLock);
-                }
-
-            } else
-            {
-                throw new TimeoutException(String.Format("Open: could not obatin lock when trying to open NodeID {0}", NodeID));
-            }
             IsOpen = true;
 
             //start up the thread that waits for received data and forwards it to subscribers
@@ -236,39 +303,28 @@ namespace Chetch.Arduino.XBee
             }
             FlushBuffer();
 
-            if (Monitor.TryEnter(XBCoordinatorLock, COORDINATOR_LOCK_TIMEOUT))
+            Gateway.Coordinator.DataReceived += HandleXBeeDataReceived;
+            Gateway.Coordinator.PacketReceived += HandleXBeePacketReceived;
+            XBRemoteDevice = null;
+            Gateway.Disconnect();
+            
+
+            bool allClosed = true;
+            foreach (var cnn in _connections[PortName])
             {
-                try
+                if (cnn.IsOpen)
                 {
-                    XBCoordinator.DataReceived -= HandleXBeeDataReceived;
-                    XBCoordinator.PacketReceived -= HandleXBeePacketReceived;
-                    XBRemoteDevice = null;
-
-                    bool allClosed = true;
-                    foreach (var cnn in _connections[PortName])
-                    {
-                        if (cnn.IsOpen)
-                        {
-                            allClosed = false;
-                            break;
-                        }
-                    }
-
-                    if (allClosed && XBCoordinator.IsOpen)
-                    {
-                        XBCoordinator.Close();
-                        Console.WriteLine("{0} closing coordinator", NodeID);
-
-                    }
+                    allClosed = false;
+                    break;
                 }
-                finally
-                {
-                    Monitor.Exit(XBCoordinatorLock);
-                }
-            } else
-            {
-                throw new TimeoutException(String.Format("Close: could not obatin lock when trying to close NodeID {0}", NodeID));
             }
+
+            if (allClosed && Gateway.IsConnected)
+            {
+                Gateway.Disconnect();
+                Console.WriteLine("{0} disconnecting gateway", NodeID);
+            }
+                
         }
 
 
@@ -305,21 +361,7 @@ namespace Chetch.Arduino.XBee
                     throw new BoardNotFoundException("XBeeFirmataSerialConnection::Write ... cannot send data as no remote XBee device available");
                 }
 
-                if (Monitor.TryEnter(XBCoordinatorLock, COORDINATOR_LOCK_TIMEOUT))
-                {
-                    try
-                    {
-                        //XBCoordinator.SendDataAsync(XBRemoteDevice, buffer);
-                        XBCoordinator.SendData(XBRemoteDevice, buffer);
-                    }
-                    finally
-                    {
-                        Monitor.Exit(XBCoordinatorLock);
-                    }
-                } else
-                {
-                    //TODO: couldn't obain a lock.. for now we just let it pass
-                }
+                Gateway.SendData(XBRemoteDevice, buffer);               
             }
             else
             {
