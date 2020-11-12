@@ -128,10 +128,10 @@ namespace Chetch.Arduino.Devices.Temperature
         {
             if (message.Type == Messaging.MessageType.DATA)
             {
-                ActiveSensors = System.Math.Min(ActiveSensors, message.Arguments.Count);
+                ActiveSensors = System.Math.Min(Sensors.Count, message.ArgumentAsInt(0));
                 for (int i = 0; i < ActiveSensors; i++)
                 {
-                    float temp = message.ArgumentAsFloat(i);
+                    float temp = message.ArgumentAsFloat(i + 1);
                     Sensors[i].SetTemperature(temp);
 
                     //prettyify the message
