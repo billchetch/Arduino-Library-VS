@@ -47,8 +47,7 @@ namespace Chetch.Arduino.Devices.Temperature
 
         private int _oneWirePin;
         public List<DS18B20Sensor> Sensors { get; } = new List<DS18B20Sensor>();
-        public int ActiveSensors { get; internal set; } = 0; //set by the board once device is connected
-
+        
         public List<DS18B20Sensor> ConnectedSensors { 
             get
             {
@@ -110,8 +109,8 @@ namespace Chetch.Arduino.Devices.Temperature
         {
             if (message.Arguments.Count > 0)
             {
-                ActiveSensors = System.Math.Min(Sensors.Count, message.ArgumentAsInt(0));
-                for (int i = 0; i < ActiveSensors; i++)
+                int sc = System.Math.Min(Sensors.Count, message.ArgumentAsInt(0));
+                for (int i = 0; i < sc; i++)
                 {
                     DS18B20Array.DS18B20Sensor sensor = Sensors[i];
                     if (SampleInterval > 0 && SampleSize > 0 && !sensor.IsConnected)
@@ -120,7 +119,7 @@ namespace Chetch.Arduino.Devices.Temperature
                         sensor.IsConnected = true;
                     }
                 }
-                message.AddValue(PARAM_SENSOR_COUNT, ActiveSensors);
+                message.AddValue(PARAM_SENSOR_COUNT, ConnectedSensors.Count);
                 message.AddValue(PARAM_ONE_WIRE_PIN, message.ArgumentAsInt(1));
             }
         }
@@ -129,8 +128,8 @@ namespace Chetch.Arduino.Devices.Temperature
         {
             if (message.Type == Messaging.MessageType.DATA)
             {
-                ActiveSensors = System.Math.Min(Sensors.Count, message.ArgumentAsInt(0));
-                for (int i = 0; i < ActiveSensors; i++)
+                int sc = System.Math.Min(Sensors.Count, message.ArgumentAsInt(0));
+                for (int i = 0; i < sc; i++)
                 {
                     float temp = message.ArgumentAsFloat(i + 1);
                     Sensors[i].SetTemperature(temp);
@@ -138,7 +137,7 @@ namespace Chetch.Arduino.Devices.Temperature
                     //prettyify the message
                     message.AddValue(PARAM_TEMPERATURE + "-" + i, temp);
                 }
-                message.AddValue(PARAM_SENSOR_COUNT, ActiveSensors);
+                message.AddValue(PARAM_SENSOR_COUNT, sc);
             }
 
             base.HandleMessage(message);
