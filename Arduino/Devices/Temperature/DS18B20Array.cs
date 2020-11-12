@@ -46,6 +46,8 @@ namespace Chetch.Arduino.Devices.Temperature
         public const String PARAM_TEMPERATURE = "Temperature";
 
         private int _oneWirePin;
+
+        public int Resolution { get; set; } = 10;
         public List<DS18B20Sensor> Sensors { get; } = new List<DS18B20Sensor>();
         
         public List<DS18B20Sensor> ConnectedSensors { 
@@ -101,8 +103,8 @@ namespace Chetch.Arduino.Devices.Temperature
         {
             base.AddConfig(message);
 
-            //this should be argument with index 3 (argument values are retrieved by numerical index on the arduino)
             message.AddArgument(_oneWirePin);
+            message.AddArgument(Resolution);
         }
 
         protected override void OnConnect(ADMMessage message)
