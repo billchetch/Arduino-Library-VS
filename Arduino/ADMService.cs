@@ -789,13 +789,22 @@ namespace Chetch.Arduino
                     }
 
 
-                    //Finally we look to see if there has been suspicioius lack of activity
+                    //Finally we check on the state of the ADM
                     foreach (ArduinoDeviceManager adm in adms)
                     {
-                        long msQuiet = (DateTime.Now.Ticks - adm.LastMessageReceivedOn.Ticks) / TimeSpan.TicksPerMillisecond;
-                        if(msQuiet > ADMInactivityTimeout)
+                        if (!adm.IsConnected)
                         {
-                            OnADMInactivityTimeout(adm, msQuiet);
+                            //TODO: how do we handle this?
+                            Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADM (BDID={0}) @ {1} is of state", adm.State);
+                        }
+                        else 
+                        {
+                            //if there has been a suspicioius lack of activity...
+                            long msQuiet = (DateTime.Now.Ticks - adm.LastMessageReceivedOn.Ticks) / TimeSpan.TicksPerMillisecond;
+                            if (msQuiet > ADMInactivityTimeout)
+                            {
+                                OnADMInactivityTimeout(adm, msQuiet);
+                            }
                         }
                     }
 
