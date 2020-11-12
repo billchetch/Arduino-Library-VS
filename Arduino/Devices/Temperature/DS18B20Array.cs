@@ -15,6 +15,7 @@ namespace Chetch.Arduino.Devices.Temperature
             public String ID { get; set; }
             public double Temperature { get; set; }
             public bool IsConnected { get; set; } = false;
+
             public double AverageTemperature {
                 get
                 {
@@ -46,6 +47,8 @@ namespace Chetch.Arduino.Devices.Temperature
 
         private int _oneWirePin;
         public List<DS18B20Sensor> Sensors { get; } = new List<DS18B20Sensor>();
+        public int ActiveSensors { get; internal set; } = 0; //set by the board once device is connected
+
         public List<DS18B20Sensor> ConnectedSensors { 
             get
             {
@@ -107,8 +110,8 @@ namespace Chetch.Arduino.Devices.Temperature
         {
             if (message.Arguments.Count > 0)
             {
-                int sc = message.ArgumentAsInt(0);
-                for (int i = 0; i < System.Math.Min(sc, Sensors.Count); i++)
+                ActiveSensors = System.Math.Min(Sensors.Count, message.ArgumentAsInt(0));
+                for (int i = 0; i < ActiveSensors; i++)
                 {
                     DS18B20Array.DS18B20Sensor sensor = Sensors[i];
                     if (SampleInterval > 0 && SampleSize > 0 && !sensor.IsConnected)
@@ -117,6 +120,7 @@ namespace Chetch.Arduino.Devices.Temperature
                         sensor.IsConnected = true;
                     }
                 }
+                message.AddValue(PARAM_SENSOR_COUNT, ActiveSensors);
             }
         }
 
@@ -124,14 +128,16 @@ namespace Chetch.Arduino.Devices.Temperature
         {
             if (message.Type == Messaging.MessageType.DATA)
             {
-                for (int i = 0; i < Sensors.Count; i++)
+                ActiveSensors = System.Math.Min(ActiveSensors, message.Arguments.Count);
+                for (int i = 0; i < ActiveSensors; i++)
                 {
-                    String key = PARAM_TEMPERATURE + "-" + i;
-                    if (message.HasValue(key))
-                    {
-                        Sensors[i].SetTemperature(message.GetDouble(key));
-                    }
+                    float temp = message.ArgumentAsFloat(i);
+                    Sensors[i].SetTemperature(temp);
+
+                    //prettyify the message
+                    message.AddValue(PARAM_TEMPERATURE + "-" + i, temp);
                 }
+                message.AddValue(PARAM_SENSOR_COUNT, ActiveSensors);
             }
 
             base.HandleMessage(message);
