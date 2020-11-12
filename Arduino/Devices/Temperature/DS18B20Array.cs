@@ -121,6 +121,7 @@ namespace Chetch.Arduino.Devices.Temperature
                     }
                 }
                 message.AddValue(PARAM_SENSOR_COUNT, ActiveSensors);
+                message.AddValue(PARAM_ONE_WIRE_PIN, message.ArgumentAsInt(1));
             }
         }
 
