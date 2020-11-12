@@ -26,7 +26,8 @@ namespace Chetch.Arduino.Devices.Counters
         public long Count { get; internal set; } = 0;
         public long Interval { get; internal set; } = 0;
         public float Rate { get; internal set; } = 0;
-        
+        public int RateInterval { get; set; } = 1000; //ms to count over (max val for int 2 bytes)
+
         private int _counterPin;
         private int _countState = 0;
         
@@ -85,6 +86,7 @@ namespace Chetch.Arduino.Devices.Counters
 
             message.AddArgument(_counterPin);
             message.AddArgument(_countState);
+            message.AddArgument(RateInterval);
         }
 
         public override void HandleMessage(ADMMessage message)
