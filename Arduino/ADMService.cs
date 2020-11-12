@@ -164,8 +164,8 @@ namespace Chetch.Arduino
             
         }
 
-        //some error codes upon which to try and reset the port
-        //public const int ERROR_ATTACHED_DEVICE_NOT_FUNCTIONING = -2147024865;
+        //some constants
+        protected const int ADM_INACTIVITY_TIMEOUT = 10000; 
 
         //map of port names to arduino device managers
         protected Dictionary<String, ArduinoDeviceManager> ADMS { get; } = new Dictionary<String, ArduinoDeviceManager>();
@@ -184,7 +184,7 @@ namespace Chetch.Arduino
         protected List<String> AllowedPorts { get; } = new List<String>();
         protected List<String> DeniedPorts { get; } = new List<String>();
         protected SerialBaudRate BaudRate { get; set; } = SerialBaudRate.Bps_38400; //SerialBaudRate.Bps_57600;
-        protected int MaxPingResponseTime { get; set; } = 20; //in seconds
+        protected int ADMInactivityTimeout { get; set; } = ADM_INACTIVITY_TIMEOUT; //in ms
         protected bool AutoStartADMTimer { get; set; }  = true;
 
         protected Timer _admtimer;
@@ -272,8 +272,11 @@ namespace Chetch.Arduino
                 _admtimer = new System.Timers.Timer();
                 _admtimer.Interval = 5000;
                 _admtimer.Elapsed += new System.Timers.ElapsedEventHandler(this.MonitorADM);
-                if(AutoStartADMTimer)_admtimer.Start();
-                Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Created ADM monitor timer at intervals of {0}", _admtimer.Interval);
+                if (AutoStartADMTimer)
+                {
+                    _admtimer.Start();
+                    Tracing?.TraceEvent(TraceEventType.Information, 100, "ADM: Created ADM monitor timer at intervals of {0} with ADMInactivityTimeout set at {1}", _admtimer.Interval, ADMInactivityTimeout);
+                }
             }
             catch (Exception e)
             {
@@ -706,12 +709,29 @@ namespace Chetch.Arduino
             }
         }
 
+        protected virtual bool OnADMInactivityTimeout(ArduinoDeviceManager adm, long msQuiet)
+        {
+            Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADMService::MonitorADM: Last activity of ADM (BoardID={0}) on {1} was {2} ms ago ... so attempting a clear", adm.BoardID, adm.PortAndNodeID, msQuiet);
+            try
+            {
+                adm.Clear();
+                Tracing?.TraceEvent(TraceEventType.Information, 100, "ADMService::MonitorADM: Clearing ADM (BoardID={0}) on {1} was successful so attempting to Ping", adm.BoardID, adm.PortAndNodeID);
+                adm.Ping();
+                return true;
+            }
+            catch (Exception e)
+            {
+                Tracing?.TraceEvent(TraceEventType.Error, 100, "ADMService::MonitorADM: Error clearing ADM (BoardID={0}) on {1}: {2} {3}", adm.BoardID, adm.PortAndNodeID, e.GetType(), e.Message);
+                return false;
+            }
+        }
+
         /// <summary>
         /// Called by a timer
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="eventArgs"></param>
-        public virtual void MonitorADM(Object sender, ElapsedEventArgs eventArgs)
+        protected virtual void MonitorADM(Object sender, ElapsedEventArgs eventArgs)
         {
             _admtimer.Stop();
 
@@ -772,7 +792,11 @@ namespace Chetch.Arduino
                     //Finally we look to see if there has been suspicioius lack of activity
                     foreach (ArduinoDeviceManager adm in adms)
                     {
-
+                        long msQuiet = (DateTime.Now.Ticks - adm.LastMessageReceivedOn.Ticks) / TimeSpan.TicksPerMillisecond;
+                        if(msQuiet > ADMInactivityTimeout)
+                        {
+                            OnADMInactivityTimeout(adm, msQuiet);
+                        }
                     }
 
                 } //end of monitor lock

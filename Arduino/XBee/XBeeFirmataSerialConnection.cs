@@ -107,7 +107,8 @@ namespace Chetch.Arduino.XBee
                         long msSinceLastSent = (DateTime.Now.Ticks - DataLastSent.Ticks) / TimeSpan.TicksPerMillisecond;
                         if(msSinceLastSent < SEND_DATA_THROTTLE)
                         {
-                            System.Threading.Thread.Sleep((int)(SEND_DATA_THROTTLE - msSinceLastSent));
+                            int sleep = (int)(SEND_DATA_THROTTLE - msSinceLastSent);
+                            System.Threading.Thread.Sleep(sleep);
                         }
                         Coordinator.SendData(rxb, data);
                         DataLastSent = DateTime.Now;
