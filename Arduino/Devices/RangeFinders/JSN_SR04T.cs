@@ -11,6 +11,8 @@ namespace Chetch.Arduino.Devices.RangeFinders
     public class JSN_SR04T : RangeFinderBase
     {
         public const String DEVICE_NAME = "JSN-SR04T"; //This name must be used if the ChetchFirmata code on the Arduino is to work
+        public const String PARAM_DISTANCE = "Distance";
+        public const String PARAM_UNITS = "Units";
 
         private int _transmitPin;
         private int _receivePin;
@@ -47,9 +49,9 @@ namespace Chetch.Arduino.Devices.RangeFinders
         {
             base.HandleMessage(message);
 
-            if (message.Type == MessageType.DATA && message.HasValue("Duration"))
+            if (message.Type == MessageType.DATA)
             {
-                double duration = message.GetDouble("Duration"); //this is in microseconds
+                double duration = message.ArgumentAsLong(0); //this is in microseconds
                 if (duration > 0)
                 {
                     double speedInMicros = Measurement.ConvertUnit(SpeedOfSound, Measurement.Unit.MICROSECOND, Measurement.Unit.SECOND);
@@ -57,8 +59,8 @@ namespace Chetch.Arduino.Devices.RangeFinders
 
                     Sampler?.ProvideSample(this, Distance);
 
-                    message.AddValue("Distance", Distance);
-                    message.AddValue("Units", MeasurementUnit);
+                    message.AddValue(PARAM_DISTANCE, Distance);
+                    message.AddValue(PARAM_UNITS, MeasurementUnit);
                 }
 
             }
