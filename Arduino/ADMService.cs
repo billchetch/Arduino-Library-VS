@@ -681,6 +681,9 @@ namespace Chetch.Arduino
                 _devicesConnected[port] = false;
                 Tracing?.TraceEvent(TraceEventType.Information, 100, "ADMService::ConnectADM: Connected to board on port {0}", port);
                 Broadcast(ADMEvent.CONNECTED, String.Format("Connected ADM to port {0}", port));
+
+                //TODO: check this is the last of all the required boards before starting sampler
+                Sampler.Start();
             }
         }
 
