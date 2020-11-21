@@ -32,7 +32,8 @@ namespace Chetch.Arduino
         ERROR_CHECKSUM = 1,
         ERROR_UNRECOGNISED_MESSAGE_TYPE = 2,
         ERROR_BADLY_FORMED_MESSAGE = 3,
-        ERROR_UNKNOWN = 4
+        ERROR_UNKNOWN = 4,
+        ERROR_ADM_NOT_INITIALISED = 5
     }
 
     public class ADMMessage : Message
@@ -930,7 +931,6 @@ namespace Chetch.Arduino
                 }
                 Console.WriteLine("<--------- {0}: Received message {1} tag {2} target {3} from sender {4}", PortAndNodeID, message.Type, message.Tag, message.TargetID, message.SenderID);
 
-
                 switch (message.Type)
                 {
                     case Messaging.MessageType.INITIALISE_RESPONSE:
@@ -987,7 +987,6 @@ namespace Chetch.Arduino
                         message.AddValue("ErrorCode", (ErrorCode)message.ArgumentAsByte(0));
                         LastErrorMessage = message;
                         LastErrorOn = DateTime.Now;
-                        Console.WriteLine("ArduinoDeviceManager::HandleReceivedADMMessage !!!ERROR!!!: {0} produced error {1}", BoardID, message.GetValue("ErrorCode"));
                         break;
                 }
 

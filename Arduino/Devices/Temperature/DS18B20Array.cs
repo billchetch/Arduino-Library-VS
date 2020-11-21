@@ -128,6 +128,19 @@ namespace Chetch.Arduino.Devices.Temperature
             }
         }
 
+
+        public override void Disconnect()
+        {
+            base.Disconnect();
+            if (Mgr.Sampler != null)
+            {
+                foreach (var sensor in Sensors)
+                {
+                    Mgr.Sampler.Remove(sensor);
+                }
+            }
+        }
+
         public override void HandleMessage(ADMMessage message)
         {
             if (message.Type == Messaging.MessageType.DATA)

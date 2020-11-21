@@ -584,6 +584,10 @@ namespace Chetch.Arduino
         virtual public void Disconnect()
         {
             IsConnected = false;
+            if (Mgr.Sampler != null)
+            {
+                Mgr.Sampler.Remove(this);
+            }
         }
     }
 }
