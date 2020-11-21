@@ -622,7 +622,10 @@ namespace Chetch.Arduino
 
         virtual protected void ConnectADM(String port, String nodeID = null)
         {
-            if(PortSharing)
+            //turn off the sampler ... it will start again when all boards have been connected
+            Sampler.Stop();
+
+            if (PortSharing)
             {
                 if (RequiredBoards == null) throw new Exception("If using a shared port, 'Nodes' on the port must be specified as the 'RequiredBoards' property");
 
@@ -634,9 +637,6 @@ namespace Chetch.Arduino
                 {
                     String key = port + ":" + nid;
                     if (ADMS.ContainsKey(key)) continue ;
-
-                    //turn off the sampler ... it will start again when all boards have been connected
-                    Sampler.Stop();
 
                     try
                     {
@@ -799,6 +799,8 @@ namespace Chetch.Arduino
                     List<ArduinoDeviceManager> adms = ADMS.Values.ToList();
                     foreach (ArduinoDeviceManager adm in adms)
                     {
+                        if (adm == null) continue;
+
                         if (!ports.Contains(adm.Port))
                         {
                             //if for some reason (config change?) the port for the ADM is not a possible board port
@@ -1013,8 +1015,8 @@ namespace Chetch.Arduino
             }
             if (startSampler)
             {
-                Tracing?.TraceEvent(TraceEventType.Information, 0, "Starting sampler with {0} subjects and tick time of {1}", Sampler.SubjectCount, Sampler.TimerInterval);
                 Sampler.Start();
+                Tracing?.TraceEvent(TraceEventType.Information, 0, "Started sampler with {0} subjects and tick time of {1}", Sampler.SubjectCount, Sampler.TimerInterval);
             }
 
             String msg = String.Format("All {0} added devices connected for {1} ", adm.DeviceCount, adm.BoardID);
