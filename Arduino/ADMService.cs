@@ -192,7 +192,9 @@ namespace Chetch.Arduino
         private bool _noPortsFoundWarning = false; //has a no ports found warning been 'traced' ... a flag to prevent multiple trace/log entries
         private Object _lockMonitorADM = new Object(); //lock so we don't disconnect/connect concurrently
         private List<ADMRequest> _admRequests = new List<ADMRequest>();
-        
+
+        //Sampler
+        protected Sampler Sampler { get; set; } = new Sampler();
 
         abstract protected void AddADMDevices(ArduinoDeviceManager adm, ADMMessage message);
         
@@ -410,6 +412,7 @@ namespace Chetch.Arduino
             AddCommandHelp("adm/<board>:capability", "List pin capabilities");
             AddCommandHelp("adm/<board>:pingloadtest", "Send a rapid <number> of pings with <delay> between each.");
             AddCommandHelp("adm/<board>:setdigitalpin", "Set the <pin number> to <true/false>");
+            AddCommandHelp("adm/<board>:setdigitalport", "State the state of <port> to <value>");
             AddCommandHelp("adm/<board>:<device>:wait", "Pause for a short while, useful if interspersed with other, comma-seperated, commands");
             AddCommandHelp("adm/<board>:<device>:list-commands", "List device commands");
         }
@@ -556,7 +559,7 @@ namespace Chetch.Arduino
                                 {
                                     throw new Exception("Insufficient arguments ... must supply a pin number and value");
                                 }
-                                int pin =System.Convert.ToInt16(args[0]);
+                                int pin = System.Convert.ToInt16(args[0]);
                                 bool val = Chetch.Utilities.Convert.ToBoolean(args[1]);
                                 if(!adm.IsPinCapable(pin, Solid.Arduino.Firmata.PinMode.DigitalOutput))
                                 {
@@ -568,6 +571,17 @@ namespace Chetch.Arduino
                                 }
                                 adm.SetDigitalPinMode(pin, Solid.Arduino.Firmata.PinMode.DigitalOutput);
                                 adm.SetDigitalPin(pin, val);
+                                break;
+
+                            case "setdigitalport":
+                                if (args.Count < 2)
+                                {
+                                    throw new Exception("Insufficient arguments ... must supply a port number and value");
+                                }
+                                int port = System.Convert.ToInt16(args[0]);
+                                bool enable = Chetch.Utilities.Convert.ToBoolean(args[1]);
+                                adm.SetDigitalReportMode(port, enable);
+                                //adm.G
                                 break;
 
                             case "list-devices":
@@ -613,31 +627,47 @@ namespace Chetch.Arduino
                 if (RequiredBoards == null) throw new Exception("If using a shared port, 'Nodes' on the port must be specified as the 'RequiredBoards' property");
 
                 //when using a shared port we connect all the boards in one go
-                var ar = RequiredBoards.Split(',');
-                foreach(String nodeID in ar)
+                var reqBoards = RequiredBoards.Split(',');
+                ArduinoDeviceManager adm = null;
+                List<Exception> exs = new List<Exception>();
+
+                foreach (String nodeID in reqBoards)
                 {
                     String key = port + ":" + nodeID;
                     if (ADMS.ContainsKey(key)) continue ;
 
-                    List<Exception> exs = new List<Exception>();
                     try
                     {
+                        //now proceed to connect
                         Tracing?.TraceEvent(TraceEventType.Information, 100, ">>>>>>>>>>>>>>>> ADMService::ConnectADM: Attempting to connect board @ {0}", key);
-                        ArduinoDeviceManager adm = ArduinoDeviceManager.Connect(nodeID, port, BaudRate, TryHandleADMMessage);
+                        adm = ArduinoDeviceManager.Connect(nodeID, port, BaudRate, TryHandleADMMessage);
+                        adm.Sampler = Sampler;
                         adm.Tracing = Tracing;
                         ADMS[key] = adm;
                         _devicesConnected[key] = false;
                         Tracing?.TraceEvent(TraceEventType.Information, 100, ">>>>>>>>>>>>>>>> ADMService::ConnectADM: Connected to board @ {0}", key);
-
                         Broadcast(ADMEvent.CONNECTED, String.Format("ADM now Connected @ {0}", key));
 
+                        //Wait here (i.e. before connecting to another board) until the adm is of status device connected
+                        while (!adm.DevicesConnected)
+                        {
+                            System.Threading.Thread.Sleep(1000);
+                            Console.WriteLine("WWWWWWWWWWWwaiting on {0}", adm.PortAndNodeID);
+                        }
                     } catch (Exception e)
                     {
                         //TODO: remove the trace and create a single 'aggregate' exception and throw that after th eloop
                         Tracing?.TraceEvent(TraceEventType.Error, 100, "ADMService::ConnectADM: Error connection to board @ {0}: {1}", key, e.Message);
                         exs.Add(e);
                     }
+                } //end loop of all required boards
+
+                if(exs.Count == 0)
+                {
+                    Tracing?.TraceEvent(TraceEventType.Information, 100, ">>>>>>>>>>>>>>>> ADMService::ConnectADM: All {0} adms have all devices connected so starting sampler...", ADMS.Count);
+                    Sampler.Start();
                 }
+
             } else
             {
                 if (ADMS.ContainsKey(port)) throw new Exception("ADMService::ConnectADM: port " + port + " already has an assigned ADM");
@@ -645,6 +675,7 @@ namespace Chetch.Arduino
                 Tracing?.TraceEvent(TraceEventType.Information, 100, "ADMService::ConnectADM: Attempting to connect board on {0} port {0}", port);
 
                 ArduinoDeviceManager adm = ArduinoDeviceManager.Connect(port, BaudRate, TryHandleADMMessage);
+                adm.Sampler = Sampler;
                 adm.Tracing = Tracing;
                 ADMS[port] = adm;
                 _devicesConnected[port] = false;

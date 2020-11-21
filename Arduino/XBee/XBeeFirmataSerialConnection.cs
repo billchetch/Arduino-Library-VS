@@ -20,7 +20,7 @@ namespace Chetch.Arduino.XBee
         public class XBGateway
         {
             private const int DELAY_AFTER_CONNECT = 2000; //how many ms to wait after a connection ... there can be reconnect issues if attempting to reconnect too soon
-            private const int COORDINATOR_LOCK_TIMEOUT = 2000; //how long we wait to obatin a lock on the coordinator (e.g. for writing data)
+            private const int COORDINATOR_LOCK_TIMEOUT = 1800; //how long we wait to obatin a lock on the coordinator (e.g. for writing data)
             private const int SEND_DATA_THROTTLE = 100; //ensure this many ms between data sends
 
             public XBeeDevice Coordinator;
@@ -304,19 +304,20 @@ namespace Chetch.Arduino.XBee
         {
             if (!IsOpen) return;
 
+            Console.WriteLine("Waiting for data to be delivered before closing connection for {0} ", NodeID);
             IsOpen = false;
             if (!_deliverDataTask.IsCompleted)
             {
                 _deliverDataTask.Wait();
             }
             FlushBuffer();
+            Console.WriteLine("Data cleared and buffer flushed {0} ", NodeID);
 
-            Gateway.Coordinator.DataReceived += HandleXBeeDataReceived;
-            Gateway.Coordinator.PacketReceived += HandleXBeePacketReceived;
+
+            Gateway.Coordinator.DataReceived -= HandleXBeeDataReceived;
+            Gateway.Coordinator.PacketReceived -= HandleXBeePacketReceived;
             XBRemoteDevice = null;
-            Gateway.Disconnect();
             
-
             bool allClosed = true;
             foreach (var cnn in _connections[PortName])
             {

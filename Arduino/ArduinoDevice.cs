@@ -567,7 +567,7 @@ namespace Chetch.Arduino
             System.Diagnostics.Debug.Print(String.Format("Adding config for device {0} ... ", ID));
 #endif
 
-            if (SampleInterval > 0 && SampleSize > 0)
+            if (Mgr.Sampler != null && SampleInterval > 0 && SampleSize > 0)
             {
                 Mgr.Sampler.Add(this, SampleInterval, SampleSize, SamplingOptions, SampleIntervalDeviation);
 #if DEBUG

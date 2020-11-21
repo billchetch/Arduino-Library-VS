@@ -301,8 +301,8 @@ namespace Chetch.Arduino
     {
         private const int RESPONSE_TIMEOUT = 10000; //Firmata setting
         private const int MAX_SEND_STRING_LENGTH = 31; //maximum string length to send by Firmata (was 32, reduced to 31 cos message now contains checksum byte)
-        private const int MESSAGE_RECEIVED_TIMEOUT = 3000; //how long we hold up Sending the current message while waiting for the previous ADMMessage to be received
-        private const int SEND_MESSAGE_LOCK_TIMEOUT = 2000; //number of ms we wait to send a message before allowing thread to continue
+        private const int MESSAGE_RECEIVED_TIMEOUT = 1500; //how long we hold up Sending the current message while waiting for the previous ADMMessage to be received
+        private const int SEND_MESSAGE_LOCK_TIMEOUT = 1500; //number of ms we wait to send a message before allowing thread to continue
 
         public const string ARDUINO_MEGA_2560 = "USB-SERIAL CH340";
         public const string ARDUINO_UNO = "Arduino Uno";
@@ -426,7 +426,7 @@ namespace Chetch.Arduino
         {
             get
             {
-                bool devicesConnected = true;
+                bool devicesConnected = State == ADMState.DEVICE_READY || State == ADMState.DEVICE_CONNECTED;
                 foreach (var d in _devices.Values)
                 {
                     if (!d.IsConnected)
@@ -485,7 +485,7 @@ namespace Chetch.Arduino
         public List<ArduinoDeviceGroup> DeviceGroups { get; internal set; } = new List<ArduinoDeviceGroup>();
 
         //interval based sampler for providing averages over device values.
-        public Sampler Sampler { get; internal set; } = new Sampler();
+        public Sampler Sampler { get; set; } = null; //To be supplied externally
 
         public ArduinoDeviceManager(ArduinoSession firmata, Action<ADMMessage, ArduinoDeviceManager> listener, String port, String nodeID = null)
         {
@@ -528,8 +528,6 @@ namespace Chetch.Arduino
 
         public void Disconnect()
         {
-            Sampler.Stop();
-            
             foreach(ArduinoDevice dev in _devices.Values)
             {
                 dev.Disconnect();
@@ -572,9 +570,11 @@ namespace Chetch.Arduino
                     errMsg = null;
                     try
                     {
+                        Sampler?.Stop();
                         Tracing?.TraceEvent(TraceEventType.Information, 0, "Attempt ({0} of {1}) to clear session @ {2}", i + 1, attempts, PortAndNodeID);
                         _session.Clear();
                         Tracing?.TraceEvent(TraceEventType.Information, 0, "Session @ {0} cleared", PortAndNodeID);
+                        Sampler?.Start();
                         break;
                     }
                     catch (Exception e)
@@ -719,6 +719,7 @@ namespace Chetch.Arduino
                 {
                     case PinMode.DigitalInput:
                     case PinMode.DigitalOutput:
+                        Console.WriteLine("{0}: set digital pin {1} for device {2} to mode {3} and value {4}", PortAndNodeID, dpin.PinNumber, device.ID, dpin.Mode, dpin.InitialValue);
                         SetDigitalPinMode(dpin.PinNumber, dpin.Mode);
                         if (dpin.InitialValue != -1)
                         {
@@ -856,8 +857,10 @@ namespace Chetch.Arduino
                         break;
 
                     case Solid.Arduino.Firmata.MessageType.DigitalPortState:
-                        Console.WriteLine("!!!!!Message arrived: {0}!!!!", fmessage.Type);
                         DigitalPortState portState = (DigitalPortState)fmessage.Value;
+                        String s = BitConverter.ToString(BitConverter.GetBytes(portState.Pins));
+                        Console.WriteLine("!!!!!{0}: Digital Port State {1}: {2}!!!!", PortAndNodeID, portState.Port, s);
+
                         int pinsChanged;
                         if (_portStates.ContainsKey(portState.Port))
                         {
@@ -1013,12 +1016,6 @@ namespace Chetch.Arduino
                     if (message.Type == Messaging.MessageType.CONFIGURE_RESPONSE && DevicesConnected)
                     {
                         State = ADMState.DEVICE_CONNECTED;
-                        Tracing?.TraceEvent(TraceEventType.Information, 0, "{0} Starting sampler...", BoardID);
-                        Task.Run(() =>
-                        {
-                            System.Threading.Thread.Sleep(2000);
-                            Sampler.Start();
-                        });
                     }
                 }
             } catch (Exception e)
@@ -1132,7 +1129,7 @@ namespace Chetch.Arduino
                             {
                                 //so here we have waited long enough for the previous sent message which has failed to arrive
                                 //so we proceed with sending anyway
-                                Tracing?.TraceEvent(TraceEventType.Warning, 0, "SendMessage {0}: Timed out waiting to receive message tag {1}", PortAndNodeID, LastMessageSent.Tag, message.Type, message.Tag);
+                                Tracing?.TraceEvent(TraceEventType.Warning, 0, "SendMessage {0}: Sending {1} timed out waiting to receive message {2} tag {3}", PortAndNodeID, message.Type, LastMessageSent.Type, LastMessageSent.Tag);
                             }
                         }
                     } while (!ready2send);
@@ -1323,15 +1320,22 @@ namespace Chetch.Arduino
         
         public void Configure()
         {
-            //send configuration/setup data to board
-            foreach (ArduinoDevice device in _devices.Values)
+            if (_devices.Count == 0)
             {
-                var message = new ADMMessage();
-                message.LittleEndian = LittleEndian;
-                message.Type = Messaging.MessageType.CONFIGURE;
-                device.AddConfig(message);
-                SendMessage(message);
-                _sleep(250); //leave some time for this process to complete to avoid bombarding the board
+                State = ADMState.DEVICE_CONNECTED;
+            }
+            else
+            {
+                //send configuration/setup data to board
+                foreach (ArduinoDevice device in _devices.Values)
+                {
+                    Console.WriteLine("XXXXXXXX {0}: Configure device {1}", PortAndNodeID, device.ID);
+                    var message = new ADMMessage();
+                    message.LittleEndian = LittleEndian;
+                    message.Type = Messaging.MessageType.CONFIGURE;
+                    device.AddConfig(message);
+                    SendMessage(message);
+                }
             }
         }
 

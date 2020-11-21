@@ -40,6 +40,8 @@ namespace Chetch.Arduino.Devices.Temperature
             }
         }
 
+        public const int ERROR_TOO_MUCH_NOISE = 85;
+        public const int ERROR_NO_READING = -127;
         public const String COMMAND_READ_TEMP = "read-temp";
         public const String PARAM_SENSOR_COUNT = "SensorCount";
         public const String PARAM_ONE_WIRE_PIN = "OneWirePin";
@@ -47,7 +49,7 @@ namespace Chetch.Arduino.Devices.Temperature
 
         private int _oneWirePin;
 
-        public int Resolution { get; set; } = 10;
+        public int Resolution { get; set; } = 9;
         public List<DS18B20Sensor> Sensors { get; } = new List<DS18B20Sensor>();
         
         public List<DS18B20Sensor> ConnectedSensors { 
@@ -134,10 +136,35 @@ namespace Chetch.Arduino.Devices.Temperature
                 for (int i = 0; i < sc; i++)
                 {
                     float temp = message.ArgumentAsFloat(i + 1);
-                    Sensors[i].SetTemperature(temp);
+                    bool error = false;
+                    String errMsg = null;
+                    switch ((int)temp)
+                    {
+                        case ERROR_TOO_MUCH_NOISE:
+                            error = true;
+                            errMsg = "Too much noise";
+                            break;
 
-                    //prettyify the message
-                    message.AddValue(PARAM_TEMPERATURE + "-" + i, temp);
+                        case ERROR_NO_READING:
+                            error = true;
+                            errMsg = "No reading";
+                            break;
+
+                        default:
+                            break;
+                    }
+
+                    if (!error) { 
+                        Sensors[i].SetTemperature(temp);
+
+                        //prettyify the message
+                        message.AddValue(PARAM_TEMPERATURE + "-" + i, temp);
+                    } else
+                    {
+                        //change message to Error and report
+                        message.Type = Messaging.MessageType.ERROR;
+                        message.AddValue("ErrorMessage", String.Format("Temperature of {0} indicates error: {1}", temp, errMsg));
+                    }
                 }
                 message.AddValue(PARAM_SENSOR_COUNT, sc);
             }
