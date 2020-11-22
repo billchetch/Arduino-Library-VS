@@ -643,7 +643,7 @@ namespace Chetch.Arduino
                         //now proceed to connect
                         ADMS[key] = null; //reserve a place (cos the connection process takes a while)
                         Tracing?.TraceEvent(TraceEventType.Information, 100, ">>>>>>>>>>>>>>>> ADMService::ConnectADM: Attempting to connect board @ {0}", key);
-                        ArduinoDeviceManager adm = ArduinoDeviceManager.Connect(nodeID, port, BaudRate, TryHandleADMMessage);
+                        ArduinoDeviceManager adm = ArduinoDeviceManager.Connect(nid, port, BaudRate, TryHandleADMMessage);
                         adm.Sampler = Sampler;
                         adm.Tracing = Tracing;
                         ADMS[key] = adm;

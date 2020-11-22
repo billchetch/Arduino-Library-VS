@@ -370,6 +370,7 @@ namespace Chetch.Arduino
 
         static public ArduinoDeviceManager Connect(String nodeID, String port, SerialBaudRate bps, int timeOut, Action<ADMMessage, ArduinoDeviceManager> listener)
         {
+            if (String.IsNullOrEmpty(nodeID)) throw new Exception("ArduinoDeviceManager::Connect ... nodeID cannot be empty or null");
             ISerialConnection connection = new XBee.XBeeFirmataSerialConnection(nodeID, port, bps);
             if (connection != null)
             {
