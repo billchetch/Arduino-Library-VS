@@ -228,21 +228,30 @@ namespace Chetch.Arduino
             return false;
         }
 
-        public ArduinoDeviceManager GetADM(String boardID)
+        public ArduinoDeviceManager GetADM(String searchOn)
         {
             if(ADMS.Count == 0)
             {
                 return null;
             }
 
-            if (boardID == null || boardID.Equals("ADM", StringComparison.OrdinalIgnoreCase) && ADMS.Count == 1)
+            if (searchOn == null || searchOn.Equals("ADM", StringComparison.OrdinalIgnoreCase) && ADMS.Count == 1)
             {
                 return ADMS.First().Value;
             }
 
             foreach(ArduinoDeviceManager adm in ADMS.Values)
             {
-                if (adm != null && adm.BoardID != 0 && adm.BoardID.ToString().Equals(boardID, StringComparison.OrdinalIgnoreCase)) return adm;
+                if (adm == null) continue;
+
+                if (adm.BoardID != 0 && adm.BoardID.ToString().Equals(searchOn, StringComparison.OrdinalIgnoreCase))
+                {
+                    return adm;
+                }
+                if(adm.NodeID != null && adm.NodeID.Equals(searchOn, StringComparison.OrdinalIgnoreCase))
+                {
+                    return adm;
+                }
             }
 
             return null;
