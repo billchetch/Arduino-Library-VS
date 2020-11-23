@@ -14,6 +14,9 @@ namespace Chetch.Arduino.Devices.RangeFinders
         public const String PARAM_DISTANCE = "Distance";
         public const String PARAM_UNITS = "Units";
 
+        public const int MIN_DISTANCE = 25;
+        public const int MAX_DISTANCE = 600;
+
         private int _transmitPin;
         private int _receivePin;
         public double SpeedOfSound { get; set; }
@@ -28,8 +31,8 @@ namespace Chetch.Arduino.Devices.RangeFinders
             ConfigurePin(_receivePin, Solid.Arduino.Firmata.PinMode.DigitalInput);
 
             MeasurementUnit = Measurement.Unit.CM;
-            MinDistance = 25;
-            MaxDistance = 600;
+            MinDistance = MIN_DISTANCE;
+            MaxDistance = MAX_DISTANCE;
 
             SpeedOfSound = Measurement.GetSpeedOfSound(30.0); //get for tropical environments
         }

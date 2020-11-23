@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Chetch.Application;
+using Chetch.Utilities;
 using Solid.Arduino.Firmata;
 
 namespace Chetch.Arduino.Devices
@@ -123,6 +124,12 @@ namespace Chetch.Arduino.Devices
                 Enabled = true;
             }
             base.HandleMessage(message);
+        }
+
+        public override void RequestSample(Sampler sampler)
+        {
+            base.RequestSample(sampler);
+            RequestState();
         }
 
         public void Enable(bool enabled = true)

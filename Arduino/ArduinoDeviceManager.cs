@@ -371,13 +371,14 @@ namespace Chetch.Arduino
         static public ArduinoDeviceManager Connect(String nodeID, String port, SerialBaudRate bps, int timeOut, Action<ADMMessage, ArduinoDeviceManager> listener)
         {
             if (String.IsNullOrEmpty(nodeID)) throw new Exception("ArduinoDeviceManager::Connect ... nodeID cannot be empty or null");
-            ISerialConnection connection = new XBee.XBeeFirmataSerialConnection(nodeID, port, bps);
+            ISerialConnection connection = new XBeeFirmataSerialConnection(nodeID, port, bps);
             if (connection != null)
             {
                 var session = new ArduinoSession(connection, timeOut);
                 try
                 {
                     var mgr = new ArduinoDeviceManager(session, listener, port, nodeID);
+                    mgr.Connection = connection;
                     return mgr;
                 }
                 catch (Exception e)
@@ -410,6 +411,9 @@ namespace Chetch.Arduino
         }
 
         public ArduinoSession Session { get { return _session;  } }
+
+        public ISerialConnection Connection { get; set; }
+
         public bool IsConnected
         {
             get
@@ -850,7 +854,8 @@ namespace Chetch.Arduino
                         }
                         catch (Exception e)
                         {
-                            Tracing?.TraceEvent(TraceEventType.Error, 4000, "Deserializing {0} produced exception {1}: {2}", sd.Text, e.GetType(), e.Message);
+                            String sbytes = BitConverter.ToString(Chetch.Utilities.Convert.ToBytes(sd.Text));
+                            Tracing?.TraceEvent(TraceEventType.Error, 4000, "Deserializing {0} produced exception {1}: {2}", sbytes, e.GetType(), e.Message);
                             throw e;
                         }
                         break;

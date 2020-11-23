@@ -91,7 +91,7 @@ namespace Chetch.Arduino.XBee
 
                         lock (this)
                         {
-                            Monitor.Pulse(this);
+                            Monitor.PulseAll(this);
                         }
                     }
                 } catch (Exception e)

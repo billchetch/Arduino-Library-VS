@@ -297,7 +297,8 @@ namespace Chetch.Arduino.XBee
             IsOpen = true;
 
             //start up the thread that waits for received data and forwards it to subscribers
-            _deliverDataTask = Task.Run(() => DeliverData());
+            _deliverDataTask = new Task(() => { DeliverData(); }, TaskCreationOptions.LongRunning);
+            _deliverDataTask.Start();
         }
 
         public void Close()
@@ -335,8 +336,7 @@ namespace Chetch.Arduino.XBee
             }
                 
         }
-
-
+       
         public int ReadByte()
         {
             if (BytesToRead > 0)

@@ -863,7 +863,7 @@ namespace Chetch.Arduino
                             //TODO: how do we handle this?
                             Tracing?.TraceEvent(TraceEventType.Warning, 100, "ADM (BDID={0}) @ {1} is of state", adm.State);
                         }
-                        else 
+                        else if(ADMInactivityTimeout > 0)
                         {
                             //if there has been a suspicioius lack of activity...
                             long msQuiet = (DateTime.Now.Ticks - adm.LastMessageReceivedOn.Ticks) / TimeSpan.TicksPerMillisecond;
