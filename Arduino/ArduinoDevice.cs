@@ -249,7 +249,7 @@ namespace Chetch.Arduino
 
         override public String ToString()
         {
-            return String.Format("{0} {1} {2} {3}", ID, Name, Category.ToString(), IsConnected ? "Connected" : "Not connected");
+            return String.Format("{0} {1} {2} {3}, {4}", ID, Name, Category.ToString(), IsConnected ? "Connected" : "Not connected", Enabled ? "Enabled" : "Disabled");
         }
 
         public String ToString(bool listPins)
