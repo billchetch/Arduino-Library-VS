@@ -19,6 +19,14 @@ namespace Chetch.Arduino.Devices.Counters
             }
         }
 
+        public double RPM
+        {
+            get
+            {
+                return Calibration* Rate * 60;
+            }
+        }
+
         public RPMCounter(int pin, String id, String name) : base(pin, id, name)
         {
             SampleInterval = 1000; //in ms
