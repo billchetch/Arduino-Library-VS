@@ -11,6 +11,7 @@ namespace Chetch.Arduino.Devices.Temperature
     {
         public class DS18B20Sensor : ISampleSubject
         {
+            public bool Enabled { get; set; } = true;
             public Sampler Sampler { get; internal set; }
             public String ID { get; set; }
             public double Temperature { get; set; }

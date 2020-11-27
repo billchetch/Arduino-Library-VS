@@ -409,9 +409,9 @@ namespace Chetch.Arduino
 
             //general commands related to a service or hardware
             AddCommandHelp("status", "Get status info about this service and the ADMs");
-            AddCommandHelp("enable-device", "Enables device on port <port>");
-            AddCommandHelp("disable-device", "Disables device on port <port>");
-            AddCommandHelp("reset-device", "Disables then enables the device on port <port>");
+            AddCommandHelp("enable-port", "Enables device on port <port>");
+            AddCommandHelp("disable-port", "Disables device on port <port>");
+            AddCommandHelp("reset-port", "Disables then enables the device on port <port>");
 
             //adm specific commands related to a board and device
             AddCommandHelp("adm/<board>:status",  "ADM will request board status and add additional information");
@@ -455,9 +455,9 @@ namespace Chetch.Arduino
                     response.AddValue("PortDevices", portDevices);
                     break;
 
-                case "disable-device":
-                case "enable-device":
-                case "reset-device":
+                case "disable-port":
+                case "enable-port":
+                case "reset-port":
                     if (args.Count != 1 || args[0] == null || args[0].ToString() == String.Empty) throw new Exception("No port specified");
                     String devicePort = args[0].ToString().ToUpper();
                     devMgr = DeviceManager.GetInstance();
@@ -478,11 +478,11 @@ namespace Chetch.Arduino
                         }
 
                         Process proc = null;
-                        if (cmd == "disable-device")
+                        if (cmd == "disable-port")
                         {
                             proc = devMgr.DisableDevice(di.InstanceID);
                         }
-                        else if (cmd == "enable-device")
+                        else if (cmd == "enable-port")
                         {
                             proc = devMgr.EnableDevice(di.InstanceID);
                         }
