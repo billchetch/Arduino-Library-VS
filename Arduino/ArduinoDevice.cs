@@ -219,6 +219,9 @@ namespace Chetch.Arduino
 
         public Measurement.Unit MeasurementUnit { get; set; } = Measurement.Unit.NONE;
 
+        //use the Enable method to set this value
+        public bool Enabled { get; private set; } = false;
+
         public ArduinoDevice()
         { 
             //Empty constructor
@@ -239,6 +242,9 @@ namespace Chetch.Arduino
             ID = id;
             Name = name;
             BoardID = boardID;
+
+            TryAddCommand("enable");
+            TryAddCommand("disable");
         }
 
         override public String ToString()
@@ -491,23 +497,42 @@ namespace Chetch.Arduino
 
         virtual protected void ExecuteCommand(ArduinoCommand command, ExecutionArguments xargs)
         {
-            if(command.Commands.Count > 0)
+            switch (command.CommandAlias.ToLower())
             {
-                for (int i = 0; i < command.Repeat; i++)
-                {
-                    foreach (var ccommand in command.Commands)
+                case "enable":
+                    Enable(true);
+                    break;
+                
+                case "disable":
+                    Enable(false);
+                    break;
+
+                default:
+                    if (command.Commands.Count > 0)
                     {
-                        ExecuteCommand(ccommand, xargs != null && xargs.Deep ? xargs : null);
-                        if (command.Delay > 0)
+                        for (int i = 0; i < command.Repeat; i++)
                         {
-                            System.Threading.Thread.Sleep(command.Delay);
-                        }
+                            foreach (var ccommand in command.Commands)
+                            {
+                                ExecuteCommand(ccommand, xargs != null && xargs.Deep ? xargs : null);
+                                if (command.Delay > 0)
+                                {
+                                    System.Threading.Thread.Sleep(command.Delay);
+                                }
+                            }
+                        } //end command repeat
                     }
-                } //end command repeat
-            } else
-            {
-                SendCommand(command, xargs);
+                    else
+                    {
+                        SendCommand(command, xargs);
+                    }
+                    break;
             }
+        }
+
+        virtual public void Enable(bool enable = true)
+        {
+            Enabled = enable;
         }
 
         //messaging
@@ -538,6 +563,7 @@ namespace Chetch.Arduino
             {
                 case Messaging.MessageType.CONFIGURE_RESPONSE:
                     IsConnected = true;
+                    Enable(true);
                     OnConnect(message);
                     break;
                 default:

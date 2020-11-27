@@ -18,8 +18,6 @@ namespace Chetch.Arduino.Devices
         private int _noiseThreshold; //time delay in mills for acceptable state change
         private Object _stateLock = new Object();
 
-        public bool Enabled { get; protected set; } = false;
-        
         public bool IsOn { get { return State; } }
         public bool IsOff { get { return !State;  } }
 
@@ -34,8 +32,7 @@ namespace Chetch.Arduino.Devices
             _noiseThreshold = noiseThreshold;
             ConfigurePin(_sensorPin, PinMode.DigitalInput, State); //, initialState ? 1 : 0);
 
-            TryAddCommand("enable");
-            TryAddCommand("disable");
+            
         }
 
         public SwitchSensor(int pin, int noiseThreshold = 0) : this(pin, noiseThreshold, "switch" + pin, "SWSensor"){ }
@@ -110,20 +107,10 @@ namespace Chetch.Arduino.Devices
                 LastOff = DateTime.Now;
             }
 
-            
             ADMMessage message  = new ADMMessage();
             message.Type = BroadcastStateChangeAs;
             message.AddValue("State", newState);
             Broadcast(message);
-        }
-
-        public override void HandleMessage(ADMMessage message)
-        {
-            if(message.Type == Messaging.MessageType.CONFIGURE_RESPONSE)
-            {
-                Enabled = true;
-            }
-            base.HandleMessage(message);
         }
 
         public override void RequestSample(Sampler sampler)
@@ -133,11 +120,11 @@ namespace Chetch.Arduino.Devices
             Console.WriteLine("{0} : {1} requesting state for sample", Mgr.PortAndNodeID, ID);
         }
 
-        public void Enable(bool enabled = true)
+        public void Enable(bool enable = true)
         {
-            if (enabled == Enabled) return; //to avoid triggring stuff twice
+            if (enable == Enabled) return; //to avoid triggring stuff twice
 
-            Enabled = enabled;
+            base.Enable(enable);
             if (!Enabled)
             {
                 State = false;
@@ -145,22 +132,6 @@ namespace Chetch.Arduino.Devices
             } else if (_rawState)
             { 
                 HandleDigitalPinStateChange(_sensorPin, _rawState);
-            }
-        }
-
-        protected override void ExecuteCommand(ArduinoCommand command, ExecutionArguments xargs)
-        {
-            switch (command.CommandAlias.ToLower())
-            {
-                case "enable":
-                    Enable(true);
-                    break;
-                case "disable":
-                    Enable(false);
-                    break;
-                default:
-                    base.ExecuteCommand(command, xargs);
-                    break;
             }
         }
     }
