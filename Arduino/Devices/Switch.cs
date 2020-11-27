@@ -12,7 +12,16 @@ namespace Chetch.Arduino.Devices
         public bool IsOn { get { return State; } }
         public bool IsOff { get { return !State; } }
 
-        public bool State { get; protected set; } = false;
+        private bool _state = false;
+        public bool State { 
+            get { return _state; } 
+            protected set 
+            {
+                if (!Enabled) throw new Exception("Cannot set state of switch " + ID + " as it is not enabled");
+
+                _state = value;
+            } 
+        }
 
         private int _pin = 0;
 
