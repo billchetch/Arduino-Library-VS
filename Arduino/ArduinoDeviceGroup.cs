@@ -14,6 +14,10 @@ namespace Chetch.Arduino
 
         public List<ArduinoDevice> Devices { get; internal set; } = new List<ArduinoDevice>();
 
+        //use the Enable method to set this value
+        public bool Enabled { get; private set; } = false;
+
+
         public ArduinoDeviceGroup(String id, String name)
         {
             ID = id;
@@ -37,6 +41,18 @@ namespace Chetch.Arduino
                 if (dev.ID != null && dev.ID.Equals(deviceID)) return dev;
             }
             return null;
+        }
+
+        virtual public void Enable(bool enable = true, bool setDevices = true)
+        {
+            Enabled = enable;
+            if (setDevices)
+            {
+                foreach(var dev in Devices)
+                {
+                    dev.Enable(enable);
+                }
+            }
         }
 
     } //end class

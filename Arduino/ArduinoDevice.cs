@@ -220,7 +220,7 @@ namespace Chetch.Arduino
         public Measurement.Unit MeasurementUnit { get; set; } = Measurement.Unit.NONE;
 
         //use the Enable method to set this value
-        public bool Enabled { get; private set; } = false;
+        public bool Enabled { get; private set; } = true;
 
         public ArduinoDevice()
         { 
@@ -563,7 +563,6 @@ namespace Chetch.Arduino
             {
                 case Messaging.MessageType.CONFIGURE_RESPONSE:
                     IsConnected = true;
-                    Enable(true);
                     OnConnect(message);
                     break;
                 default:
