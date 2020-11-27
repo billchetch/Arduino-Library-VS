@@ -33,12 +33,12 @@ namespace Chetch.Arduino.Devices.RangeFinders
 
         public double Percentage
         {
-            get { return 100 * ((Distance - MinDistance) / Range); }
+            get { return 100 * System.Math.Min(100, System.Math.Max(0, ((Distance - MinDistance) / Range))); }
         }
 
         public double AveragePercentage
         {
-            get { return 100 * ((AverageDistance - MinDistance) / Range); }
+            get { return 100 * System.Math.Min(100, System.Math.Max(0, ((AverageDistance - MinDistance) / Range))); }
         }
 
         //constructor

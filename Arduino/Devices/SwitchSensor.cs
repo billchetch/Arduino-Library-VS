@@ -130,6 +130,7 @@ namespace Chetch.Arduino.Devices
         {
             base.RequestSample(sampler);
             RequestState();
+            Console.WriteLine("{0} : {1} requesting state for sample", Mgr.PortAndNodeID, ID);
         }
 
         public void Enable(bool enabled = true)
