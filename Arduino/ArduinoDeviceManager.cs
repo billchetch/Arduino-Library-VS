@@ -891,7 +891,7 @@ namespace Chetch.Arduino
                             {
                                 foreach (var dev in devs)
                                 {
-                                    if(dev.Enabled)dev.HandleDigitalPinStateChange(pinNumber, state);
+                                    dev.HandleDigitalPinStateChange(pinNumber, state);
                                 }
                             }
                         }
@@ -1000,7 +1000,7 @@ namespace Chetch.Arduino
                 {
                     //direct messages to devices
                     var dev = GetTargetedDevice(message);
-                    if (dev != null && dev.Enabled)
+                    if (dev != null)
                     {
 #if DEBUG
                         Debug.Print(String.Format("Handling message {0} for device {1} ... connected: {2}, memory: {3}", message.Type, dev.ID, dev.IsConnected, message.HasValue("FM") ? message.GetValue("FM") : "N/A"));
