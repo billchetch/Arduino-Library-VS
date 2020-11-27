@@ -31,12 +31,14 @@ namespace Chetch.Arduino.Devices
 
         virtual public void On()
         {
+            if(!Enabled)throw new Exception(String.Format("Cannot turn on as switch {0} is not enabled", ID));
             State = true;
             SetPin(State);
         }
 
         virtual public void Off()
         {
+            if (!Enabled) throw new Exception(String.Format("Cannot turn off as switch {0} is not enabled", ID));
             State = false;
             SetPin(State);
         }
