@@ -725,7 +725,6 @@ namespace Chetch.Arduino
                 {
                     case PinMode.DigitalInput:
                     case PinMode.DigitalOutput:
-                        Console.WriteLine("{0}: set digital pin {1} for device {2} to mode {3} and value {4}", PortAndNodeID, dpin.PinNumber, device.ID, dpin.Mode, dpin.InitialValue);
                         SetDigitalPinMode(dpin.PinNumber, dpin.Mode);
                         if (dpin.InitialValue != -1)
                         {
@@ -824,8 +823,6 @@ namespace Chetch.Arduino
         {
             String msg = String.Format("{0} error processing firmata message {1}: {2} ", BoardID, e.GetType(), e.Message);
             Tracing?.TraceEvent(TraceEventType.Error, 0, msg);
-
-            Console.WriteLine(msg);
         }
 
 
@@ -866,8 +863,7 @@ namespace Chetch.Arduino
                     case Solid.Arduino.Firmata.MessageType.DigitalPortState:
                         DigitalPortState portState = (DigitalPortState)fmessage.Value;
                         String s = BitConverter.ToString(BitConverter.GetBytes(portState.Pins));
-                        Console.WriteLine("!!!!!{0}: Digital Port State {1}: {2}!!!!", PortAndNodeID, portState.Port, s);
-
+                        
                         int pinsChanged;
                         if (_portStates.ContainsKey(portState.Port))
                         {
@@ -935,7 +931,7 @@ namespace Chetch.Arduino
                     MessageReceivedSuccess = message.Tag == LastMessageSent.Tag;
                     MessagesReceived++;
                 }
-                Console.WriteLine("<--------- {0}: Received message {1} tag {2} target {3} from sender {4}", PortAndNodeID, message.Type, message.Tag, message.TargetID, message.SenderID);
+                //Console.WriteLine("<--------- {0}: Received message {1} tag {2} target {3} from sender {4}", PortAndNodeID, message.Type, message.Tag, message.TargetID, message.SenderID);
 
                 switch (message.Type)
                 {
@@ -948,8 +944,6 @@ namespace Chetch.Arduino
                         MaxDevices = message.GetInt("MaxDevices");
                         message.AddValue("LEDBI", message.ArgumentAsInt(3));
                         LEDBIPin = message.GetInt("LEDBI");
-
-                        Console.WriteLine("{0}: Board {1} intialise response .... FM={2}", PortAndNodeID, BoardID, message.GetInt("FreeMemory"));
                         break;
 
                     case Messaging.MessageType.STATUS_RESPONSE:
@@ -961,7 +955,6 @@ namespace Chetch.Arduino
                                 message.AddValue("BoardType", message.ArgumentAsString(1));
                                 message.AddValue("Initialised", message.ArgumentAsBool(2));
                                 message.AddValue("DeviceCount", message.ArgumentAsInt(3));
-                                Console.WriteLine("{0}: Board {1} status response .... FM={2}", PortAndNodeID, BoardID, message.GetInt("FreeMemory"));
                             }
                             if (State == ADMState.CONNECTED)
                             {
@@ -1154,7 +1147,7 @@ namespace Chetch.Arduino
                         }
                         if (message.Tag == 0) message.Tag = MessageTags.CreateTag();
                         message.SenderID = BoardID;
-                        Console.WriteLine("-------------> {0}: Sending message {1} tag {2} target {3}." , PortAndNodeID, message.Type, message.Tag, message.TargetID);
+                        //Console.WriteLine("-------------> {0}: Sending message {1} tag {2} target {3}." , PortAndNodeID, message.Type, message.Tag, message.TargetID);
                         SendString(message.Serialize());
                     }
                     catch (Exception e)
@@ -1179,7 +1172,6 @@ namespace Chetch.Arduino
             else
             {
                 //we waited too long to get the lock...
-                Console.WriteLine("ArduinoDeviceManager::SendMessage {0} with tag {1} waited to long to obtain lock", message.Type, message.Tag);
                 throw new SendFailedException("ArduinoDeviceManager::SendMessage ... waited to long to obtain lock");
             }
             return message.Tag;
@@ -1334,7 +1326,6 @@ namespace Chetch.Arduino
                 //send configuration/setup data to board
                 foreach (ArduinoDevice device in _devices.Values)
                 {
-                    Console.WriteLine("XXXXXXXX {0}: Configure device {1}", PortAndNodeID, device.ID);
                     var message = new ADMMessage();
                     message.LittleEndian = LittleEndian;
                     message.Type = Messaging.MessageType.CONFIGURE;

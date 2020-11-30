@@ -545,7 +545,6 @@ namespace Chetch.Arduino
                                 {
                                     for (int i = 0; i < repeat; i++)
                                     {
-                                        Console.WriteLine("Ping {0}", i);
                                         adm.Ping();
                                         System.Threading.Thread.Sleep(delay);
                                     }
@@ -651,20 +650,19 @@ namespace Chetch.Arduino
                     {
                         //now proceed to connect
                         ADMS[key] = null; //reserve a place (cos the connection process takes a while)
-                        Tracing?.TraceEvent(TraceEventType.Information, 100, ">>>>>>>>>>>>>>>> ADMService::ConnectADM: Attempting to connect board @ {0}", key);
+                        Tracing?.TraceEvent(TraceEventType.Information, 100, "ADMService::ConnectADM: Attempting to connect board @ {0}", key);
                         ArduinoDeviceManager adm = ArduinoDeviceManager.Connect(nid, port, BaudRate, TryHandleADMMessage);
                         adm.Sampler = Sampler;
                         adm.Tracing = Tracing;
                         ADMS[key] = adm;
                         _devicesConnected[key] = false;
-                        Tracing?.TraceEvent(TraceEventType.Information, 100, ">>>>>>>>>>>>>>>> ADMService::ConnectADM: Connected to board @ {0}", key);
+                        Tracing?.TraceEvent(TraceEventType.Information, 100, "ADMService::ConnectADM: Connected to board @ {0}", key);
                         Broadcast(ADMEvent.CONNECTED, String.Format("ADM now Connected @ {0}", key));
 
                         //Wait here (i.e. before connecting to another board) until the adm is of status device connected
                         while (!adm.DevicesConnected)
                         {
                             System.Threading.Thread.Sleep(1000);
-                            Console.WriteLine("WWWWWWWWWWWwaiting on {0}", adm.PortAndNodeID);
                         }
                     } catch (Exception e)
                     {
@@ -957,7 +955,7 @@ namespace Chetch.Arduino
                     {
                         if(message.HasValue("Initialised") && !message.GetBool("Initialised"))
                         {
-                            Console.WriteLine("Whoa ... {0} has reset without us knowing", adm.PortAndNodeID);
+                            //Console.WriteLine("Whoa ... {0} has reset without us knowing", adm.PortAndNodeID);
                         }
                     }
                     break;
