@@ -42,7 +42,7 @@ namespace Chetch.Arduino.XBee
                     {
                         if (!Coordinator.IsOpen)
                         {
-                            Console.WriteLine("Opening coordinator while opening connection to {0}", remoteNodeID);
+                            //Console.WriteLine("Opening coordinator while opening connection to {0}", remoteNodeID);
                             Coordinator.Open();
                         }
 
@@ -279,7 +279,7 @@ namespace Chetch.Arduino.XBee
                 TransmitStatusPacket receivedPacket = (TransmitStatusPacket)args.ReceivedPacket;
                 if(receivedPacket.TransmitStatus != XBeeTransmitStatus.SUCCESS)
                 {
-                    Console.WriteLine("!!!!!!! Transmit issues: {0}", NodeID);
+                    //Console.WriteLine("!!!!!!! Transmit issues: {0}", NodeID);
                 }
             }
         }
@@ -305,16 +305,13 @@ namespace Chetch.Arduino.XBee
         {
             if (!IsOpen) return;
 
-            Console.WriteLine("Waiting for data to be delivered before closing connection for {0} ", NodeID);
             IsOpen = false;
             if (!_deliverDataTask.IsCompleted)
             {
                 _deliverDataTask.Wait();
             }
             FlushBuffer();
-            Console.WriteLine("Data cleared and buffer flushed {0} ", NodeID);
-
-
+            
             Gateway.Coordinator.DataReceived -= HandleXBeeDataReceived;
             Gateway.Coordinator.PacketReceived -= HandleXBeePacketReceived;
             XBRemoteDevice = null;
@@ -332,7 +329,7 @@ namespace Chetch.Arduino.XBee
             if (allClosed && Gateway.IsConnected)
             {
                 Gateway.Disconnect();
-                Console.WriteLine("{0} disconnecting gateway", NodeID);
+                //Console.WriteLine("{0} disconnecting gateway", NodeID);
             }
                 
         }
@@ -357,7 +354,6 @@ namespace Chetch.Arduino.XBee
         public void Write(String text)
         {
             //_serialPort.Write(text);
-            Console.WriteLine("oops... write string");
             throw new NotImplementedException("XBeeFirmataSerialConnection::Write string");
         }
 
@@ -380,13 +376,11 @@ namespace Chetch.Arduino.XBee
 
         public void Write(char[] buffer, int offset, int count)
         {
-            Console.WriteLine("oops... write char buffer");
             throw new NotImplementedException("XBeeFirmataSericalConnection::Write char[]");
         }
 
         public void WriteLine(string text)
         {
-            Console.WriteLine("oops... write line");
             throw new NotImplementedException("XBeeFirmataSericalConnection::Write string ");
         }
 

@@ -47,7 +47,6 @@ namespace Chetch.Arduino.Devices
         public void RequestState()
         {
             //this will trigger firmata to return the digital state of the port
-            Console.WriteLine("{0}: Requesting state for {1} on pin {2}", Mgr.PortAndNodeID, ID, _sensorPin);
             Mgr.SetDigitalReportMode(Mgr.GetPortForPin(_sensorPin), true);
         }
 
@@ -117,7 +116,6 @@ namespace Chetch.Arduino.Devices
         {
             base.RequestSample(sampler);
             RequestState();
-            Console.WriteLine("{0} : {1} requesting state for sample", Mgr.PortAndNodeID, ID);
         }
 
         public void Enable(bool enable = true)
