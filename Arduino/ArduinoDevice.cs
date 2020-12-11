@@ -500,7 +500,8 @@ namespace Chetch.Arduino
             switch (command.CommandAlias.ToLower())
             {
                 case "enable":
-                    Enable(true);
+                    bool enable = xargs != null && xargs.Arguments.Count > 0 ? Utilities.Convert.ToBoolean(xargs.Arguments[0]) : true;
+                    Enable(enable);
                     break;
                 
                 case "disable":
