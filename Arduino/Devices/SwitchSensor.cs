@@ -31,8 +31,6 @@ namespace Chetch.Arduino.Devices
             _sensorPin = pin;
             _noiseThreshold = noiseThreshold;
             ConfigurePin(_sensorPin, PinMode.DigitalInput, State); //, initialState ? 1 : 0);
-
-            
         }
 
         public SwitchSensor(int pin, int noiseThreshold = 0) : this(pin, noiseThreshold, "switch" + pin, "SWSensor"){ }
