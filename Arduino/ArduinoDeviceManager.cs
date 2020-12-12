@@ -33,7 +33,8 @@ namespace Chetch.Arduino
         ERROR_UNRECOGNISED_MESSAGE_TYPE = 2,
         ERROR_BADLY_FORMED_MESSAGE = 3,
         ERROR_UNKNOWN = 4,
-        ERROR_ADM_NOT_INITIALISED = 5
+        ERROR_ADM_NOT_INITIALISED = 5,
+        ERROR_HOST_GENERATED = 6
     }
 
     public class ADMMessage : Message
@@ -1022,6 +1023,7 @@ namespace Chetch.Arduino
                 message = new ADMMessage();
                 message.Type = Messaging.MessageType.ERROR;
                 message.Value = e.Message;
+                message.AddValue("ErrorCode", ErrorCode.ERROR_HOST_GENERATED);
                 message.Tag = tag;
             }
 
