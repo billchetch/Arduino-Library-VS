@@ -984,7 +984,13 @@ namespace Chetch.Arduino
 
                     case Messaging.MessageType.ERROR:
                         //record last error message
-                        message.AddValue("ErrorCode", (ErrorCode)message.ArgumentAsByte(0));
+                        if (message.Arguments.Count)
+                        {
+                            message.AddValue("ErrorCode", (ErrorCode)message.ArgumentAsByte(0));
+                        } else
+                        {
+                            message.AddValue("ErrorCode", ErrorCode.ERROR_HOST_GENERATED);
+                        }
                         LastErrorMessage = message;
                         LastErrorOn = DateTime.Now;
                         break;
