@@ -48,6 +48,14 @@ namespace Chetch.Arduino.Devices.RangeFinders
             message.AddArgument(_receivePin);
         }
 
+        protected override void OnConnect(ADMMessage message)
+        {
+            base.OnConnect(message);
+
+            message.AddValue("SensorIndex", message.ArgumentAsInt(0));
+            message.AddValue("SensorCount", message.ArgumentAsInt(1));
+        }
+
         public override void HandleMessage(ADMMessage message)
         {
             base.HandleMessage(message);
@@ -59,13 +67,15 @@ namespace Chetch.Arduino.Devices.RangeFinders
                 {
                     double speedInMicros = Measurement.ConvertUnit(SpeedOfSound, Measurement.Unit.MICROSECOND, Measurement.Unit.SECOND);
                     Distance = 0.5 * Measurement.ConvertUnit(speedInMicros * duration, Measurement.Unit.METER, MeasurementUnit);
-
-                    Sampler?.ProvideSample(this, Distance);
-
-                    message.AddValue(PARAM_DISTANCE, Distance);
-                    message.AddValue(PARAM_UNITS, MeasurementUnit);
+                } else
+                {
+                    Distance = 0;
                 }
 
+                Sampler?.ProvideSample(this, Distance);
+
+                message.AddValue(PARAM_DISTANCE, Distance);
+                message.AddValue(PARAM_UNITS, MeasurementUnit);
             }
         } //end HandleMessage
     } //end class
