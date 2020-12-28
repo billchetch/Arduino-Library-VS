@@ -116,7 +116,7 @@ namespace Chetch.Arduino.Devices
             RequestState();
         }
 
-        public void Enable(bool enable = true)
+        override public void Enable(bool enable = true)
         {
             if (enable == Enabled) return; //to avoid triggring stuff twice
 
