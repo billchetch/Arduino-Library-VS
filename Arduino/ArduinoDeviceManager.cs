@@ -965,7 +965,7 @@ namespace Chetch.Arduino
                         catch (Exception e)
                         {
                             Tracing?.TraceEvent(TraceEventType.Error, 4000, "STATUS_RESPONSE error: {0}, {1}", e.GetType(), e.Message);
-                            throw e;
+                            throw new ArduinoException(PortAndNodeID, e.Message, e);
                         }
 
                         //record this
@@ -1012,7 +1012,7 @@ namespace Chetch.Arduino
                         catch (Exception e)
                         {
                             Tracing?.TraceEvent(TraceEventType.Error, 4000, "Handling message for device {0} produced exception {1}: {2}", dev.ID, e.GetType(), e.Message);
-                            throw e;
+                            throw new ArduinoException(dev.ID, e.Message, e);
                         }
 
                     }
@@ -1030,6 +1030,12 @@ namespace Chetch.Arduino
                 message.Type = Messaging.MessageType.ERROR;
                 message.Value = e.Message;
                 message.AddValue("ErrorCode", ErrorCode.ERROR_HOST_GENERATED);
+                if(e is ArduinoException)
+                {
+                    ArduinoException ae = (ArduinoException)e;
+                    message.AddValue("ErrorSource", ae.Source);
+                }
+
                 message.Tag = tag;
             }
 
