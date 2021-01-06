@@ -168,15 +168,16 @@ namespace Chetch.Arduino.Devices.Temperature
                             break;
                     }
 
+                    DS18B20Array.DS18B20Sensor sensor = Sensors[i];
                     if (!error) { 
-                        Sensors[i].SetTemperature(temp);
+                        sensor.SetTemperature(temp);
 
                         //prettyify the message
                         message.AddValue(PARAM_TEMPERATURE + "-" + i, temp);
                     } else
                     {
                         //exception will be processed and turned to an Error message
-                        throw new Exception(String.Format("Temperature of {0} indicates error: {1}", temp, errMsg));
+                        throw new Exception(String.Format("{1} temperature of {0} indicates error: {1}", sensor.ID, temp, errMsg));
                     }
                 }
                 message.AddValue(PARAM_SENSOR_COUNT, sc);

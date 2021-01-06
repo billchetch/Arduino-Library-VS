@@ -167,7 +167,8 @@ namespace Chetch.Arduino.XBee
         public RemoteXBeeDevice XBRemoteDevice { get; set; }
 
         private Object bufferPositionLock = new Object();
-        private Task _deliverDataTask = null;
+        private Thread _deliverDataThread = null;
+        private bool _deliveringData = false;
 
         public XBeeFirmataSerialConnection(String nodeID, String port, Solid.Arduino.SerialBaudRate baudRate)
         {
@@ -245,6 +246,7 @@ namespace Chetch.Arduino.XBee
 
         private void DeliverData()
         {
+            _deliveringData = true;
             while (IsOpen)
             {
                 if (DataReceived != null && BytesToRead > 0)
@@ -253,6 +255,7 @@ namespace Chetch.Arduino.XBee
                 }
                 System.Threading.Thread.Sleep(10);
             }
+            _deliveringData = false;
         }
 
         private void HandleXBeeDataReceived(Object sender, XBeeLibrary.Core.Events.DataReceivedEventArgs args)
@@ -297,8 +300,8 @@ namespace Chetch.Arduino.XBee
             IsOpen = true;
 
             //start up the thread that waits for received data and forwards it to subscribers
-            _deliverDataTask = new Task(() => { DeliverData(); }, TaskCreationOptions.LongRunning);
-            _deliverDataTask.Start();
+            _deliverDataThread = new Thread(new ThreadStart(this.DeliverData));
+            _deliverDataThread.Start();
         }
 
         public void Close()
@@ -306,9 +309,9 @@ namespace Chetch.Arduino.XBee
             if (!IsOpen) return;
 
             IsOpen = false;
-            if (!_deliverDataTask.IsCompleted)
+            while (_deliveringData)
             {
-                _deliverDataTask.Wait();
+                System.Threading.Thread.Sleep(10);
             }
             FlushBuffer();
             
