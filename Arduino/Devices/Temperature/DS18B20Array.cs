@@ -177,7 +177,7 @@ namespace Chetch.Arduino.Devices.Temperature
                     } else
                     {
                         //exception will be processed and turned to an Error message
-                        throw new Exception(String.Format("{1} temperature of {0} indicates error: {1}", sensor.ID, temp, errMsg));
+                        throw new Exception(String.Format("{0} temperature of {1} indicates error: {2}", sensor.ID, temp, errMsg));
                     }
                 }
                 message.AddValue(PARAM_SENSOR_COUNT, sc);
