@@ -31,7 +31,7 @@ namespace Chetch.Arduino
 
             }
 
-            const int TTL = 5 * 1000; //how long in millis a Tag can last for 
+            public const int DEFAULT_TTL = 5 * 1000; //how long in millis a Tag can last for 
             private Dictionary<byte, MessageTag> _usedTags = new Dictionary<byte, MessageTag>();
             private Dictionary<byte, List<byte>> _tagSets = new Dictionary<byte, List<byte>>();
 
@@ -61,7 +61,7 @@ namespace Chetch.Arduino
                 return tag;
             }
 
-            public byte CreateTag(int ttl = TTL)
+            public byte CreateTag(int ttl = DEFAULT_TTL)
             {
                 //start from 1 as we reserve 0 to mean a non-assigned tag
                 for (byte i = 1; i <= 255; i++)
@@ -79,8 +79,7 @@ namespace Chetch.Arduino
             {
                 byte tag = CreateTag(ttl);
                 _tagSets[tag] = new List<byte>();
-                _tagSets[tag].Add(tag);
-
+                
                 return tag;
             }
 
