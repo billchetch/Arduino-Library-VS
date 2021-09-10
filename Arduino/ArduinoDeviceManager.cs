@@ -835,7 +835,7 @@ namespace Chetch.Arduino
                 }
                 else if (arg.GetType().IsValueType)
                 {
-                    b = Chetch.Utilities.Convert.ToBytes((ValueType)arg, LittleEndian);
+                    b = Chetch.Utilities.Convert.ToBytes((ValueType)arg, LittleEndian, -1);
                 }
                 else
                 {
