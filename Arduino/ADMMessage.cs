@@ -212,6 +212,11 @@ namespace Chetch.Arduino
             AddArgument(new byte[] { b });
         }
 
+        public void AddArgument(bool b)
+        {
+            AddArgument(b ? (byte)1 : (byte)0);
+        }
+
         public void AddArgument(String s)
         {
             AddArgument(Chetch.Utilities.Convert.ToBytes(s));

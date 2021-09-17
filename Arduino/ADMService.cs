@@ -349,7 +349,7 @@ namespace Chetch.Arduino
             return req2return;
         }
         
-        virtual protected bool HandleADMDeviceCommand(ArduinoDeviceManager adm, String deviceID, String command, List<Object> args, Message response)
+        virtual protected bool HandleADMDeviceCommand(ArduinoDeviceManager adm, String deviceID, String command, List<ValueType> args, Message response)
         {
             if (adm == null) throw new Exception("No ADM provided");
             
@@ -426,7 +426,7 @@ namespace Chetch.Arduino
             AddCommandHelp("adm/<board>:<device>:list-commands", "List device commands");
         }
 
-        override public bool HandleCommand(Connection cnn, Message message, String cmd, List<Object> args, Message response)
+        override public bool HandleCommand(Connection cnn, Message message, String cmd, List<ValueType> args, Message response)
         {
             bool respond = true;
             MessageSchema schema = new ADMService.MessageSchema(response);
